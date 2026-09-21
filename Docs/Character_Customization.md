@@ -1,6 +1,8 @@
 # Character Customization
 
 How fighters in Open Stance are customized, and the rules every tool, material and menu must follow.
+The Game Design Document (`Docs/GDD_Open_Stance.docx`, sections 5.4 and 10) is the source of truth;
+this page adds the implementation detail.
 
 ## Structure
 
@@ -100,14 +102,30 @@ picker); adjust the table if a preset renders lighter or darker than its name.
 
 ### Belt and collar
 
-- Belt (mask channel G): rank colours. The rank list is still to be defined.
+- Belt (mask channel G): rank colours from GDD 5.3: white, yellow, green, blue and red for the gup
+  ranks, black for dan ranks, and red-black for poom. The belt colour order for release is still
+  open (GDD 18.1).
 - Collar (mask channel B): dobok collar colour (black dan collar, red-black poom collar, or white).
 
 ## Body types
 
-Body shape comes from MetaHuman body types. The dobok and gear are refit to each body so they
-follow the body instead of using separate morph targets. The `BodyHeavy` / `BodyMuscular` /
-`BodySlim` shape keys on the original fighter model are only for that model's previews.
+Body shape comes from five MetaHuman body types (GDD 5.4.2), each with a set height and weight:
+
+| Body type | Height, weight |
+| --- | --- |
+| Compact | 165 cm, 60 kg |
+| Medium (the base fighter) | 175 cm, 68 kg |
+| Stocky | 172 cm, 80 kg |
+| Lean tall | 185 cm, 72 kg |
+| Tall | 192 cm, 84 kg |
+
+Body type is the one appearance choice that affects play: height sets reach, and the body type
+shifts Career base ratings between attributes (GDD 5.4.2). Everything else on this page is
+cosmetic and never changes attributes (GDD 5.6).
+
+The dobok and gear are refit to each body so they follow the body instead of using separate
+morph targets. The `BodyHeavy` / `BodyMuscular` / `BodySlim` shape keys on the original fighter
+model are only for that model's previews.
 
 ## Where these rules are enforced
 
