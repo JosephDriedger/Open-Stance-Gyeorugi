@@ -77,3 +77,6 @@ DerivedDataCache/*
 # Blender tool logs
 Tools/Blender/logs/
 __pycache__/
+
+# Binary game assets now versioned in Perforce (see //depot/...)
+Content/
