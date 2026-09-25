@@ -1,0 +1,12 @@
+{
+  "source": "Resources/Models/Fighter_Rigged.fbx",
+  "output": "D:\\Open-Stance-Gyeorugi\\Resources\\Models\\MotionBuilder\\OpenStance_TestFighter.fbx",
+  "character": "OpenStance_TestFighter",
+  "mapped_slots": 56,
+  "characterized": true,
+  "control_rig": true,
+  "reopened_successfully": true,
+  "wrist_control_hand_movement_cm": 25.247191435459698,
+  "visual_deformation_checked": false,
+  "mocap_applied": false
+}

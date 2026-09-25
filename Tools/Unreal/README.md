@@ -21,7 +21,7 @@ Scripts that write logs put them in `Saved/Logs/<script>.txt`.
 | --- | --- |
 | `create_base_fighter.py` | Creates `/Game/Characters/Fighters/MH_FighterBase` (MetaHuman, 175 cm medium build), exports its head, body and full-body skeletal meshes, writes FBX copies to `Resources/Models/MetaHuman/` for the Blender refit, and exports MetaHuman's iris colour chart for the natural eye-colour presets. No cloud requests. |
 | `import_fighter_gear.py` | Imports the fitted parts (`Resources/Models/Fitted/MH_FighterBase_Body`) onto the MetaHuman body skeleton, builds the two-sided recolour material `M_FighterGear` + `MI_FighterGear_Chung/Hong`, and creates or updates `WI_Fighter_<Part>` wardrobe items (SkeletalMesh slot pipeline + body hidden face maps). Safe to re-run in an open editor; close MetaHuman Creator first. |
-| `gear_rom_test.py` | Deformation check: plays MetaHuman's body range-of-motion animation on the base body with all gear following (leader pose). `py ".../gear_rom_test.py"` spawns it at Z 20000; `... 18.5` jumps to 18.5 s, `... 18.5 back` views from behind. |
+| `gear_rom_test.py` | Deformation check: plays MetaHuman's body range-of-motion animation on the base body with all gear following (leader pose). `py ".../gear_rom_test.py"` spawns it at Z 20000 and frames the camera; `... 18.5` pauses at 18.5 s, `... 18.5 back` views from behind, `... play` resumes. Enable viewport Realtime (Ctrl+R) to see playback. |
 | `fix_wardrobe_pipelines.py` | One-off repair for wardrobe items created before pipelines were assigned. |
 | `create_referee.py` | Referee roster from MetaHuman presets (Kelvin, Bo, Jorge, Omari, Walter, Vivian) as `/Game/Characters/Officials/MH_Referee_<P>`; exports each body to `Resources/Models/MetaHuman/`. Matches pick one at random. |
 | `import_referee_outfit.py` | Imports each referee's uniform (shirt, tie, trousers, belt, sneakers from `Tools/Blender/build_referee_outfit.py`) onto that referee, with hidden face maps; puts it on and removes the preset's default T-shirt. |
@@ -46,6 +46,9 @@ editor UI). After changing it, close the editor and build:
    (`WardrobePaths`). Match view: all seven pieces; career menu: Jacket, Pants and Belt only.
 
 ## Animation compatibility
+
+For the Vicon Nexus lab evaluation, see `Docs/Vicon_Nexus_Test.md` for verified local
+asset assignments, remaining uncertainties, and a capture-to-character acceptance test.
 
 - Every gear piece is skinned to the MetaHuman body skeleton (`metahuman_base_skel`) and follows the
   body with Leader Pose, so any animation on a MetaHuman body drives it. Mocap (Rokoko, MetaHuman
