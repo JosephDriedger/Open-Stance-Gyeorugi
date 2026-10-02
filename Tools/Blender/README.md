@@ -73,6 +73,11 @@ Interactive helpers:
 - `run("build_environment_meshes")`: arena and dojang props (mats, truss, judge tables, chairs, seat
   rows, scoreboard, heavy bags, paddles, shields, doboks, cubbies, windows...) in an "Environment"
   scene, exported to `Resources/Environment/Meshes/` (textures: `py Tools/Environment/make_env_textures.py`).
+- `run("build_venue_meshes")`: Career venue props (GDD 6.2): stadium seat blocks and gym bleachers with
+  stand-in seated crowds, club mates on benches, warm-up groups, portable and gym scoreboards, basketball hoop,
+  high bays, ad boards, court signs, raised stage and steps, video cube, LED ribbon, hanging flags, broadcast
+  camera and jib, entrance arch, runway, moving heads, podium. Both scripts share `env_builder.py` (prop
+  conventions; large props are assembled in chunks because bmesh primitive ops slow down as a bmesh grows).
 - Stress-testing a MetaHuman fit: `run("posetest"); use_armature("root", 25, followers=["root.001"])`, then
   `pose_chamber()` / `pose_twist()`. The follower matters: the MetaHuman head mesh (neck and shoulders)
   is on its own `root.001` skeleton and would otherwise stay still and look like the collar tore.

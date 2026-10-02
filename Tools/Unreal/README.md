@@ -28,6 +28,9 @@ Scripts that write logs put them in `Saved/Logs/<script>.txt`.
 | `setup_cloth.py` | Chaos cloth on the garments that move: fighter belt tails, jacket skirt, pant hems; referee tie and trouser legs. Re-run after any re-import. Uses the C++ helper `unreal.OpenStanceClothLibrary`. |
 | `cloth_preview_test.py` | Plays the body range-of-motion animation on a referee (`Kelvin`, `Vivian`...) or `fighter` with cloth simulating in the viewport. |
 | `build_arenas.py` | Imports environment textures/props and builds the staging levels `L_CompetitionArena` and `L_TrainingDojang` (WT mat: 8 m octagon in a 12 m square). |
+| `build_venues.py` | Builds the six Career venues (GDD 6.2), one per tournament tier: `L_ClubDojang`, `L_SchoolGym`, `L_ProvincialHall`, `L_NationalArena`, `L_ContinentalArena`, `L_WorldFinalStage`. Environments only. Imports only new or writable assets, so it runs without checking out the read-only Perforce files; pass venue names (`club gym ...`) to build a subset. Needs `build_arenas.py` to have run once. |
+| `capture_levels.py` | Renders venue levels from fixed cameras to `Saved/Screenshots/Venues/` for review, with no editor window: `UnrealEditor-Cmd.exe <project> -RenderOffscreen -unattended -ExecCmds="py .../capture_levels.py [L_Name ...] quit"`. |
+| `env_common.py` | Shared helpers for the level scripts (placement, lights, material instances, asset locks). |
 
 ## C++ editor helper
 

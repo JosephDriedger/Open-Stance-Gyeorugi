@@ -14,70 +14,38 @@ Outputs
 Real dimensions: WT competition mat = 8 m octagon (flat to flat) inside a 12 m x 12 m square, 1 m tiles.
 Layout units below are metres; Unreal is centimetres (M() converts).
 """
+import importlib
 import math
 import os
+import random
 import sys
 import traceback
 
 import unreal
 
-REPO = "D:/Open-Stance-Gyeorugi"
-LOG = f"{REPO}/Saved/Logs/build_arenas.txt"
-TEX_SRC = f"{REPO}/Resources/Environment/Textures"
-MESH_SRC = f"{REPO}/Resources/Environment/Meshes"
-ENV = "/Game/Environment"
-EAL = unreal.EditorAssetLibrary
-MEL = unreal.MaterialEditingLibrary
-tools = unreal.AssetToolsHelpers.get_asset_tools()
-actors = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
-levels = unreal.get_editor_subsystem(unreal.LevelEditorSubsystem)
+sys.path.insert(0, "D:/Open-Stance-Gyeorugi/Tools/Unreal")
+import env_common
 
-_log = open(LOG, "w", encoding="utf-8")
+importlib.reload(env_common)
+from env_common import (ENV, EAL, MEL, MESH_SRC, TEX_SRC, M, Placer, actors, asset_file, crowd_overrides, expr,
+                        finish_material, grey, import_task, instance, is_locked, levels, light, new_level, new_material,
+                        post_process, set_light, srgb, vec)
 
-
-def log(*a):
-    msg = " ".join(str(x) for x in a)
-    _log.write(msg + "\n")
-    _log.flush()
-    unreal.log(f"[build_arenas] {msg}")
-
-
-def M(v):
-    return v * 100.0
-
-
-def vec(x, y, z):
-    return unreal.Vector(M(x), M(y), M(z))
-
-
-def srgb(r, g, b):
-    def lin(c):
-        c /= 255.0
-        return c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4
-    return unreal.LinearColor(lin(r), lin(g), lin(b), 1.0)
-
-
-def grey(v):
-    return unreal.LinearColor(v, v, v, 1.0)
+log = env_common.open_log("build_arenas")
 
 
 # ------------------------------------------------------------------ import
-def import_task(filename, dest, name, options=None):
-    t = unreal.AssetImportTask()
-    t.filename, t.destination_path, t.destination_name = filename, dest, name
-    t.automated, t.replace_existing, t.save = True, True, True
-    if options:
-        t.options = options
-    tools.import_asset_tasks([t])
-    return EAL.load_asset(f"{dest}/{name}")
-
-
 def import_textures():
     tex = {}
     for fn in sorted(os.listdir(TEX_SRC)):
         if not fn.endswith(".png"):
             continue
         name = fn[:-4]
+        path = f"{ENV}/Textures/{name}"
+        if is_locked(path) or (EAL.does_asset_exist(path) and
+                               os.path.getmtime(asset_file(path)) >= os.path.getmtime(f"{TEX_SRC}/{fn}")):
+            tex[name] = EAL.load_asset(path)   # read-only from Perforce, or already up to date
+            continue
         t = import_task(f"{TEX_SRC}/{fn}", f"{ENV}/Textures", name)
         if name.endswith("_N"):
             t.set_editor_property("srgb", False)
@@ -97,6 +65,11 @@ def import_meshes():
         if not fn.endswith(".fbx"):
             continue
         name = fn[:-4]
+        path = f"{ENV}/Meshes/{name}"
+        if is_locked(path) or (EAL.does_asset_exist(path) and
+                               os.path.getmtime(asset_file(path)) >= os.path.getmtime(f"{MESH_SRC}/{fn}")):
+            meshes[name] = EAL.load_asset(path)   # read-only from Perforce, or already up to date
+            continue
         ui = unreal.FbxImportUI()
         ui.import_mesh, ui.import_as_skeletal = True, False
         ui.mesh_type_to_import = unreal.FBXImportType.FBXIT_STATIC_MESH
@@ -109,28 +82,6 @@ def import_meshes():
 
 
 # ------------------------------------------------------------------ materials
-def expr(m, cls, x, y, **props):
-    e = MEL.create_material_expression(m, cls, x, y)
-    for k, v in props.items():
-        e.set_editor_property(k, v)
-    return e
-
-
-def new_material(name):
-    path = f"{ENV}/Materials/{name}"
-    if EAL.does_asset_exist(path):
-        m = EAL.load_asset(path)
-        MEL.delete_all_material_expressions(m)
-    else:
-        m = tools.create_asset(name, f"{ENV}/Materials", unreal.Material, unreal.MaterialFactoryNew())
-    return m
-
-
-def finish_material(m):
-    MEL.recompile_material(m)
-    EAL.save_asset(m.get_path_name())
-
-
 def build_surface_material(white):
     """Colour x triplanar world-aligned greyscale detail; roughness/metallic scalars."""
     m = new_material("M_Env_Surface")
@@ -248,28 +199,17 @@ def build_glass_material():
     return m
 
 
-def instance(name, parent, scalars=None, vectors=None, textures=None):
-    path = f"{ENV}/Materials/{name}"
-    mi = EAL.load_asset(path) if EAL.does_asset_exist(path) else tools.create_asset(
-        name, f"{ENV}/Materials", unreal.MaterialInstanceConstant, unreal.MaterialInstanceConstantFactoryNew())
-    MEL.set_material_instance_parent(mi, parent)
-    for k, v in (scalars or {}).items():
-        MEL.set_material_instance_scalar_parameter_value(mi, k, float(v))
-    for k, v in (vectors or {}).items():
-        MEL.set_material_instance_vector_parameter_value(mi, k, v)
-    for k, v in (textures or {}).items():
-        MEL.set_material_instance_texture_parameter_value(mi, k, v)
-    EAL.save_asset(path)
-    return mi
-
-
 def build_materials(tex):
     white = EAL.load_asset("/Engine/EngineResources/WhiteSquareTexture")
-    surf = build_surface_material(white)
-    mat = build_mat_material(tex)
-    textured = build_textured_material(white, emissive=False)
-    emissive = build_textured_material(white, emissive=True)
-    glass = build_glass_material()
+    if is_locked(f"{ENV}/Materials/M_Env_Surface"):   # parents synced read-only: reuse them as they are
+        surf, mat, textured, emissive, glass = (EAL.load_asset(f"{ENV}/Materials/{n}") for n in
+                                                ("M_Env_Surface", "M_Env_Mat", "M_Env_Textured", "M_Env_Emissive", "M_Env_Glass"))
+    else:
+        surf = build_surface_material(white)
+        mat = build_mat_material(tex)
+        textured = build_textured_material(white, emissive=False)
+        emissive = build_textured_material(white, emissive=True)
+        glass = build_glass_material()
 
     def S(name, color, rough=0.6, metal=0.0, detail=None, size=100.0, strength=0.0):
         t = {"DetailTex": tex[detail]} if detail else None
@@ -317,96 +257,21 @@ def build_materials(tex):
     mi["MI_Mirror"] = S("MI_Mirror", grey(0.95), 0.02, 1.0)
     mi["MI_CeilingWhite"] = S("MI_CeilingWhite", grey(0.7), 0.9)
     mi["MI_DuctMetal"] = S("MI_DuctMetal", grey(0.35), 0.5, 1.0)
+    for path in EAL.list_assets(f"{ENV}/Materials", recursive=False):
+        a = EAL.load_asset(path.split(".")[0])
+        if isinstance(a, unreal.MaterialInstance):
+            mi.setdefault(a.get_name(), a)
     log("materials", len(mi))
     return mi
 
 
-# ------------------------------------------------------------------ placement helpers
-class Placer:
-    def __init__(self, meshes, mi):
-        self.meshes, self.mi = meshes, mi
-        self.cube = EAL.load_asset("/Engine/BasicShapes/Cube")
-        self.cylinder = EAL.load_asset("/Engine/BasicShapes/Cylinder")
-        self.count = 0
-
-    def _finish(self, a, label, folder):
-        a.set_actor_label(label)
-        a.set_folder_path(folder)
-        self.count += 1
-        return a
-
-    def prop(self, name, x, y, z=0.0, yaw=0.0, folder="Props", overrides=None, scale=1.0, label=None, pitch=0.0, roll=0.0):
-        """Blender props face -Y in Blender, which is +Y in Unreal; yaw rotates from there."""
-        a = actors.spawn_actor_from_object(self.meshes[name], vec(x, y, z), unreal.Rotator(roll, pitch, yaw))
-        comp = a.static_mesh_component
-        for slot in comp.get_material_slot_names():
-            s = str(slot)
-            if overrides and s in overrides:
-                comp.set_material(comp.get_material_index(slot), self.mi[overrides[s]])
-            elif s in self.mi:
-                comp.set_material(comp.get_material_index(slot), self.mi[s])
-        if scale != 1.0:
-            a.set_actor_scale3d(unreal.Vector(scale, scale, scale))
-        return self._finish(a, label or name, folder)
-
-    def box(self, label, sx, sy, sz, cx, cy, cz, material, folder="Architecture", yaw=0.0):
-        """Axis-aligned box: size and centre in metres."""
-        a = actors.spawn_actor_from_object(self.cube, vec(cx, cy, cz), unreal.Rotator(0, 0, yaw))
-        a.set_actor_scale3d(unreal.Vector(sx, sy, sz))
-        a.static_mesh_component.set_material(0, self.mi[material])
-        return self._finish(a, label, folder)
-
-    def column(self, label, r, h, cx, cy, z0, material, folder="Architecture", axis_rot=None):
-        a = actors.spawn_actor_from_object(self.cylinder, vec(cx, cy, z0 + h / 2), axis_rot or unreal.Rotator(0, 0, 0))
-        a.set_actor_scale3d(unreal.Vector(r * 2, r * 2, h))
-        a.static_mesh_component.set_material(0, self.mi[material])
-        return self._finish(a, label, folder)
-
-
-def light(cls, label, x, y, z, pitch=0.0, yaw=0.0, folder="Lighting"):
-    a = actors.spawn_actor_from_class(cls, vec(x, y, z), unreal.Rotator(0, pitch, yaw))
-    a.set_actor_label(label)
-    a.set_folder_path(folder)
-    return a
-
-
-def set_light(comp, intensity, color=(1.0, 0.96, 0.9), radius=None, cast_shadows=True, units=None, **props):
-    """Properties are set directly: the Set* functions are ignored on stationary lights."""
-    comp.set_editor_property("mobility", unreal.ComponentMobility.MOVABLE)
-    if units is not None:
-        comp.set_editor_property("intensity_units", units)
-    comp.set_editor_property("intensity", intensity)
-    comp.set_editor_property("light_color", unreal.Color(r=int(color[0] * 255), g=int(color[1] * 255), b=int(color[2] * 255), a=255))
-    if radius is not None:
-        comp.set_editor_property("attenuation_radius", M(radius))
-    comp.set_editor_property("cast_shadows", cast_shadows)
-    for k, v in props.items():
-        comp.set_editor_property(k, v)
-
-
-def post_process(label, bias, min_b=2.0, max_b=12.0, bloom=0.4, vignette=0.3):
-    """min_b/max_b are EV100 (the project extends the default luminance range)."""
-    a = actors.spawn_actor_from_class(unreal.PostProcessVolume, vec(0, 0, 2), unreal.Rotator(0, 0, 0))
-    a.set_actor_label(label)
-    a.set_folder_path("Lighting")
-    a.set_editor_property("unbound", True)
-    s = a.get_editor_property("settings")
-    for k, v in (("auto_exposure_bias", bias), ("auto_exposure_min_brightness", min_b),
-                 ("auto_exposure_max_brightness", max_b), ("bloom_intensity", bloom), ("vignette_intensity", vignette)):
-        s.set_editor_property(f"override_{k}", True)
-        s.set_editor_property(k, v)
-    a.set_editor_property("settings", s)
-    return a
-
-
-def new_level(path):
-    if EAL.does_asset_exist(path):
-        EAL.delete_asset(path)
-    levels.new_level(path)
-    log("new level", path)
-
-
 # ------------------------------------------------------------------ competition arena
+# occupancy per 6-row band, cycled along each side: a small crowd for Sparring and local Tournament matches
+SMALL_CROWD = (("Sparse", "Half", "Sparse", "Sparse", "Half", "Sparse", "Empty"),
+               ("Empty", "Sparse", "Empty", "Empty", "Sparse", "Empty", "Empty"),
+               ("Empty",))
+
+
 def build_arena(p):
     new_level("/Game/Maps/L_CompetitionArena")
     HX, HY, HZ = 34.0, 30.0, 24.0     # hall half-extents / ceiling height (m)
@@ -416,8 +281,9 @@ def build_arena(p):
     p.prop("SM_MatOctagon", 0, 0, 0, folder="Mat")
     p.prop("SM_MatSquareBorder", 0, 0, 0, folder="Mat")
 
-    # stands on all four sides: stepped risers with seat rows, black barrier wall in front
+    # stands on all four sides: stepped risers with seat blocks, black barrier wall in front
     rows, step_d, step_h = 18, 0.85, 0.42
+    crowd_rng = random.Random(7)
     for side, (dirx, diry) in enumerate(((0, 1), (0, -1), (1, 0), (-1, 0))):
         along = 2 * FLOOR if diry else 2 * FLOOR
         yaw = {(0, 1): 0, (0, -1): 180, (1, 0): -90, (-1, 0): 90}[(dirx, diry)]
@@ -436,14 +302,21 @@ def build_arena(p):
                 p.box(f"Riser_{side}_{r}", along + 2 * d, step_d, z, 0, cy, z / 2, "MI_ArenaRiser", "Stands")
             else:
                 p.box(f"Riser_{side}_{r}", step_d, along + 2 * d, z, cx, 0, z / 2, "MI_ArenaRiser", "Stands")
-            if r % 2 == 1 and r > 12:
-                continue   # a couple of aisle-free upper rows keep the actor count down
-            n_sections = int((along + 2 * d - 4) // 5.5)
-            for s_i in range(n_sections):
-                off = -((n_sections - 1) * 5.5) / 2 + s_i * 5.5
-                sx = off if diry else cx + dirx * 0.1
-                sy = cy + diry * 0.1 if diry else off
-                p.prop("SM_SeatRow10", sx, sy, z, yaw=yaw + 180, folder="Stands", label=f"Seats_{side}_{r}_{s_i}")
+        # seats in 6-row blocks (Tools/Blender/build_venue_meshes.py) with a small crowd (GDD 6.2): scattered
+        # down the front, a few further up, the top band empty; corners stay clear as aisles
+        n = int(2 * FLOOR // 5.0)
+        for band in range(rows // 6):
+            c = FLOOR + 1.0 + 6 * band * step_d + step_d / 2 + 0.1
+            z0 = 1.2 + 6 * band * step_h
+            for i in range(n):
+                kind = SMALL_CROWD[band][(i + side) % len(SMALL_CROWD[band])]
+                name = "SM_SeatBlock_Empty" if kind == "Empty" else f"SM_SeatBlock_{kind}{crowd_rng.choice('AB')}"
+                off = (i - (n - 1) / 2) * 5.0
+                sx, sy = (off, diry * c) if diry else (dirx * c, off)
+                a = p.prop(name, sx, sy, z0, yaw=yaw + 180, folder="Stands", label=f"Seats_{side}_{band}_{i}",
+                           overrides=crowd_overrides(crowd_rng, "MI_SeatDark"))
+                if kind != "Empty" and crowd_rng.random() < 0.5:
+                    a.set_actor_scale3d(unreal.Vector(-1, 1, 1))   # mirrored copy for variety
     top = 1.2 + rows * step_h
     # outer walls and ceiling
     p.box("Wall_N", 2 * HX + 20, 0.5, HZ, 0, FLOOR + 1 + rows * step_d + 0.25, HZ / 2, "MI_ArenaWall")
@@ -468,14 +341,14 @@ def build_arena(p):
             p.prop("SM_SpotFixture", x, y, TZ - 0.15, folder="Truss", label=f"Spot_{x}_{y}")
             sp = light(unreal.SpotLight, f"SpotLight_{x}_{y}", x, y, TZ - 0.7, pitch=-90)
             centre = abs(x) < 4 and abs(y) < 4
-            set_light(sp.spot_light_component, 60000.0 if centre else 40000.0, radius=40.0, cast_shadows=centre,
+            set_light(sp.spot_light_component, 350000.0 if centre else 300000.0, radius=40.0, cast_shadows=centre,
                       units=unreal.LightUnits.LUMENS, inner_cone_angle=16.0, outer_cone_angle=32.0,
                       volumetric_scattering_intensity=0.6)
-    # dim fill over the stands
-    for (x, y, yaw) in ((0, 26, 0), (0, -26, 0), (26, 0, 90), (-26, 0, 90)):
+    # fill over the stands (~1/3 of the mat, as broadcast lighting); a rect light's width runs along its local Y
+    for (x, y, yaw) in ((0, 26, 90), (0, -26, 90), (26, 0, 0), (-26, 0, 0)):
         rl = light(unreal.RectLight, f"StandFill_{x}_{y}", x, y, HZ - 2, pitch=-90, yaw=yaw)
-        set_light(rl.rect_light_component, 30000.0, (0.9, 0.93, 1.0), radius=35.0, cast_shadows=False,
-                  units=unreal.LightUnits.LUMENS, source_width=M(30), source_height=M(8))
+        set_light(rl.rect_light_component, 4000000.0, (0.9, 0.93, 1.0), radius=60.0, cast_shadows=False,
+                  units=unreal.LightUnits.LUMENS, source_width=M(36), source_height=M(14))
     # small ceiling downlights (visual only)
     for x in range(-24, 25, 8):
         for y in range(-22, 23, 8):
@@ -538,7 +411,7 @@ def build_arena(p):
     sky = light(unreal.SkyLight, "SkyLight", 0, 0, 5)
     sky.light_component.set_editor_property("mobility", unreal.ComponentMobility.MOVABLE)
     sky.light_component.set_editor_property("intensity", 0.15)
-    post_process("PostProcess", bias=0.0, min_b=4.0, max_b=9.0, bloom=0.5, vignette=0.35)
+    post_process("PostProcess", bias=0.0, min_b=10.8, max_b=10.8, bloom=0.5, vignette=0.35)   # fixed broadcast exposure
     ps = actors.spawn_actor_from_class(unreal.PlayerStart, vec(0, -3.0, 0.1), unreal.Rotator(0, 0, 90))
     ps.set_folder_path("Gameplay")
     unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem).set_level_viewport_camera_info(
@@ -656,7 +529,7 @@ def build_dojang(p):
     for x in (-6, 0, 6):
         for y in (-3.6, 0, 3.6):
             rl = light(unreal.RectLight, f"CeilingLight_{x}_{y}", x, y, RZ - 0.1, pitch=-90)
-            set_light(rl.rect_light_component, 6000.0, (1.0, 0.95, 0.88), radius=12.0, cast_shadows=x == 0 and y == 0,
+            set_light(rl.rect_light_component, 20000.0, (1.0, 0.95, 0.88), radius=12.0, cast_shadows=x == 0 and y == 0,
                       units=unreal.LightUnits.LUMENS, source_width=M(4), source_height=M(2))
 
     # late-afternoon sun through the windows, sky for the window light
@@ -690,4 +563,4 @@ try:
 except Exception:
     log("ERROR\n" + traceback.format_exc())
 finally:
-    _log.close()
+    env_common.close_log()
