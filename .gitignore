@@ -80,3 +80,22 @@ __pycache__/
 
 # Binary game assets now versioned in Perforce (see //depot/...)
 Content/
+
+# Large Blender working files and generated study/archive folders: too big for git
+# (GitHub rejects files over 100 MB). Keep them locally or back them up elsewhere.
+*.blend
+*.blend1
+*.blend@
+Resources/Models/Archive/
+Resources/Models/Animation/
+Resources/Models/CharacterSuite/
+Resources/Models/CharacterVariations/
+Resources/Models/CreatorFighters/
+Resources/Models/GearUpgrade/
+Resources/Models/HelmetStudy/
+Resources/Models/HelmetVariants/
+Resources/Models/ProtectorReferenceV2/
+Resources/Models/ProtectorStudy/
+Resources/Models/TestFighter/
+Resources/Models/MotionBuilder/*.bck/
+Resources/Models/MotionBuilder/*.fbm/
