@@ -81,6 +81,34 @@ Interactive helpers:
 - Stress-testing a MetaHuman fit: `run("posetest"); use_armature("root", 25, followers=["root.001"])`, then
   `pose_chamber()` / `pose_twist()`. The follower matters: the MetaHuman head mesh (neck and shoulders)
   is on its own `root.001` skeleton and would otherwise stay still and look like the collar tore.
+- **Clean gear (current):** `blender --background --factory-startup --python Tools/Blender/build_clean_gear.py [-- Base Compact Stocky LeanTall Tall]`
+  carves the jacket, pants, belt, protector, helmet, gloves and foot guards from each MetaHuman body's own
+  surface (tailored ease, V-neck collar, knot and tails), with the body's skin weights, so it deforms exactly like
+  the body. The sparring gear follows World Taekwondo competition kit (Daedo / KP&P style): a 1.6 cm moulded trunk
+  protector over the front and sides with white binding, V neck, white shoulder straps and a back tie (the plate is
+  a blurred envelope of the jacket, so it shows no pecs or abs); a smooth superellipsoid foam head gear with ear
+  holes, cheek pieces and chin strap; white fingerless gloves padded over the knuckles; thin white electronic sensor
+  socks with the toes out, grey instep pad and grey sole. Textures from `py Tools/Blender/make_gear_textures.py`.
+  Replaces the Meshy-based `fit_to_body` gear for MetaHuman bodies. Checks: `Tools/Validation/check_gear_poses.py`
+  (pose stretch), `Tools/Validation/preview_gear.py` (quick shaded views) and `Tools/Unreal/animation_test.py`.
+  Hidden face maps only cover skin on the bones a garment can reach (`allow` in `hidden_face_maps.py`), so long
+  rays from fingers or toes can't hit a sleeve or hem and hide them.
+- **Mocap test model:** `blender --background --factory-startup --python Tools/Blender/build_test_model.py -- Medium`
+  assembles the fighter (body, head with eyes, teeth and lashes, clean gear) on the one MetaHuman body skeleton,
+  textured (MetaHuman stock skin maps from `Tools/Unreal/export_stock_skin_textures.py`, tinted to one skin tone;
+  gear atlas), with body skin under the gear removed, studio lights, a mat and a camera, and the range-of-motion
+  take retargeted on. Writes `Resources/Models/TestFighter/OpenStance_TestFighter_MH.blend` and `.fbx` (rest pose,
+  textures embedded) and `Resources/Previews/OpenStance_Medium_Gear_ROM.fbx`. Then
+  `mobupy.exe Tools/MotionBuilder/prepare_test_character.py --metahuman` characterizes it for MotionBuilder.
+- Other body types: `blender --background --factory-startup --python Tools/Blender/fit_all_body_types.py -- Compact Stocky LeanTall Tall`
+  (headless, no window) runs `fit_to_body` and `hidden_face_maps` for each `MH_Fighter<Type>` exported by
+  `Tools/Unreal/create_body_types.py`, writing `Resources/Models/Fitted/MH_Fighter<Type>_Body/`.
+- Mocap shot-list check (no Blender needed): `py Tools/Validation/check_gear_poses.py` skins the exported
+  `Fitted/<Body>/SK_Fighter_*.fbx` onto the body in 14 poses taken from
+  `Docs/Open_Stance_Mocap_Shot_List.docx` (chamber, head-height kicks, splits, squat, kneel, seated,
+  get-up, arms overhead...) and reports torn edges per garment, with the bare body as a control.
+  Run it after every `fit_to_body`; the crotch, thigh-fade and armpit weight rules in `fit_to_body.py`
+  came from it. `--render DIR` writes a quick image per pose.
 - `run("transfer_weights", TRANSFER_TARGETS=["MyNewHelmet"])`: skins a new mesh placed on
   the T-posed fighter (new helmet, protector, face...) by copying weights and body-type
   shape keys from the base body, then parents it to the armature.
@@ -96,7 +124,7 @@ Interactive helpers:
 | `Jacket` | Dobok top, sleeves, skirt, collar | |
 | `Pants` | Dobok pants | |
 | `Belt` | Band, knot, tails | |
-| `Gloves` | Fingerless gloves, wrist wraps | The glove is effectively the hand; swap, don't remove |
+| `Gloves` | Fingerless gloves, wrist wraps | The glove is effectively the hand; swap, don't remove. On MetaHuman bodies `fit_to_body` replaces the Meshy shell with one carved from the body's hand (`build_gloves.py`: white hand, black cuff, body skin weights) |
 | `FootGuards` | Foot protectors | |
 
 ## Masks (`T_Fighter_Masks.png`, linear / sRGB off)
@@ -136,3 +164,11 @@ See `Docs/Character_Customization.md` for the colour rules.
 - The UV layout is Meshy's auto-atlas (thousands of tiny charts). Masks are generated
   procedurally; hand-painting new designs needs clean per-part UVs.
 - Twist bones only move in Unreal if the animation source drives them or the AnimBP does.
+
+## Creator fighter source library
+
+`build_creator_fighters.py` builds the five fitted bodies with reversible garment coverage, a rebuilt dobok torso and collar, smoother chest pad, short hair and refined Blender skin shading. Run with `-- Medium` for one preset or omit body names for all five. Outputs, actual renders and integration limits are documented in `Resources/Models/CreatorFighters/README.md`; the existing production assets remain separate. Validate saved switches, bindings and both FBX exports with `Tools/Validation/check_creator_fighters.py` in background Blender.
+
+## Native animation workspace
+
+`build_animation_workspace.py` creates per-body animation scenes from the approved creator .blend files: organized modular parts, original body skeleton, restored original facial rig, keyable FK bone collections, 41 marker reference guides and separate animation tracks. `assemble_character_workspace.py` packages the five scenes into `Resources/Models/OpenStance_Characters_Workspace.blend`, archiving the previous workspace first. Both run headlessly and never alter an interactive Blender session. See `Resources/Models/Animation/README.md` for animation and capture workflow.

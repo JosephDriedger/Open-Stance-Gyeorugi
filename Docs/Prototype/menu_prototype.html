@@ -1,0 +1,653 @@
+<title>Open Stance Menu Prototype</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,500;0,600;0,700;0,800;1,500;1,600;1,700;1,800&family=Barlow:wght@400;500;600&display=swap">
+<style>
+/* Layout: a 16:9 console screen in the centre; a jump bar above it lists every screen in GDD 7.5.
+   Single dark look by choice: it is a game screen, not a document. */
+:root{
+  --ink:#050912; --panel:#0f192c; --panel2:#17243d; --line:#243453; --ice:#53c7ff;
+  --bone:#eceae3; --mute:#8c95a6;
+  --chung:#2f6fe4; --chung-d:#1b3f8a; --hong:#e03a40; --hong-d:#8c1f25;
+  --ok:#47c27a; --warn:#e8a93a;
+  --display:"Barlow Condensed","Arial Narrow",Impact,sans-serif;
+  --body:"Barlow","Segoe UI",system-ui,sans-serif;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--ink);color:var(--bone);font-family:var(--body)}
+body{padding-inline:16px;padding-block:16px 32px}
+.wrap{max-width:1280px;margin:0 auto;display:flex;flex-direction:column;gap:12px}
+.top{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:baseline;justify-content:space-between}
+.top h1{font:700 22px/1 var(--display);letter-spacing:.08em;text-transform:uppercase;margin:0}
+.top p{margin:0;color:var(--mute);font-size:13px}
+.jump{display:flex;flex-wrap:wrap;gap:6px}
+.jump button{font:600 12px var(--body);letter-spacing:.04em;text-transform:uppercase;background:var(--panel);color:var(--mute);border:1px solid var(--line);padding:6px 10px;cursor:pointer}
+.jump button:hover{color:var(--bone)}
+.jump button[aria-current=true]{background:var(--bone);color:var(--ink);border-color:var(--bone)}
+.scroll{overflow-x:auto;border:1px solid var(--line)}
+.stage{position:relative;width:100%;min-width:760px;aspect-ratio:16/9;container-type:size;overflow:hidden;background:var(--ink);--u:1cqw}
+.screen{position:absolute;inset:0;padding:calc(var(--u)*3.2) calc(var(--u)*4) calc(var(--u)*6.5);display:flex;flex-direction:column;gap:calc(var(--u)*1.6);animation:in .22s ease-out}
+@keyframes in{from{opacity:0;transform:translateX(calc(var(--u)*-1))}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.screen{animation:none}}
+/* backdrop: mat tiles */
+.bg{position:absolute;inset:0;pointer-events:none;background:
+  radial-gradient(ellipse 70% 60% at 78% 0%,rgba(83,199,255,.28),transparent 70%),
+  radial-gradient(ellipse 60% 50% at 0% 100%,rgba(47,111,228,.22),transparent 70%),
+  linear-gradient(160deg,#0a1530 0,#050912 55%,#0b0710 100%)}
+.bg::after{content:"";position:absolute;inset:0;background:linear-gradient(112deg,transparent 0 55%,rgba(255,255,255,.05) 55% 56.2%,transparent 56.2% 60%,rgba(255,255,255,.03) 60% 63%,transparent 63%)}
+.screen>*{position:relative}
+h2.t{font:italic 800 calc(var(--u)*4.2)/1 var(--display);letter-spacing:.05em;text-transform:uppercase;margin:0}
+.kick{font:600 calc(var(--u)*1.05)/1 var(--body);letter-spacing:.2em;text-transform:uppercase;color:var(--mute)}
+.head{display:flex;flex-direction:column;gap:calc(var(--u)*.7)}
+.body{flex:1;min-height:0;display:flex;gap:calc(var(--u)*2.4)}
+.col{display:flex;flex-direction:column;gap:calc(var(--u)*.8);min-width:0}
+.grow{flex:1}
+/* focusable items */
+.opt{all:unset;clip-path:polygon(0 0,100% 0,100% calc(100% - var(--u)*.9),calc(100% - var(--u)*.9) 100%,0 100%);box-sizing:border-box;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:calc(var(--u)*1.2);
+  font:italic 700 calc(var(--u)*1.9)/1 var(--display);letter-spacing:.07em;text-transform:uppercase;padding:calc(var(--u)*1.05) calc(var(--u)*1.6);
+  background:var(--panel);border-left:calc(var(--u)*.4) solid transparent;color:var(--bone)}
+.opt small{font:500 calc(var(--u)*1.05)/1.2 var(--body);letter-spacing:.02em;text-transform:none;color:var(--mute)}
+.opt:hover,.opt:focus-visible,.opt.on{background:linear-gradient(90deg,#fff,#cfe6ff);color:var(--ink);border-left-color:var(--chung)}
+.opt:hover small,.opt:focus-visible small,.opt.on small{color:#4a5365}
+.opt .v{color:var(--chung);font-weight:700}
+.opt:hover .v,.opt:focus-visible .v,.opt.on .v{color:var(--chung-d)}
+.opt.future{opacity:.38;cursor:not-allowed}
+.opt.danger:hover,.opt.danger:focus-visible{border-left-color:var(--hong)}
+.tag{font:600 calc(var(--u)*.85)/1 var(--body);letter-spacing:.14em;text-transform:uppercase;padding:calc(var(--u)*.35) calc(var(--u)*.6);border:1px solid var(--mute);color:var(--mute)}
+.card{background:var(--panel);padding:calc(var(--u)*1.4);display:flex;flex-direction:column;gap:calc(var(--u)*.7);min-width:0}
+.card h3{font:700 calc(var(--u)*1.6)/1 var(--display);letter-spacing:.08em;text-transform:uppercase;margin:0;color:var(--mute)}
+.card p,.card li{font-size:calc(var(--u)*1.2);line-height:1.45;margin:0;color:var(--bone)}
+.card ul{margin:0;padding-left:calc(var(--u)*1.6)}
+.big{font:800 calc(var(--u)*3)/1 var(--display);letter-spacing:.03em}
+.blue{color:var(--chung)} .red{color:var(--hong)}
+.row{display:flex;gap:calc(var(--u)*.8);align-items:center}
+/* hint bar */
+.hints{position:absolute;left:0;right:0;bottom:0;height:calc(var(--u)*4.4);display:flex;align-items:center;gap:calc(var(--u)*2.4);padding:0 calc(var(--u)*4);background:linear-gradient(0deg,#05070b,transparent);font:500 calc(var(--u)*1.15) var(--body);color:var(--mute);z-index:5}
+.hints span{display:flex;align-items:center;gap:calc(var(--u)*.6)}
+.btn{display:inline-grid;place-items:center;width:calc(var(--u)*2.1);height:calc(var(--u)*2.1);border-radius:50%;font:700 calc(var(--u)*1.2)/1 var(--display);color:var(--ink);background:var(--bone)}
+.btn.b{background:var(--hong);color:#fff}.btn.a{background:var(--ok)}.btn.x{background:var(--chung);color:#fff}.btn.y{background:var(--warn)}
+/* title */
+.title{align-items:center;justify-content:center;text-align:center;gap:calc(var(--u)*1)}
+.logo{font:italic 800 calc(var(--u)*12)/.9 var(--display);letter-spacing:.06em;text-transform:uppercase}
+.logo2{font:italic 800 calc(var(--u)*6.2)/1 var(--display);letter-spacing:.32em;text-transform:uppercase;padding-left:.32em}
+.logo i{font-style:normal;color:var(--chung)} .logo b{color:var(--hong);font-weight:800}
+.pr{font:600 calc(var(--u)*1.7) var(--display);letter-spacing:.4em;text-transform:uppercase;animation:blink 1.6s steps(2,jump-none) infinite}
+@keyframes blink{50%{opacity:.25}}
+@media (prefers-reduced-motion:reduce){.pr{animation:none}}
+.vs{display:flex;align-items:center;gap:calc(var(--u)*1.6)}
+.vs span{font:800 calc(var(--u)*2.4) var(--display);color:var(--mute)}
+/* fighters */
+.fig{width:100%;height:100%}
+.tile{display:flex;flex-direction:column;gap:calc(var(--u)*.3);padding:calc(var(--u)*1) calc(var(--u)*1.2);background:var(--panel);border:0;border-bottom:calc(var(--u)*.3) solid transparent;cursor:pointer;color:var(--bone);text-align:left;font-family:var(--body)}
+.tile b{font:700 calc(var(--u)*1.7)/1 var(--display);letter-spacing:.06em;text-transform:uppercase}
+.tile small{font-size:calc(var(--u)*1);color:var(--mute)}
+.tile:hover,.tile:focus-visible,.tile.on{background:var(--panel2);border-bottom-color:var(--chung);outline:none}
+.tile.h:hover,.tile.h.on,.tile.h:focus-visible{border-bottom-color:var(--hong)}
+.bar{height:calc(var(--u)*.6);background:var(--line);position:relative}
+.bar i{position:absolute;inset:0 auto 0 0;background:var(--ok)}
+.bar.amber i{background:var(--warn)}
+.stat{display:grid;grid-template-columns:calc(var(--u)*9) 1fr calc(var(--u)*2.4);gap:calc(var(--u)*.8);align-items:center;font-size:calc(var(--u)*1.05);color:var(--mute)}
+.stat em{font-style:normal;color:var(--bone);text-align:right;font-variant-numeric:tabular-nums}
+/* hud */
+.hud{padding:0}
+.arena{position:absolute;inset:0;background:radial-gradient(ellipse at 50% 85%,#2b3547 0,#10141d 60%),var(--ink)}
+.mat{position:absolute;left:12%;right:12%;bottom:8%;height:34%;background:repeating-linear-gradient(90deg,#1b2433 0 calc(var(--u)*6),#18202d calc(var(--u)*6) calc(var(--u)*12));transform:perspective(calc(var(--u)*50)) rotateX(52deg);transform-origin:50% 100%;border:calc(var(--u)*.3) solid #2c3850}
+.score{position:absolute;top:calc(var(--u)*2);left:50%;transform:translateX(-50%);display:grid;grid-template-columns:1fr auto 1fr;width:calc(var(--u)*54);background:#05070b;border:1px solid var(--line)}
+.score .s{font:800 calc(var(--u)*5.4)/1 var(--display);padding:calc(var(--u)*.6) calc(var(--u)*2);text-align:center;font-variant-numeric:tabular-nums}
+.score .c{background:var(--chung)} .score .h{background:var(--hong)}
+.score .mid{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 calc(var(--u)*2.4);min-width:calc(var(--u)*12)}
+.score .mid b{font:700 calc(var(--u)*1.1) var(--body);letter-spacing:.2em;color:var(--mute)}
+.score .mid span{font:700 calc(var(--u)*3.4)/1 var(--display);font-variant-numeric:tabular-nums}
+.pen{position:absolute;top:calc(var(--u)*11.6);font:600 calc(var(--u)*1.05) var(--body);letter-spacing:.1em;color:var(--mute);text-transform:uppercase}
+.nm{position:absolute;top:calc(var(--u)*14);width:calc(var(--u)*24);display:flex;flex-direction:column;gap:calc(var(--u)*.5)}
+.nm b{font:700 calc(var(--u)*1.7) var(--display);letter-spacing:.08em;text-transform:uppercase}
+.fighter{position:absolute;bottom:calc(var(--u)*4.5);width:calc(var(--u)*20);height:calc(var(--u)*34)}
+.pop{position:absolute;font:800 calc(var(--u)*5) var(--display);opacity:0;pointer-events:none}
+.pop.go{animation:pop 1s ease-out}
+@keyframes pop{0%{opacity:0;transform:translateY(calc(var(--u)*2))}15%{opacity:1}100%{opacity:0;transform:translateY(calc(var(--u)*-4))}}
+.sub{position:absolute;bottom:calc(var(--u)*7.5);left:50%;transform:translateX(-50%);background:rgba(5,7,11,.85);padding:calc(var(--u)*.7) calc(var(--u)*2);font:600 calc(var(--u)*1.6) var(--display);letter-spacing:.1em;text-transform:uppercase;white-space:nowrap}
+.sub b{color:var(--warn)}
+/* overlays */
+.veil{position:absolute;inset:0;background:rgba(5,7,11,.78);display:grid;place-items:center;z-index:8}
+.dlg{width:calc(var(--u)*34);background:var(--panel);border-top:calc(var(--u)*.4) solid var(--chung);padding:calc(var(--u)*2.2);display:flex;flex-direction:column;gap:calc(var(--u)*.8)}
+.dlg h2{margin:0 0 calc(var(--u)*.6);font:800 calc(var(--u)*3) var(--display);letter-spacing:.06em;text-transform:uppercase}
+.dlg p{margin:0 0 calc(var(--u)*.8);font-size:calc(var(--u)*1.25);color:var(--mute);line-height:1.4}
+/* bracket */
+.br{display:grid;grid-template-columns:repeat(3,1fr);gap:calc(var(--u)*2);align-items:center;flex:1}
+.rd{display:flex;flex-direction:column;justify-content:space-around;gap:calc(var(--u)*1);height:100%}
+.m{background:var(--panel);font:600 calc(var(--u)*1.15) var(--body);display:grid}
+.m div{display:flex;justify-content:space-between;padding:calc(var(--u)*.5) calc(var(--u)*.9);gap:calc(var(--u)*1)}
+.m div+div{border-top:1px solid var(--line)}
+.m .w{background:var(--panel2);font-weight:600}.m .l{color:var(--mute)}
+.m.next{outline:calc(var(--u)*.25) solid var(--warn)}
+/* calendar */
+.cal{display:grid;grid-template-columns:repeat(4,1fr);gap:calc(var(--u)*.6);flex:1}
+.wk{background:var(--panel);padding:calc(var(--u)*.8);font-size:calc(var(--u)*1);color:var(--mute);display:flex;flex-direction:column;gap:calc(var(--u)*.4)}
+.wk b{font:700 calc(var(--u)*1.2) var(--display);letter-spacing:.1em;color:var(--bone)}
+.wk .e{background:var(--hong-d);color:#fff;padding:calc(var(--u)*.3) calc(var(--u)*.5)}
+.wk .g{background:var(--chung-d);color:#fff;padding:calc(var(--u)*.3) calc(var(--u)*.5)}
+.wk .t{background:var(--panel2);color:var(--bone);padding:calc(var(--u)*.3) calc(var(--u)*.5)}
+.wk.now{outline:calc(var(--u)*.25) solid var(--warn)}
+/* sliders */
+.sl{display:grid;grid-template-columns:calc(var(--u)*14) 1fr calc(var(--u)*5);align-items:center;gap:calc(var(--u)*1.2);background:var(--panel);padding:calc(var(--u)*.9) calc(var(--u)*1.6);font:600 calc(var(--u)*1.5) var(--display);letter-spacing:.07em;text-transform:uppercase}
+.sl output{text-align:right;color:var(--chung);font-variant-numeric:tabular-nums}
+.sl input{width:100%;accent-color:var(--chung);min-width:0}
+.sw{display:flex;gap:calc(var(--u)*.6);flex-wrap:wrap}
+.sw button{width:calc(var(--u)*2.6);height:calc(var(--u)*2.6);border:calc(var(--u)*.2) solid transparent;cursor:pointer;padding:0}
+.sw button.on{border-color:var(--bone);outline:calc(var(--u)*.15) solid var(--ink);outline-offset:calc(var(--u)*-.35)}
+.tabs{display:flex;gap:calc(var(--u)*.4)}
+.tabs .opt{padding:calc(var(--u)*.8) calc(var(--u)*2)}
+.opt.cur{border-left-color:var(--chung);background:var(--panel2)}
+.opt.cur:hover,.opt.cur:focus-visible{background:var(--bone)}
+.note{max-width:1280px;color:var(--mute);font-size:13px;line-height:1.5;margin:0}
+.note b{color:var(--bone);font-weight:600}
+
+/* NHL-style hub */
+.pbar{position:absolute;top:calc(var(--u)*2.4);right:calc(var(--u)*4);display:flex;align-items:center;gap:calc(var(--u)*1);z-index:4}
+.pbar .av{width:calc(var(--u)*3.4);height:calc(var(--u)*3.4);border-radius:50%;background:linear-gradient(135deg,var(--chung),var(--ice));display:grid;place-items:center;font:italic 800 calc(var(--u)*1.5) var(--display)}
+.pbar b{display:block;font:italic 700 calc(var(--u)*1.5)/1 var(--display);letter-spacing:.06em;text-transform:uppercase}
+.pbar small{font-size:calc(var(--u)*.95);color:var(--mute)}
+.hubtabs{display:flex;align-items:center;gap:calc(var(--u)*.6);margin-top:calc(var(--u)*.4)}
+.hubtabs .btn{width:calc(var(--u)*2.6);border-radius:calc(var(--u)*.5);background:#26354f;color:var(--bone);font-size:calc(var(--u)*1)}
+.hubtab{all:unset;cursor:pointer;font:italic 700 calc(var(--u)*1.7)/1 var(--display);letter-spacing:.1em;text-transform:uppercase;color:var(--mute);padding:calc(var(--u)*.7) calc(var(--u)*1.6);border-bottom:calc(var(--u)*.3) solid transparent}
+.hubtab:hover{color:var(--bone)}
+.hubtab.on{color:#fff;border-bottom-color:var(--ice);text-shadow:0 0 calc(var(--u)*1.2) rgba(83,199,255,.7)}
+.tiles{display:flex;gap:calc(var(--u)*1.2);flex:1;min-height:0}
+.hubt{all:unset;box-sizing:border-box;flex:1;position:relative;cursor:pointer;overflow:hidden;display:flex;flex-direction:column;justify-content:flex-end;
+  background:linear-gradient(155deg,var(--c1),var(--c2));clip-path:polygon(0 0,100% 0,100% calc(100% - var(--u)*2),calc(100% - var(--u)*2) 100%,0 100%);
+  transition:transform .15s,filter .15s;filter:brightness(.72) saturate(.9)}
+.hubt:hover,.hubt:focus-visible{transform:translateY(calc(var(--u)*-.8));filter:none}
+.hubt::before{content:"";position:absolute;inset:0;border:calc(var(--u)*.28) solid transparent;z-index:3;pointer-events:none}
+.hubt:hover::before,.hubt:focus-visible::before{border-color:#fff}
+.hubt .art{position:absolute;right:-6%;bottom:6%;width:62%;height:92%;opacity:.95;pointer-events:none}
+.hubt .glow{position:absolute;inset:0;background:linear-gradient(0deg,rgba(0,0,0,.78),transparent 55%)}
+.hubt .lab{position:relative;padding:calc(var(--u)*1.2) calc(var(--u)*1.6) calc(var(--u)*2.2);display:flex;flex-direction:column;gap:calc(var(--u)*.4)}
+.hubt .lab b{font:italic 800 calc(var(--u)*3)/.95 var(--display);letter-spacing:.04em;text-transform:uppercase}
+.hubt .lab small{font:500 calc(var(--u)*1.05)/1.3 var(--body);color:#c9d6ee}
+.hubt.future{filter:grayscale(1) brightness(.45);cursor:not-allowed}
+.hubt.future:hover{transform:none}
+.hubt .tag{position:absolute;top:calc(var(--u)*1);left:calc(var(--u)*1.2);background:rgba(0,0,0,.5);color:#fff;border-color:#fff;z-index:2}
+.strip{display:flex;gap:calc(var(--u)*1.2);height:calc(var(--u)*7.2)}
+.strip .card{flex:1;flex-direction:row;align-items:center;gap:calc(var(--u)*1.4);background:rgba(15,25,44,.85);border-top:1px solid var(--line)}
+.strip .card b{font:italic 800 calc(var(--u)*2.2)/1 var(--display);letter-spacing:.05em;text-transform:uppercase;color:var(--ice)}
+.strip .card p{color:var(--mute)}
+
+/* controls page */
+.ctl{display:flex;gap:calc(var(--u)*2);flex:1;min-height:0}
+.ctl .pad{flex:0 0 calc(var(--u)*30);display:flex;flex-direction:column;gap:calc(var(--u)*.8);justify-content:flex-start}
+.ctl .pad svg{width:100%;height:auto;background:var(--panel);padding:calc(var(--u)*.8)}
+.ctl .pad .hint{font-size:calc(var(--u)*1.05);color:var(--mute);line-height:1.4;margin:0}
+.gp{fill:#17243d;stroke:#2e4468;stroke-width:1.5;transition:fill .12s,stroke .12s}
+.gp-t{font:700 11px var(--display);fill:#8c95a6;letter-spacing:.06em;text-anchor:middle;pointer-events:none}
+.hl .gp{fill:var(--ice);stroke:#fff}.hl .gp-t{fill:#04101f}
+.dim .gp{opacity:.55}
+.clist{flex:1;min-width:0;display:flex;flex-direction:column;overflow-y:auto;gap:calc(var(--u)*.35);padding-right:calc(var(--u)*.5);scrollbar-width:thin;scrollbar-color:var(--line) transparent}
+.chead,.crow{display:grid;grid-template-columns:calc(var(--u)*13) 1fr calc(var(--u)*11.5);gap:calc(var(--u)*1.2);align-items:center;padding:calc(var(--u)*.55) calc(var(--u)*1.2)}
+.chead{position:sticky;top:0;background:#050912;z-index:2;font:600 calc(var(--u)*.95)/1 var(--body);letter-spacing:.16em;text-transform:uppercase;color:var(--mute)}
+.crow{all:unset;box-sizing:border-box;cursor:pointer;display:grid;grid-template-columns:calc(var(--u)*13) 1fr calc(var(--u)*11.5);gap:calc(var(--u)*1.2);align-items:center;padding:calc(var(--u)*.4) calc(var(--u)*1.2);background:var(--panel);min-height:calc(var(--u)*3.1)}
+.crow:hover,.crow:focus-visible{background:linear-gradient(90deg,#fff,#cfe6ff);color:var(--ink)}
+.crow .a{font:italic 700 calc(var(--u)*1.35)/1.1 var(--display);letter-spacing:.05em;text-transform:uppercase}
+.crow .i{font-size:calc(var(--u)*1.1);line-height:1.8;display:flex;flex-wrap:wrap;align-items:center;gap:calc(var(--u)*.35)}
+.crow .r{font-size:calc(var(--u)*1);line-height:1.3;color:var(--mute)}
+.crow:hover .r,.crow:focus-visible .r{color:#3b465a}
+.chip{display:inline-grid;place-items:center;min-width:calc(var(--u)*2.2);height:calc(var(--u)*2);padding:0 calc(var(--u)*.55);border-radius:calc(var(--u)*.45);background:#26354f;color:#fff;font:700 calc(var(--u)*1.05)/1 var(--display);letter-spacing:.04em;font-style:normal}
+.chip.f{border-radius:50%;min-width:calc(var(--u)*2);padding:0;color:var(--ink)}
+.chip.A{background:var(--ok)}.chip.B{background:var(--hong);color:#fff}.chip.X{background:var(--chung);color:#fff}.chip.Y{background:var(--warn)}
+.crow:hover .chip:not(.f),.crow:focus-visible .chip:not(.f){background:#1a2c4d}
+.pts{font:700 calc(var(--u)*1.1) var(--display);letter-spacing:.04em;color:var(--ice)}
+.crow:hover .pts,.crow:focus-visible .pts{color:var(--chung-d)}
+.ctabs{display:flex;align-items:center;gap:calc(var(--u)*.4);flex-wrap:nowrap}
+.ctabs .btn{flex:none;width:calc(var(--u)*2.6);border-radius:calc(var(--u)*.5);background:#26354f;color:var(--bone);font-size:calc(var(--u)*1)}
+.ctab{all:unset;cursor:pointer;font:italic 700 calc(var(--u)*1.15)/1 var(--display);letter-spacing:.05em;text-transform:uppercase;color:var(--mute);padding:calc(var(--u)*.6) calc(var(--u)*.8);border-bottom:calc(var(--u)*.3) solid transparent;white-space:nowrap}
+.ctab:hover{color:var(--bone)}.ctab.on{color:#fff;border-bottom-color:var(--ice)}.ctab.f{opacity:.35;cursor:not-allowed}
+.gl+.gl{margin-left:calc(var(--u)*-.2)}
+.gest{display:inline-flex;align-items:center;gap:calc(var(--u)*.3)}
+.gs{width:calc(var(--u)*3);height:calc(var(--u)*3)}
+.gs .well{fill:#0b1424;stroke:#5b6f94;stroke-width:1.5}
+.gs .arc{stroke:var(--ice);stroke-width:3.8;stroke-linecap:round}
+.gs .head{fill:var(--ice)}.gs .dot{fill:#fff}
+.gl{font:600 calc(var(--u)*.95)/1 var(--body);font-style:normal;color:var(--mute);letter-spacing:.04em}
+.crow:hover .gs .well,.crow:focus-visible .gs .well{fill:#e3edfb;stroke:#7c8aa8}
+.crow:hover .gs .arc,.crow:focus-visible .gs .arc{stroke:#1b3f8a}
+.crow:hover .gs .head,.crow:focus-visible .gs .head{fill:#1b3f8a}
+.crow:hover .gs .dot,.crow:focus-visible .gs .dot{fill:#0b1220}
+.crow:hover .gl,.crow:focus-visible .gl{color:#3b465a}
+/* capture mode (?bare#screen): the stage fills the window, no page chrome */
+body.bare{padding:0}
+body.bare .wrap{max-width:none;gap:0}
+body.bare .top,body.bare .jump,body.bare .note{display:none}
+body.bare .scroll{border:0;overflow:visible}
+body.bare .stage{min-width:0}
+</style>
+
+<div class="wrap">
+  <div class="top">
+    <h1>Open Stance <span style="color:var(--mute);font-weight:500">/ menu prototype</span></h1>
+    <p>Click, or use arrow keys, Enter and Esc. Esc is B / Back.</p>
+  </div>
+  <nav class="jump" id="jump" aria-label="Jump to screen"></nav>
+  <div class="scroll"><div class="stage" id="stage"></div></div>
+  <p class="note"><b>Example content.</b> Fighter names, ratings, dates and bracket results are placeholders. Screens and flow follow GDD 7.5 to 7.8; items tagged Future (Challenges, Referee Mode, Online, Replays) are shown greyed. Sparring and Tournament use premade fighters; the created fighter (Jae-won Choi) is part of Career only. In the match, press Enter to score a random technique and Esc to pause.</p>
+</div>
+
+<script>
+const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>[...r.querySelectorAll(s)];
+const stage=$('#stage');
+const state={stack:[],cur:null,mode:'Sparring',p:['Min-jun Park','Dae-ho Kim'],cat:'Men',sel:0,opt:{}};
+const FIGHTERS=[
+ {n:'Min-jun Park',g:'M',b:'Compact',s:'Counter',o:74},
+ {n:'Dae-ho Kim',g:'M',b:'Stocky',s:'Pressure',o:77},
+ {n:'Marcus Bell',g:'M',b:'Tall',s:'Kicker',o:80},
+ {n:'Tomas Silva',g:'M',b:'Lean Tall',s:'Counter',o:76},
+ {n:'Sofia Reyes',g:'F',b:'Lean Tall',s:'Kicker',o:81},
+ {n:'Amara Okafor',g:'F',b:'Tall',s:'Counter',o:79},
+ {n:'Aiko Tanaka',g:'F',b:'Compact',s:'Pressure',o:75},
+ {n:'Hana Lee',g:'F',b:'Stocky',s:'Counter',o:73},
+];
+const CATS={Men:'M',Women:'F'};
+const sexOf=n=>(FIGHTERS.find(x=>x.n===n)||{g:'M'}).g;
+const inCat=c=>FIGHTERS.filter(x=>x.g===CATS[c]);
+const hint=(items)=>`<div class="hints">${items.map(([k,c,t])=>`<span><i class="btn ${c}">${k}</i>${t}</span>`).join('')}</div>`;
+const HINT_STD=hint([['A','a','Select'],['B','b','Back']]);
+const HINT_SEL=hint([['A','a','Select'],['B','b','Back'],['↔','','Change value']]);
+
+function fig(col,dark,gear=true,kick=false,sex='M'){
+  const skin='#c99a76',body=gear?col:'#e7e5de',trim=gear?dark:'#bdb9ad';
+  return `<svg class="fig" viewBox="0 0 120 200" role="img" aria-label="Fighter silhouette">
+  <ellipse cx="60" cy="193" rx="38" ry="5" fill="#000" opacity=".4"/>
+  <path d="M46 120 L40 188 L54 188 L60 130Z" fill="${body}"/>
+  ${kick?`<path d="M64 128 L108 100 L114 112 L72 148Z" fill="${body}"/><rect x="104" y="96" width="16" height="22" fill="${gear?col:skin}" transform="rotate(-25 112 107)"/>`:`<path d="M62 128 L84 188 L98 188 L74 124Z" fill="${body}"/>`}
+  ${gear?`<rect x="38" y="172" width="18" height="16" fill="${trim}"/>`:''}
+  ${sex==='F'?`<path d="M42 62 L78 62 L85 126 L35 126Z" fill="${body}"/>`:`<path d="M38 62 L82 62 L88 126 L34 126Z" fill="${body}"/>`}
+  <rect x="34" y="94" width="54" height="8" fill="${gear?'#161a22':'#232a38'}"/>
+  ${gear?`<rect x="42" y="68" width="36" height="24" fill="${trim}" opacity=".9"/>`:''}
+  <path d="M38 66 L18 100 L28 108 L46 82Z" fill="${body}"/><path d="M82 66 L100 92 L90 100 L76 82Z" fill="${body}"/>
+  <circle cx="22" cy="106" r="9" fill="${gear?trim:skin}"/><circle cx="94" cy="98" r="9" fill="${gear?trim:skin}"/>
+  <rect x="54" y="50" width="12" height="14" fill="${skin}"/>
+  ${sex==='F'?`<path d="M72 28 Q106 30 98 74 Q93 54 72 46Z" fill="#1b1410"/>`:''}<ellipse cx="60" cy="38" rx="17" ry="20" fill="${skin}"/>
+  ${gear?`<path d="M42 36 Q60 4 78 36 L78 44 Q60 36 42 44Z" fill="${col}"/>`:`<path d="M43 34 Q60 8 77 34 Q60 24 43 34Z" fill="#1b1410"/>`}
+  </svg>`;
+}
+
+/* ---------- screens ---------- */
+const S={};
+S.title=()=>`<div class="bg"></div><div class="screen title" data-keep>
+  <div class="logo"><i>Open</i> <b>Stance</b>:</div>
+  <div class="logo2">Gyeorugi</div>
+  <div class="pr" style="margin-top:3.2cqw">Press any button to start</div></div>`;
+
+const HUBS={
+ Play:[
+  {n:'Sparring',s:'Local match, 1P or 2P',go:'sparring',c:['#1e56c8','#0a1d4a'],k:true},
+  {n:'Tournament',s:'8, 16 or 32 fighter bracket',go:'tournament',c:['#c8323a','#4a0c12'],k:false},
+  {n:'Challenges',s:'Set scenarios',f:1,c:['#555','#222']},
+  {n:'Referee Mode',s:'Call the match',f:1,c:['#555','#222']}],
+ Progress:[
+  {n:'Career',s:'Your created fighter: seasons and events',go:'career',c:['#1e56c8','#0a1d4a'],k:true},
+  {n:'Training',s:'Lessons, drills and free practice',go:'training',c:['#1f8a62','#082c20'],k:false}],
+ Connected:[
+  {n:'Online',s:'Ranked and friendly matches',f:1,c:['#555','#222']},
+  {n:'Replays',s:'Watch and share',f:1,c:['#555','#222']}],
+ Options:[
+  {n:'Options',s:'Audio, video and controls',go:'options',c:['#2a6fa0','#0b2236'],k:false},
+  {n:'Controls',s:'Every input, by group',go:'controls',c:['#1e56c8','#0a1d4a'],k:false},
+  {n:'Quit',s:'Back to the title screen',act:'quit',c:['#8a2a2a','#2a0a0a'],k:false}]};
+const HUB_NAMES=Object.keys(HUBS);
+S.main=()=>{const hub=state.hub||'Play';
+  return `<div class="bg"></div><div class="screen">
+  <div class="head"><div class="kick">Open Stance · Main menu</div>
+   <div class="hubtabs"><i class="btn">LB</i>${HUB_NAMES.map(h=>`<button class="hubtab ${h===hub?'on':''}" data-hub="${h}">${h}</button>`).join('')}<i class="btn">RB</i></div></div>
+  <div class="tiles">${HUBS[hub].map(t=>`<button class="tile hubt ${t.f?'future':''}" ${t.f?'disabled':''} ${t.go?'data-go="'+t.go+'"':''} ${t.act?'data-act="'+t.act+'"':''} style="--c1:${t.c[0]};--c2:${t.c[1]}">
+     ${t.f?'<span class="tag">Future</span>':''}<div class="art">${fig('#e7e5de','#bdb9ad',false,!!t.k)}</div><div class="glow"></div>
+     <div class="lab"><b>${t.n}</b><small>${t.s}</small></div></button>`).join('')}</div>
+  <div class="strip">
+   <div class="card"><b>Up next</b><p>City Open · Career week 3. Enter your fighter before the calendar advances.</p></div>
+   <div class="card"><b>Coach</b><p>Counters cost you the last three matches. Try the Counter timing drill.</p></div></div>
+  </div>${hint([['A','a','Select'],['B','b','Back'],['LB','','Previous tab'],['RB','','Next tab']])}`};
+
+S.sparring=()=>setup('Sparring','Players, ruleset, difficulty and arena.',[
+  ['Players',['1P vs AI','1P vs 2P']],['Ruleset',['World Taekwondo','Casual (no Gam-jeom)','Golden Point']],
+  ['AI difficulty',['Easy','Normal','Hard','Master']],['Arena',['Training dojang','Club dojang','National arena','Olympic arena']]]);
+S.tournament=()=>setup('Tournament','Bracket, ruleset, difficulty and arena.',[
+  ['Bracket size',['8','16','32']],['Ruleset',['World Taekwondo','Casual (no Gam-jeom)','Golden Point']],
+  ['AI difficulty',['Easy','Normal','Hard','Master']],['Arena',['Club dojang','National arena','Olympic arena']]]);
+function setup(t,sub,rows){
+  const o=state.opt;
+  return `<div class="bg"></div><div class="screen">
+  <div class="head"><div class="kick">Play</div><h2 class="t">${t} setup</h2></div>
+  <div class="body"><div class="col" style="width:46cqw">
+   ${rows.map(([k,v])=>{const key=t+k;const i=o[key]??(k==='AI difficulty'?1:0);return `<button class="opt sel" data-key="${key}" data-vals='${JSON.stringify(v)}'>${k}<span class="v">${v[i]}</span></button>`}).join('')}
+   <button class="opt" data-go="select" style="margin-top:1cqw;background:var(--chung);color:#fff">Continue to fighter select</button>
+  </div>
+  <div class="grow col"><div class="card"><h3>${t}</h3><p>${sub}</p>
+   ${t==='Tournament'?`<p>Between matches a bracket view shows results and the next pairing.</p>`:`<p>Sides are assigned by the game: Chung on the left in blue, Hong on the right in red.</p>`}
+  </div><div class="card"><h3>Ruleset note</h3><p>Rounds are 3 × 2:00 with 1:00 breaks. A 12-point gap ends the match. Head kicks score more than body kicks; turning kicks score more than straight ones.</p></div></div>
+  </div></div>${HINT_SEL}`}
+
+S.select=()=>{
+  const f=inCat(state.cat),p1=FIGHTERS.find(x=>x.n===state.p[0]),p2=FIGHTERS.find(x=>x.n===state.p[1]);
+  const side=(p,cls,who,col,dk)=>`<div class="col" style="width:25cqw;align-items:stretch">
+    <div class="row"><b class="${cls}" style="font:800 2.4cqw var(--display);letter-spacing:.1em">${who}</b><span class="tag">Assigned</span></div>
+    <div style="height:30cqw;background:var(--panel);padding:1cqw;display:flex;justify-content:center">${fig(col,dk,true,cls==='blue',p.g)}</div>
+    <div class="big" style="font-size:2.6cqw">${p.n}</div>
+    <div class="row"><span class="tag">${p.g==='F'?'Women':'Men'}</span><span class="tag">${p.b}</span><span class="tag">${p.s}</span><span class="tag">OVR ${p.o}</span></div></div>`;
+  return `<div class="bg"></div><div class="screen">
+  <div class="head"><div class="kick">${state.mode}</div><h2 class="t">Fighter select</h2></div>
+  <div class="body">
+   ${side(p1,'blue','Chung','#2f6fe4','#1b3f8a')}
+   <div class="col grow" style="justify-content:center">
+    <div class="tabs" style="margin-bottom:.4cqw"><i class="btn">LB</i>${Object.keys(CATS).map(c=>`<button class="opt ${c===state.cat?'cur':''}" data-cat="${c}" style="padding:.7cqw 2cqw">${c}</button>`).join('')}<i class="btn">RB</i></div><div class="kick">Premade ${state.cat.toLowerCase()}'s fighters · choose one</div>
+    ${f.map(x=>`<button class="tile ${x.n===p1.n?'on':''}" data-pick="0" data-n="${x.n}"><b>${x.n}</b><small>${x.b} · ${x.s} · OVR ${x.o}</small></button>`).join('')}
+    <button class="opt" data-go="match" style="margin-top:.6cqw;background:var(--chung);color:#fff">Start match</button>
+   </div>
+   ${side(p2,'red','Hong','#e03a40','#8c1f25')}
+  </div></div>${hint([['A','a','Select'],['B','b','Back'],['LB','','Men'],['RB','','Women']])}`};
+
+let clock=null,t=120,sc=[0,0],rd=1;
+S.match=()=>{
+  const c=FIGHTERS[0],h=FIGHTERS[1];
+  return `<div class="screen hud" data-hud><div class="arena"></div><div class="mat"></div>
+  <div class="score"><div class="s c" id="sc0">0</div>
+    <div class="mid"><b>ROUND <span id="rd" style="font:inherit">1</span> / 3</b><span id="clk">2:00</span></div>
+    <div class="s h" id="sc1">0</div></div>
+  <div class="pen" style="left:calc(50% - 27cqw)">Gam-jeom 0</div><div class="pen" style="right:calc(50% - 27cqw)">Gam-jeom 0</div>
+  <div class="nm" style="left:4cqw"><b class="blue">${state.p[0]}</b><div class="bar" id="st0"><i style="width:82%"></i></div><small style="color:var(--mute);font-size:1cqw">Stamina</small></div>
+  <div class="nm" style="right:4cqw;text-align:right;align-items:stretch"><b class="red">${state.p[1]}</b><div class="bar" id="st1"><i style="width:64%"></i></div><small style="color:var(--mute);font-size:1cqw">Stamina</small></div>
+  <div class="fighter" style="left:26%">${fig('#2f6fe4','#1b3f8a',true,true,sexOf(state.p[0]))}</div>
+  <div class="fighter" style="right:26%;transform:scaleX(-1)">${fig('#e03a40','#8c1f25',true,false,sexOf(state.p[1]))}</div>
+  <div class="pop blue" id="pop0" style="left:30%;top:30%"></div><div class="pop red" id="pop1" style="right:30%;top:30%"></div>
+  <div class="sub" id="sub"><b>KAL-YEO:</b> Break</div></div>
+  ${hint([['A','a','Score a technique (demo)'],['☰','','Pause']])}`};
+
+S.results=()=>{if(sc[0]+sc[1]===0)sc=[14,7];const w=sc[0]>=sc[1]?0:1;return `<div class="bg"></div><div class="screen">
+  <div class="head"><div class="kick">Match over</div><h2 class="t">Results</h2></div>
+  <div class="body">
+   <div class="col" style="width:40cqw">
+    <div class="card" style="border-top:.4cqw solid ${w?'var(--hong)':'var(--chung)'}"><h3>Winner</h3><div class="big ${w?'red':'blue'}">${state.p[w]}</div>
+     <div class="vs"><b class="big blue">${sc[0]}</b><span>–</span><b class="big red">${sc[1]}</b></div></div>
+    <div class="card"><h3>Round scores</h3>
+     <div class="stat"><span>Round 1</span><div></div><em>${Math.max(2,Math.round(sc[0]/3))}–${Math.max(1,Math.round(sc[1]/3))}</em></div>
+     <div class="stat"><span>Round 2</span><div></div><em>${Math.max(1,Math.round(sc[0]/3))}–${Math.max(2,Math.round(sc[1]/3))}</em></div>
+     <div class="stat"><span>Round 3</span><div></div><em>${Math.round(sc[0]/3)}–${Math.round(sc[1]/3)}</em></div></div>
+   </div>
+   <div class="col grow">
+    <div class="card"><h3>Points by technique</h3>
+     ${[['Roundhouse',68],['Back kick',44],['Spinning hook',30],['Axe kick',22],['Punch',12]].map(([k,v])=>`<div class="stat"><span>${k}</span><div class="bar"><i style="width:${v}%;background:var(--chung)"></i></div><em>${Math.round(v/10)}</em></div>`).join('')}</div>
+    <div class="card"><h3>Penalties</h3><p>Chung 0 · Hong 1 (Gam-jeom: grabbing)</p></div>
+    <div class="row" style="margin-top:auto"><button class="opt grow" data-go="match">Rematch</button><button class="opt grow" data-go="select">Change fighters</button><button class="opt grow" data-go="main" data-reset>Main menu</button></div>
+   </div></div></div>${HINT_STD}`};
+
+S.training=()=>`<div class="bg"></div><div class="screen">
+  <div class="head"><div class="kick">Progress</div><h2 class="t">Training</h2></div>
+  <div class="body">
+   <div class="col" style="width:30cqw"><div class="kick">Lessons</div>
+    ${[['1 · Stance and footwork','Done'],['2 · Roundhouse kick','Done'],['3 · Back kick','Next'],['4 · Active defence','Locked']].map(([a,b])=>`<button class="opt ${b==='Locked'?'future':''}" ${b==='Locked'?'disabled':''}>${a}<span class="tag">${b}</span></button>`).join('')}</div>
+   <div class="col" style="width:30cqw"><div class="kick">Drills</div>
+    ${[['Kick accuracy','B'],['Counter timing','C'],['Stamina management','—']].map(([a,b])=>`<button class="opt">${a}<span class="v">${b}</span></button>`).join('')}
+    <div class="kick" style="margin-top:.8cqw">Practice</div><button class="opt">Free practice<small>AI partner</small></button></div>
+   <div class="col grow"><div class="card"><h3>Lesson 3 · Back kick</h3><p>Step-by-step prompts show controller icons and wait for the correct input.</p>
+    <p>Turn your back to the target, look over your shoulder, then drive the heel through. Skill Stick down, then <span class="btn x" style="width:1.6cqw;height:1.6cqw;font-size:1cqw;vertical-align:middle">X</span>.</p></div>
+    <div class="card"><h3>Coach feedback</h3><p>Your last three matches lost most points to counters. Try the Counter timing drill.</p></div></div>
+  </div></div>${HINT_STD}`;
+
+S.career=()=>{
+  const wk=[['Wk 1','t','Footwork block'],['Wk 2','t','Sparring block'],['Wk 3','e','City Open'],['Wk 4','t','Rest'],['Wk 5','t','Kick power'],['Wk 6','g','Grading: blue belt'],['Wk 7','t','Counter drills'],['Wk 8','e','Regional Cup']];
+  return `<div class="bg"></div><div class="screen">
+  <div class="head"><div class="kick">Progress</div><h2 class="t">Career</h2></div>
+  <div class="body">
+   <div class="col" style="width:26cqw"><div class="card"><h3>Jae-won Choi</h3><div class="row"><span class="tag">Your fighter</span><span class="tag">Green belt</span><span class="tag">OVR 74</span></div>
+     <div class="stat"><span>Season</span><div class="bar"><i style="width:35%"></i></div><em>3/8</em></div></div>
+    <button class="opt">Training slots</button><button class="opt">Enter event<small>City Open</small></button><button class="opt">Grading</button><button class="opt">Post-match review</button><button class="opt" data-go="customize">Fighter creator<small>Look and gear</small></button></div>
+   <div class="col grow"><div class="kick">Season calendar · sample</div><div class="cal">
+    ${wk.map(([a,k,n],i)=>`<div class="wk ${i===2?'now':''}"><b>${a}</b><span class="${k}">${n}</span></div>`).join('')}</div></div>
+  </div></div>${hint([['A','a','Select'],['B','b','Back'],['Y','y','Advance week']])}`};
+
+const SKIN=['#f1d3b8','#d9a97f','#b9825a','#8a5a3a','#5a3a26'],HAIR=['#1b1410','#3a2618','#6b4a2c','#a8793c','#8a8a8a'],EYE=['#3a2618','#5b4a2a','#2f6b4a','#3a6a9a','#6a6a6a'];
+S.customize=()=>{const g=state.opt.gear??true;return `<div class="bg"></div><div class="screen">
+  <div class="head"><div class="kick">Career · created fighter</div><h2 class="t">Fighter creator</h2></div>
+  <div class="body">
+   <div class="col" style="width:26cqw;align-items:stretch"><div style="flex:1;background:var(--panel);display:flex;justify-content:center;padding:1cqw;min-height:0" id="prev">${fig('#2f6fe4','#1b3f8a',g,false,(state.opt.sex||0)?'F':'M')}</div>
+    <div class="tabs"><button class="opt ${g?'cur':''}" data-gear="1" style="flex:1;justify-content:center">Gear on</button><button class="opt ${g?'':'cur'}" data-gear="0" style="flex:1;justify-content:center">Gear off</button></div></div>
+   <div class="col grow" style="overflow:hidden">
+    <button class="opt sel" data-key="sex" data-vals='["Male","Female"]'>Sex<span class="v">${['Male','Female'][state.opt.sex||0]}</span></button>
+    <button class="opt sel" data-key="body" data-vals='["Compact","Lean tall","Stocky","Tall"]'>Body type<span class="v">${['Compact','Lean tall','Stocky','Tall'][state.opt.body||0]}</span></button>
+    <button class="opt sel" data-key="style" data-vals='["Counter","Kicker","Pressure"]'>Fighting style<span class="v">${['Counter','Kicker','Pressure'][state.opt.style||0]}</span></button>
+    <div class="card"><h3>Skin</h3><div class="sw">${SKIN.map((c,i)=>`<button style="background:${c}" class="${i===1?'on':''}" aria-label="Skin ${i+1}"></button>`).join('')}</div>
+     <h3>Hair</h3><div class="sw">${HAIR.map((c,i)=>`<button style="background:${c}" class="${i===0?'on':''}" aria-label="Hair ${i+1}"></button>`).join('')}</div>
+     <h3>Eyes</h3><div class="sw">${EYE.map((c,i)=>`<button style="background:${c}" class="${i===0?'on':''}" aria-label="Eyes ${i+1}"></button>`).join('')}</div>
+     <h3>Protector and helmet</h3><div class="sw"><button style="background:var(--chung)" class="on" aria-label="Chung blue"></button><button style="background:var(--hong)" aria-label="Hong red"></button></div></div>
+    <p style="font-size:1cqw;color:var(--mute);margin:0">Appearance never changes attributes. Body type and style shift Career base ratings only.</p>
+   </div></div></div>${HINT_SEL}`};
+
+S.options=()=>{const tab=state.opt.tab||'Audio';
+  const sl=(k,v,u='')=>`<label class="sl">${k}<input type="range" min="0" max="100" value="${v}" oninput="this.nextElementSibling.value=this.value+'${u}'"><output>${v}${u}</output></label>`;
+  const bodies={
+   Audio:['Master',80,'Effects',90,'Referee voice',100,'Crowd',60,'Music',50].reduce((a,x,i,arr)=>i%2?a:a+sl(x,arr[i+1]),''),
+   Video:`<button class="opt sel" data-key="res" data-vals='["1920×1080","2560×1440","3840×2160"]'>Resolution<span class="v">${['1920×1080','2560×1440','3840×2160'][state.opt.res||0]}</span></button>
+    <button class="opt sel" data-key="win" data-vals='["Fullscreen","Borderless","Windowed"]'>Window mode<span class="v">${['Fullscreen','Borderless','Windowed'][state.opt.win||0]}</span></button>
+    <button class="opt sel" data-key="q" data-vals='["Low","Medium","High","Epic"]'>Quality preset<span class="v">${['Low','Medium','High','Epic'][state.opt.q??2]}</span></button>
+    <button class="opt sel" data-key="fps" data-vals='["30","60","120","Unlimited"]'>Frame-rate cap<span class="v">${['30','60','120','Unlimited'][state.opt.fps??1]}</span></button>
+    <button class="opt sel" data-key="vs" data-vals='["On","Off"]'>V-sync<span class="v">${['On','Off'][state.opt.vs||0]}</span></button>`,
+   Controls:`<button class="opt sel" data-key="vib" data-vals='["On","Off"]'>Vibration<span class="v">${['On','Off'][state.opt.vib||0]}</span></button>
+    <label class="sl">Skill Stick dead zone<input type="range" min="0" max="40" value="15" oninput="this.nextElementSibling.value=this.value+'%'"><output>15%</output></label>
+    <label class="sl">Stick input window<input type="range" min="20" max="40" value="25" oninput="this.nextElementSibling.value=(this.value/100).toFixed(2)+' s'"><output>0.25 s</output></label>
+    <button class="opt" data-go="controls" style="margin-top:.6cqw">Open controls reference<small>All inputs, by group</small></button><p style="font-size:1cqw;color:var(--mute);margin:0">Button remapping is Future.</p>`};
+  return `<div class="bg"></div><div class="screen">
+  <div class="head"><div class="kick">Settings save automatically</div><h2 class="t">Options</h2></div>
+  <div class="tabs">${['Audio','Video','Controls'].map(x=>`<button class="opt ${x===tab?'cur':''}" data-tab="${x}">${x}</button>`).join('')}</div>
+  <div class="body"><div class="col grow" style="max-width:60cqw">${bodies[tab]}</div></div></div>${HINT_SEL}`};
+
+/* ---------- controls page ---------- */
+const CTR={
+ 'Movement and guards':{cols:['Action','Input','Notes'],rows:[
+  ['Movement','LS','Move around the mat'],['Switch sides','A','Swap lead and back leg'],['Dash / clinch','B','Dash 1 m; dashing into contact starts a clinch'],
+  ['High guard','D-pad ↑',''],['Cross guard','D-pad ←',''],['Mixed guard','D-pad →',''],['Low guard','D-pad ↓','A normal guard, never a foul']]},
+ 'Modifiers':{cols:['Modifier','Input','Effect'],rows:[
+  ['Back leg','Hold RT','Throw with the back leg'],['Head','Hold RB','Aim at the head, not the trunk'],
+  ['Fake','Hold LB','Feint; see the Fakes tab for each kick'],
+  ['Jump','Tap Y before the kick','Throw the kick airborne'],['Active defense','Hold LT','RS defends instead of attacks'],
+  ['Stand or slide','LS neutral or held','Neutral roots you; held slides you']]},
+ 'Standing kicks':{cols:['Technique','Input','Points'],rows:[
+  ['Side kick','RS ↑','Body 2 · Head 3'],['Side kick, back leg','Hold RT + RS ↑','Body 2 · Head 3'],
+  ['Roundhouse','RS ←/→ toward the lead leg','Body 2'],['Roundhouse, back leg','Hold RT + RS ←/→ toward the back leg','Body 2 · Head 3'],
+  ['Roundhouse, head','Hold RB + RS ←/→ toward the lead leg','Head 3'],['Hook kick','RS ←/→ away from the lead leg','Body 2 · Head 3'],
+  ['Axe kick','RS ←/→ {qf}, ↓','Head 3']]},
+ 'Spinning and jump kicks':{cols:['Technique','Input','Points'],rows:[
+  ['Spin side kick','RS ↓, ↑','Body 4 · Head 6'],['Spin hook kick','Hold RT + RS ←/→ {h}','Body 4 · Head 6'],
+  ['Tornado kick','Y, RS ←/→ {h}, {hu}','Body 4 · Head 6'],['Jump side kick','Y, RS ↑','Body 2 · Head 3'],
+  ['Jump roundhouse','Y, RS ←/→ toward the lead leg','Body 2 · Head 3'],['Jump hook kick','Y, RS ←/→ away from the lead leg','Body 2 · Head 3'],
+  ['Jump axe kick','Y, RS ←/→ {qf}, ↓','Head 3'],['Jump spin hook','Y, Hold RT + RS ←/→ {h}','Body 4 · Head 6']]},
+ 'Fakes':{cols:['Fake','Input','Result'],rows:[
+  ['Fake, no kick','Hold LB','Feint without choosing a kick'],
+  ['Fake side kick','Hold LB + RS ↑','Startup plays, no score'],
+  ['Fake roundhouse','Hold LB + RS ←/→ toward the lead leg','Startup plays, no score'],
+  ['Fake hook kick','Hold LB + RS ←/→ away from the lead leg','Startup plays, no score'],
+  ['Fake axe kick','Hold LB + RS ←/→ {qf}, ↓','Startup plays, no score'],
+  ['Fake spin side kick','Hold LB + RS ↓, ↑','Startup plays, no score'],
+  ['Fake spin hook kick','Hold LB + RT + RS ←/→ {h}','Startup plays, no score'],
+  ['Fake tornado kick','Y, Hold LB + RS ←/→ {h}, {hu}','Startup plays, no score'],
+  ['Fake a jump kick','Y, Hold LB + the kick’s RS input','Startup plays, no score']]},
+ 'Punches and defense':{cols:['Action','Input','Effect'],rows:[
+  ['Punch','X','Trunk 1 point'],['High block','Hold LT, RS ↑','Stops head-height attacks'],
+  ['Body block','Hold LT','Blocks punches and body kicks'],['Leg check','Hold LT, RS ↓','Stops a body kick; held too long is a penalty'],
+  ['Sway or step','Hold LT, RS ←/→','Move out of range, no block']]}
+};
+const CTAB_NAMES=Object.keys(CTR);
+const TOK=/(Menu button|D-pad|RT|RB|LB|LT|RS|LS|\b[ABXY]\b)/g;
+const GS={q:[0,90,'¼ turn'],h:[0,180,'½ turn'],hu:[180,360,'½ turn'],qf:[0,-90,'¼ turn'],f:[0,359.9,'full turn']};
+function gesture(k,c){
+  const [a0,a1,lab]=GS[k],R=9,C=18,rad=d=>d*Math.PI/180,P=a=>[C+R*Math.cos(rad(a)),C+R*Math.sin(rad(a))];
+  const [x0,y0]=P(a0),[x1,y1]=P(a1),large=Math.abs(a1-a0)>180?1:0,dir=a1>=a0?1:0,sg=dir?1:-1;
+  const t=[-sg*Math.sin(rad(a1)),sg*Math.cos(rad(a1))],n=[Math.cos(rad(a1)),Math.sin(rad(a1))];
+  const tip=[x1+t[0]*6.5,y1+t[1]*6.5],b1=[x1+n[0]*4.4,y1+n[1]*4.4],b2=[x1-n[0]*4.4,y1-n[1]*4.4];
+  const f=v=>v.map(z=>z.toFixed(1)).join(',');
+  return '<span class="gest"><svg class="gs" viewBox="0 0 36 36" aria-hidden="true"><circle class="well" cx="18" cy="18" r="16"/>'+
+   '<path class="arc" d="M'+f([x0,y0])+' A'+R+' '+R+' 0 '+large+' '+dir+' '+f([x1,y1])+'" fill="none"/>'+
+   '<polygon class="head" points="'+f(tip)+' '+f(b1)+' '+f(b2)+'"/><circle class="dot" cx="'+x0.toFixed(1)+'" cy="'+y0.toFixed(1)+'" r="2.4"/></svg><em class="gl">'+lab+'</em>'+(c?'<em class="gl">,</em>':'')+'</span>';
+}
+const chips=t=>t.replace(TOK,m=>/^[ABXY]$/.test(m)?'<i class="chip f '+m+'">'+m+'</i>':'<i class="chip">'+m+'</i>').replace(/\{(qf|q|hu|h|f)\}(,?)/g,(_,k,c)=>gesture(k,c));
+const padKeys=t=>[...new Set((t.match(TOK)||[]).map(m=>m==='Menu button'?'MENU':m==='D-pad'?'DPAD':m))];
+function gamepad(){
+  const b=(id,x,y,r,l)=>'<g id="gp-'+id+'"><circle class="gp" cx="'+x+'" cy="'+y+'" r="'+r+'"/><text class="gp-t" x="'+x+'" y="'+(y+4)+'">'+l+'</text></g>';
+  const k=(id,x,y,w,h,l)=>'<g id="gp-'+id+'"><rect class="gp" x="'+x+'" y="'+y+'" width="'+w+'" height="'+h+'" rx="8"/><text class="gp-t" x="'+(x+w/2)+'" y="'+(y+h/2+4)+'">'+l+'</text></g>';
+  return '<svg viewBox="0 0 400 250" role="img" aria-label="Controller layout">'+
+   k('LT',52,6,62,22,'LT')+k('RT',286,6,62,22,'RT')+k('LB',48,34,76,20,'LB')+k('RB',276,34,76,20,'RB')+
+   '<path class="gp" style="fill:#0f192c" d="M70 62 H330 Q372 66 378 150 Q382 222 336 226 Q300 228 278 190 H122 Q100 228 64 226 Q18 222 22 150 Q28 66 70 62Z"/>'+
+   b('LS',118,100,22,'LS')+b('RS',250,156,22,'RS')+b('MENU',200,96,10,'☰')+
+   '<g id="gp-DPAD"><path class="gp" d="M141 130 h18 v17 h17 v18 h-17 v17 h-18 v-17 h-17 v-18 h17z"/><text class="gp-t" x="150" y="160">D-pad</text></g>'+
+   b('Y',282,80,12,'Y')+b('X',258,102,12,'X')+b('B',306,102,12,'B')+b('A',282,124,12,'A')+'</svg>';
+}
+S.controls=()=>{
+  const tab=CTR[state.tab]?state.tab:CTAB_NAMES[0], d=CTR[tab];
+  return `<div class="bg"></div><div class="screen">
+  <div class="head"><div class="kick">Options · Controls</div><h2 class="t">Controls</h2></div>
+  <div class="ctabs"><i class="btn">LB</i>${CTAB_NAMES.map(n=>`<button class="ctab ${n===tab?'on':''}" data-ctab="${n}">${n}</button>`).join('')}<button class="ctab f" disabled>Referee [Future]</button><i class="btn">RB</i></div>
+  <div class="ctl">
+   <div class="pad">${gamepad()}<p class="hint">Point at a row and its buttons light up. Stick icons start at the dot and turn the way the arrow points. The icons show the → side; mirror them for ←.</p></div>
+   <div class="clist"><div class="chead"><span>${d.cols[0]}</span><span>${d.cols[1]}</span><span>${d.cols[2]}</span></div>
+    ${d.rows.map(r=>`<button class="crow" data-keys="${padKeys(r[1]).join(',')}"><span class="a">${r[0]}</span><span class="i">${chips(r[1])}</span><span class="r ${d.cols[2]==='Points'?'pts':''}">${r[2]}</span></button>`).join('')}
+   </div></div></div>${hint([['A','a','Select'],['B','b','Back'],['LB','','Previous tab'],['RB','','Next tab']])}`};
+function padHL(keys){
+  $$('#stage svg g[id^=gp-]').forEach(g=>g.classList.remove('hl'));
+  (keys||[]).forEach(k=>{const g=$('#gp-'+k,stage);g&&g.classList.add('hl')});
+}
+stage.addEventListener('mouseover',e=>{const r=e.target.closest?.('.crow');if(r)padHL(r.dataset.keys.split(',').filter(Boolean))});
+stage.addEventListener('focusin',e=>{const r=e.target.closest?.('.crow');if(r)padHL(r.dataset.keys.split(',').filter(Boolean))});
+
+/* ---------- engine ---------- */
+const NAMES={title:'Title',main:'Main menu',sparring:'Sparring setup',tournament:'Tournament setup',select:'Fighter select',match:'Match',results:'Results',controls:'Controls',training:'Training',career:'Career',customize:'Customize',options:'Options'};
+$('#jump').innerHTML=Object.entries(NAMES).map(([k,v])=>`<button data-j="${k}">${v}</button><!---->`).join('')+`<button data-j="pause">Pause</button><button data-j="bracket">Bracket</button>`;
+
+function stopClock(){clearInterval(clock);clock=null}
+function show(name,push=true){
+  stopClock();
+  if(push&&state.cur&&state.cur!==name)state.stack.push(state.cur);
+  state.cur=name; state.sel=0;
+  const kept=name==='match'&&state.keep;if(name==='match')state.keep=false;if(name==='match'&&!kept){t=120;sc=[0,0];rd=1}
+  stage.innerHTML=S[name]();
+  if(['career','customize'].includes(name))stage.insertAdjacentHTML('beforeend',`<div class="pbar"><div><b>Jae-won Choi</b><small>Your fighter · Green belt · OVR 74</small></div><div class="av">JC</div></div>`);
+  wire();
+  $$('#jump button').forEach(b=>b.setAttribute('aria-current',b.dataset.j===name));
+  if(name==='match'){if(kept){$('#sc0').textContent=sc[0];$('#sc1').textContent=sc[1];$('#clk').textContent=Math.floor(t/60)+':'+String(t%60).padStart(2,'0');$('#rd').textContent=rd;pause()}else startClock()}
+  if(name==='controls'){const r=$('.crow',stage);r&&r.focus({preventScroll:true})}
+  else{const f=$$('.opt:not(.future),.tile:not(.future)',stage)[0];f&&f.focus({preventScroll:true})}
+}
+function back(){
+  if(state.cur==='title')return;
+  if(state.cur==='match'){return pause()}
+  const p=state.stack.pop();
+  if(p)show(p,false); else show('main',false);
+}
+function wire(){
+  $$('[data-go]',stage).forEach(e=>e.onclick=()=>{if(e.hasAttribute('data-reset'))state.stack=[];state.opt.__mode=e.dataset.go;
+    if(['sparring','tournament'].includes(e.dataset.go))state.mode=e.dataset.go==='sparring'?'Sparring':'Tournament';show(e.dataset.go)});
+  $$('[data-act=quit]',stage).forEach(e=>e.onclick=()=>dialog('Quit game?','Settings and created fighters are already saved.',[['Quit to title',()=>{state.stack=[];show('title',false)}],['Cancel']]));
+  $$('.sel',stage).forEach(e=>e.onclick=()=>cycle(e,1));
+  $$('[data-hub]',stage).forEach(e=>e.onclick=()=>{state.hub=e.dataset.hub;refresh()});
+  $$('[data-ctab]',stage).forEach(e=>e.onclick=()=>{state.tab=e.dataset.ctab;show('controls',false)});
+  $$('[data-tab]',stage).forEach(e=>e.onclick=()=>{state.opt.tab=e.dataset.tab;refresh()});
+  $$('[data-gear]',stage).forEach(e=>e.onclick=()=>{state.opt.gear=e.dataset.gear==='1';refresh()});
+  $$('.sw button',stage).forEach(b=>b.onclick=()=>{$$('button',b.parentElement).forEach(x=>x.classList.remove('on'));b.classList.add('on')});
+  $$('[data-pick]',stage).forEach(e=>e.onclick=()=>{state.p[0]=e.dataset.n;if(state.p[1]===state.p[0])state.p[1]=inCat(state.cat).find(x=>x.n!==state.p[0]).n;refresh()});
+  $$('[data-cat]',stage).forEach(e=>e.onclick=()=>setCat(e.dataset.cat));
+  if(state.cur==='title')stage.onclick=()=>show('main');
+  else stage.onclick=null;
+}
+function setCat(c){state.cat=c;const l=inCat(c);state.p=[l[0].n,l[1].n];refresh()}
+function refresh(){const k=document.activeElement?.dataset;const idx=$$('.opt,.tile',stage).indexOf(document.activeElement);show(state.cur,false);const el=$$('.opt:not(.future),.tile:not(.future)',stage)[Math.max(idx,0)];el&&el.focus({preventScroll:true})}
+function cycle(e,d){const v=JSON.parse(e.dataset.vals),k=e.dataset.key;let i=(state.opt[k]??(k.endsWith('AI difficulty')?1:(k==='q'?2:(k==='fps'?1:0))));i=(i+d+v.length)%v.length;state.opt[k]=i;$('.v',e).textContent=v[i];if(k==='sex')refresh()}
+function dialog(title,msg,btns){
+  const v=document.createElement('div');v.className='veil';v.dataset.veil='';
+  v.innerHTML=`<div class="dlg"><h2>${title}</h2><p>${msg}</p>${btns.map((b,i)=>`<button class="opt ${i===0&&b[0].startsWith('Quit')?'danger':''}">${b[0]}</button>`).join('')}</div>`;
+  stage.appendChild(v);
+  $$('.opt',v).forEach((el,i)=>el.onclick=e=>{e.stopPropagation();v.remove();btns[i][1]&&btns[i][1]();});
+  $('.opt',v).focus();
+}
+function pause(){
+  if($('[data-veil]',stage))return; stopClock();
+  const v=document.createElement('div');v.className='veil';v.dataset.veil='';
+  v.innerHTML=`<div class="dlg"><h2>Paused</h2>
+   <button class="opt" data-p="resume">Resume</button><button class="opt" data-p="moves">Move list</button><button class="opt" data-p="controls">Controls</button>
+   <button class="opt" data-p="options">Options</button><button class="opt" data-p="restart">Restart</button><button class="opt danger" data-p="quit">Quit match</button></div>`;
+  stage.appendChild(v);$('.opt',v).focus();
+  $$('.opt',v).forEach(el=>el.onclick=e=>{e.stopPropagation();const a=el.dataset.p;v.remove();
+    if(a==='resume')startClock();
+    else if(a==='restart')show('match',false);
+    else if(a==='quit')dialog('Quit match?','The match will not be saved.',[['Quit to main menu',()=>{state.stack=[];show('main',false)}],['Cancel',()=>pause()]]);
+    else if(a==='options'){state.stack.push('match');show('options',false)}
+    else{state.keep=true;state.stack.push('match');state.tab=a==='moves'?'Standing kicks':'Movement and guards';show('controls',false)}});
+}
+function info(t,lines){
+  const v=document.createElement('div');v.className='veil';v.dataset.veil='';
+  v.innerHTML=`<div class="dlg" style="width:46cqw"><h2>${t}</h2><div class="card"><ul>${lines.map(l=>`<li>${l}</li>`).join('')}</ul></div><button class="opt">Back</button></div>`;
+  stage.appendChild(v);$('.opt',v).focus();$('.opt',v).onclick=e=>{e.stopPropagation();v.remove();pause()};
+}
+function startClock(){
+  stopClock();
+  const sub=$('#sub');if(sub)sub.innerHTML='<b>SI-JAK:</b> Begin';
+  clock=setInterval(()=>{t--;if(t<0){if(rd<3){rd++;t=120}else return endMatch()}
+    $('#clk').textContent=Math.floor(t/60)+':'+String(t%60).padStart(2,'0');$('#rd').textContent=rd;
+    if(t===115&&sub)sub.innerHTML='<b>KAL-YEO:</b> Break'; },1000);
+}
+function endMatch(){stopClock();show('results')}
+function score(){
+  if(state.cur!=='match'||$('[data-veil]',stage))return;
+  const side=Math.random()<.5?0:1,pts=[1,2,3,4,5,6][Math.floor(Math.random()*6)];
+  sc[side]+=pts;$('#sc'+side).textContent=sc[side];
+  const p=$('#pop'+side);p.textContent='+'+pts;p.classList.remove('go');void p.offsetWidth;p.classList.add('go');
+  const s=$('#st'+side);s.firstElementChild.style.width=Math.max(12,parseInt(s.firstElementChild.style.width)-8)+'%';s.classList.toggle('amber',parseInt(s.firstElementChild.style.width)<25);
+  $('#sub').innerHTML=pts>=4?'<b>Head kick</b> · '+pts+' points':'<b>Body kick</b> · '+pts+' points';
+  if(Math.abs(sc[0]-sc[1])>=12)endMatch();
+}
+function bracket(){
+  stage.innerHTML=`<div class="bg"></div><div class="screen"><div class="head"><div class="kick">Tournament · 8 fighters · World Taekwondo</div><h2 class="t">Bracket</h2></div>
+  <div class="br">
+   <div class="rd">${[['Min-jun Park',2,'Joon Lee',0],['Sofia Reyes',3,'Tomas Silva',1],['Dae-ho Kim',1,'Aiko Tanaka',2],['Amara Okafor',2,'Leo Martin',0]].map(m=>`<div class="m"><div class="${m[1]>m[3]?'w':'l'}"><span>${m[0]}</span><b>${m[1]}</b></div><div class="${m[3]>m[1]?'w':'l'}"><span>${m[2]}</span><b>${m[3]}</b></div></div>`).join('')}</div>
+   <div class="rd">${[['Min-jun Park','—','Sofia Reyes','—'],['Aiko Tanaka','—','Amara Okafor','—']].map((m,i)=>`<div class="m ${i===0?'next':''}"><div><span>${m[0]}</span><b>${m[1]}</b></div><div><span>${m[2]}</span><b>${m[3]}</b></div></div>`).join('')}</div>
+   <div class="rd"><div class="m"><div><span>TBD</span><b>—</b></div><div><span>TBD</span><b>—</b></div></div></div>
+  </div>
+  <button class="opt" data-go="match" style="align-self:flex-start;background:var(--chung);color:#fff">Next match: Park vs Reyes</button></div>${HINT_STD}`;
+  wire();state.cur='bracket';$$('#jump button').forEach(b=>b.setAttribute('aria-current',b.dataset.j==='bracket'));
+  $$('[data-go]',stage)[0].focus({preventScroll:true});
+}
+/* keys */
+document.addEventListener('keydown',e=>{
+  const k=e.key;
+  if(state.cur==='title'&&!['Tab','Shift'].includes(k)){e.preventDefault();return show('main')}
+  if(state.cur==='match'&&!$('[data-veil]',stage)){
+    if(k==='Escape'||k==='Backspace'){e.preventDefault();return pause()}
+    if(k==='Enter'||k===' '){e.preventDefault();return score()}return}
+  if(k==='Escape'||k==='Backspace'){if(e.target.tagName==='INPUT')return;e.preventDefault();
+    const v=$('[data-veil]',stage);if(v){v.remove();return state.cur==='match'?startClock():0}return back()}
+  if(state.cur==='main'&&!$('[data-veil]',stage)&&['q','e','PageUp','PageDown','[',']'].includes(k)){e.preventDefault();const i=HUB_NAMES.indexOf(state.hub||'Play'),d=['q','PageUp','['].includes(k)?-1:1;state.hub=HUB_NAMES[(i+d+HUB_NAMES.length)%HUB_NAMES.length];return show('main',false)}
+  if(state.cur==='controls'&&['q','e','PageUp','PageDown','[',']'].includes(k)){e.preventDefault();const i=CTAB_NAMES.indexOf(CTR[state.tab]?state.tab:CTAB_NAMES[0]),d=['q','PageUp','['].includes(k)?-1:1;state.tab=CTAB_NAMES[(i+d+CTAB_NAMES.length)%CTAB_NAMES.length];return show('controls',false)}
+  if(state.cur==='select'&&['q','e','PageUp','PageDown','[',']'].includes(k)){e.preventDefault();return setCat(['q','PageUp','['].includes(k)?'Men':'Women')}
+  const root=$('[data-veil]',stage)||stage;
+  const items=$$('.opt:not(.future),.tile:not(.future)',root);const i=items.indexOf(document.activeElement);
+  if(['ArrowDown','ArrowRight','ArrowUp','ArrowLeft'].includes(k)){
+    const el=document.activeElement;
+    if(el&&el.tagName==='INPUT')return;
+    if(el&&el.classList.contains('sel')&&(k==='ArrowLeft'||k==='ArrowRight')){e.preventDefault();return cycle(el,k==='ArrowRight'?1:-1)}
+    e.preventDefault();const d=(k==='ArrowDown'||k==='ArrowRight')?1:-1;
+    items[(i+d+items.length)%items.length]?.focus({preventScroll:true});
+  }
+});
+$('#jump').onclick=e=>{const j=e.target.dataset?.j;if(!j)return;
+  if(j==='bracket'){state.stack=['main'];return bracket()}
+  if(j==='pause'){show('match',false);return pause()}
+  state.stack=j==='title'||j==='main'?[]:j==='customize'?['main','career']:['main'];show(j,false)};
+{
+  const bare=/[?&]bare/.test(location.search), j=location.hash.slice(1);
+  if(bare)document.body.classList.add('bare');
+  const tp=new URLSearchParams(location.search).get('tab');if(tp!==null)state.tab=CTAB_NAMES[+tp];
+  const cp=new URLSearchParams(location.search).get("cat");if(cp&&CATS[cp]){state.cat=cp;const l=inCat(cp);state.p=[l[0].n,l[1].n]}
+  if(new URLSearchParams(location.search).get("sex")=="1")state.opt.sex=1;
+  if(j&&NAMES[j]||j==='pause'||j==='bracket'){
+    $('#jump [data-j='+j+']').click();
+    if(bare&&j==='match'||bare&&j==='pause'){stopClock();sc=[7,4];t=72;rd=2;
+      $('#sc0').textContent=7;$('#sc1').textContent=4;$('#clk').textContent='1:12';$('#rd').textContent=2;
+      $('#sub').innerHTML='<b>Head kick</b> · 3 points';$('#st0').firstElementChild.style.width='58%';$('#st1').firstElementChild.style.width='22%';$('#st1').classList.add('amber')}
+    if(bare&&j==='pause')pause();
+  } else show('title',false);
+}
+</script>

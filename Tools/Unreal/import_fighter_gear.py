@@ -2,6 +2,12 @@
 
 Prerequisites: create_base_fighter.py, then Tools/Blender/fit_to_body.py for MH_FighterBase_Body.
 
+Clean gear (Tools/Blender/build_clean_gear.py), every body type: set OPEN_STANCE_BODY_TYPE to Medium,
+Compact, Stocky, LeanTall or Tall (Medium is the base fighter, MH_FighterBase). Meshes, wardrobe items and
+hidden face maps go to /Game/Characters/Fighters/Gear/<Type>/ and are selected on the type's MetaHuman
+character. The shared material, instances and textures live in Gear/Clean/ and are built on first use.
+All of it is add-only: assets from the earlier Meshy-based gear (Gear/ root) are never touched.
+
 Outputs (under /Game/Characters/Fighters/Gear)
   Textures/T_Fighter_BaseColor, Textures/T_Fighter_Masks
   M_FighterGear             recolour master material (rules: Docs/Character_Customization.md)
@@ -17,12 +23,22 @@ import traceback
 import unreal
 
 REPO = "D:/Open-Stance-Gyeorugi"
-LOG = f"{REPO}/Saved/Logs/import_fighter_gear.txt"
+TYPE = os.environ.get("OPEN_STANCE_BODY_TYPE", "")   # "" = the original Meshy gear in Gear/ (legacy)
+LOG = f"{REPO}/Saved/Logs/import_fighter_gear{'_' + TYPE if TYPE else ''}.txt"
 FITTED = f"{REPO}/Resources/Models/Fitted/MH_FighterBase_Body"
 TEXTURES = f"{REPO}/Resources/Models/Textures"
 GEAR = "/Game/Characters/Fighters/Gear"
 CHARACTER = "/Game/Characters/Fighters/MH_FighterBase"
 BODY_MESH = "/Game/Characters/Fighters/Export/MH_FighterBase_Body"
+PART_DIR = GEAR        # where this body's meshes, wardrobe items and hidden face maps live
+SHARED = GEAR          # shared material, instances and textures
+if TYPE:
+    asset = "MH_FighterBase" if TYPE == "Medium" else f"MH_Fighter{TYPE}"
+    FITTED = f"{REPO}/Resources/Models/Fitted/{asset}_Body"
+    CHARACTER = f"/Game/Characters/Fighters/{asset}"
+    BODY_MESH = f"/Game/Characters/Fighters/Export/{asset}_Body"
+    PART_DIR = f"{GEAR}/{TYPE}"
+    SHARED = f"{GEAR}/Clean"
 PARTS = ["Jacket", "Pants", "Belt", "Protector", "Helmet", "Gloves", "FootGuards"]
 GEAR_PARTS = {"Helmet", "Protector", "Gloves", "FootGuards"}   # removed for menu / career views
 
@@ -85,11 +101,11 @@ def set_hidden_face_map(item, part):
     png = f"{FITTED}/T_HFM_{part}.png"
     if not os.path.exists(png):
         return
-    tex = import_file(png, f"{GEAR}/HiddenFaceMaps", f"T_HFM_{part}")
+    tex = import_file(png, f"{PART_DIR}/HiddenFaceMaps", f"T_HFM_{part}")
     tex.set_editor_property("srgb", False)
     tex.set_editor_property("compression_settings", unreal.TextureCompressionSettings.TC_GRAYSCALE)
     tex.set_editor_property("mip_gen_settings", unreal.TextureMipGenSettings.TMGS_NO_MIPMAPS)
-    EAL.save_asset(f"{GEAR}/HiddenFaceMaps/T_HFM_{part}")
+    EAL.save_asset(f"{PART_DIR}/HiddenFaceMaps/T_HFM_{part}")
     editor = item.get_editor_property("pipeline").get_editor_property("editor_pipeline")
     hfm = unreal.HiddenFaceMapTexture()
     hfm.set_editor_property("Texture", tex)
@@ -107,14 +123,14 @@ def expr(material, cls, x, y, **props):
     return e
 
 
-def build_material(base_tex, mask_tex):
-    path = f"{GEAR}/M_FighterGear"
+def build_material(base_tex, mask_tex, surf_tex, weave_tex):
+    path = f"{SHARED}/M_FighterGear"
     if EAL.does_asset_exist(path):
         # Rebuild in place (instances and meshes reference it, so don't delete)
         m = EAL.load_asset(path)
         MEL.delete_all_material_expressions(m)
     else:
-        m = tools.create_asset("M_FighterGear", GEAR, unreal.Material, unreal.MaterialFactoryNew())
+        m = tools.create_asset("M_FighterGear", SHARED, unreal.Material, unreal.MaterialFactoryNew())
 
     base = expr(m, unreal.MaterialExpressionTextureSampleParameter2D, -1400, -200, parameter_name="BaseColor", texture=base_tex)
     masks = expr(m, unreal.MaterialExpressionTextureSampleParameter2D, -1400, 300, parameter_name="Masks", texture=mask_tex,
@@ -166,9 +182,22 @@ def build_material(base_tex, mask_tex):
     MEL.connect_material_expressions(collar_tint, "", lerp_collar, "B")
     MEL.connect_material_expressions(masks, "B", lerp_collar, "Alpha")
 
-    rough = expr(m, unreal.MaterialExpressionConstant, 400, 200, r=0.8)
+    # Surface patch: R = roughness (cotton 0.88, padded vinyl 0.38), G = how much fabric weave shows. The weave
+    # normal map tiles on UV1 (1 UV unit = 5 cm of surface, set by Tools/Blender/build_clean_gear.py).
+    surf = expr(m, unreal.MaterialExpressionTextureSampleParameter2D, -1400, 700, parameter_name="Surface", texture=surf_tex,
+                sampler_type=unreal.MaterialSamplerType.SAMPLERTYPE_MASKS)
+    uv1 = expr(m, unreal.MaterialExpressionTextureCoordinate, -1700, 1000, coordinate_index=1)
+    weave = expr(m, unreal.MaterialExpressionTextureSampleParameter2D, -1400, 1000, parameter_name="WeaveNormal", texture=weave_tex,
+                 sampler_type=unreal.MaterialSamplerType.SAMPLERTYPE_NORMAL)
+    MEL.connect_material_expressions(uv1, "", weave, "UVs")
+    flat = expr(m, unreal.MaterialExpressionConstant3Vector, -1100, 900, constant=unreal.LinearColor(0, 0, 1, 1))
+    normal = expr(m, unreal.MaterialExpressionLinearInterpolate, -800, 950)
+    MEL.connect_material_expressions(flat, "", normal, "A")
+    MEL.connect_material_expressions(weave, "RGB", normal, "B")
+    MEL.connect_material_expressions(surf, "G", normal, "Alpha")
     MEL.connect_material_property(lerp_collar, "", unreal.MaterialProperty.MP_BASE_COLOR)
-    MEL.connect_material_property(rough, "", unreal.MaterialProperty.MP_ROUGHNESS)
+    MEL.connect_material_property(surf, "R", unreal.MaterialProperty.MP_ROUGHNESS)
+    MEL.connect_material_property(normal, "", unreal.MaterialProperty.MP_NORMAL)
     m.set_editor_property("used_with_skeletal_mesh", True)
     m.set_editor_property("two_sided", True)   # cloth: sleeve and collar interiors are visible
     MEL.recompile_material(m)
@@ -178,9 +207,9 @@ def build_material(base_tex, mask_tex):
 
 
 def make_instance(parent, name, team_side):
-    path = f"{GEAR}/{name}"
+    path = f"{SHARED}/{name}"
     mi = EAL.load_asset(path) if EAL.does_asset_exist(path) else tools.create_asset(
-        name, GEAR, unreal.MaterialInstanceConstant, unreal.MaterialInstanceConstantFactoryNew())
+        name, SHARED, unreal.MaterialInstanceConstant, unreal.MaterialInstanceConstantFactoryNew())
     MEL.set_material_instance_parent(mi, parent)
     MEL.set_material_instance_scalar_parameter_value(mi, "TeamSide", float(team_side))
     EAL.save_asset(path)
@@ -192,17 +221,28 @@ try:
     # Legacy FBX importer so FbxImportUI options (existing skeleton, no materials) apply.
     unreal.SystemLibrary.execute_console_command(None, "Interchange.FeatureFlags.Import.FBX false")
 
-    base_tex = import_file(f"{TEXTURES}/T_Fighter_BaseColor.png", f"{GEAR}/Textures", "T_Fighter_BaseColor")
-    base_tex.set_editor_property("srgb", True)
-    mask_tex = import_file(f"{TEXTURES}/T_Fighter_Masks.png", f"{GEAR}/Textures", "T_Fighter_Masks")
-    mask_tex.set_editor_property("srgb", False)
-    mask_tex.set_editor_property("compression_settings", unreal.TextureCompressionSettings.TC_MASKS)
-    EAL.save_asset(f"{GEAR}/Textures/T_Fighter_Masks")
-    EAL.save_asset(f"{GEAR}/Textures/T_Fighter_BaseColor")
+    chung_path = f"{SHARED}/MI_FighterGear_Chung"
+    if EAL.does_asset_exist(chung_path) and not os.environ.get("OPEN_STANCE_REBUILD_MATERIAL"):
+        mi_chung = EAL.load_asset(chung_path)             # shared: built by the first run
+    else:
+        tex_dir = f"{SHARED}/Textures"
+        base_tex = import_file(f"{TEXTURES}/T_Fighter_BaseColor.png", tex_dir, "T_Fighter_BaseColor")
+        base_tex.set_editor_property("srgb", True)
+        mask_tex = import_file(f"{TEXTURES}/T_Fighter_Masks.png", tex_dir, "T_Fighter_Masks")
+        mask_tex.set_editor_property("srgb", False)
+        mask_tex.set_editor_property("compression_settings", unreal.TextureCompressionSettings.TC_MASKS)
+        surf_tex = import_file(f"{TEXTURES}/T_Fighter_Surface.png", tex_dir, "T_Fighter_Surface")
+        surf_tex.set_editor_property("srgb", False)
+        surf_tex.set_editor_property("compression_settings", unreal.TextureCompressionSettings.TC_MASKS)
+        weave_tex = import_file(f"{TEXTURES}/T_Fighter_Weave_N.png", tex_dir, "T_Fighter_Weave_N")
+        weave_tex.set_editor_property("srgb", False)
+        weave_tex.set_editor_property("compression_settings", unreal.TextureCompressionSettings.TC_NORMALMAP)
+        for name in ("T_Fighter_Masks", "T_Fighter_BaseColor", "T_Fighter_Surface", "T_Fighter_Weave_N"):
+            EAL.save_asset(f"{tex_dir}/{name}")
 
-    material = build_material(base_tex, mask_tex)
-    mi_chung = make_instance(material, "MI_FighterGear_Chung", 0)
-    make_instance(material, "MI_FighterGear_Hong", 1)
+        material = build_material(base_tex, mask_tex, surf_tex, weave_tex)
+        mi_chung = make_instance(material, "MI_FighterGear_Chung", 0)
+        make_instance(material, "MI_FighterGear_Hong", 1)
 
     skeleton = EAL.load_asset(BODY_MESH).get_editor_property("skeleton")
     log("body skeleton", skeleton.get_path_name())
@@ -219,7 +259,7 @@ try:
         ui.import_animations = False
         ui.create_physics_asset = False
         ui.skeletal_mesh_import_data.set_editor_property("import_morph_targets", False)
-        mesh = import_file(f"{FITTED}/SK_Fighter_{part}.fbx", GEAR, f"SK_Fighter_{part}", ui)
+        mesh = import_file(f"{FITTED}/SK_Fighter_{part}.fbx", PART_DIR, f"SK_Fighter_{part}", ui)
         if mesh is None:
             log("FAILED to import", part)
             continue
@@ -231,7 +271,7 @@ try:
         mesh.set_editor_property("materials", mats)
         bounds = mesh.get_bounds()
         log("mesh", part, "bounds extent (cm)", bounds.box_extent)
-        EAL.save_asset(f"{GEAR}/SK_Fighter_{part}")
+        EAL.save_asset(f"{PART_DIR}/SK_Fighter_{part}")
         meshes[part] = mesh
         log("mesh", part, "bones in skeleton", skeleton.get_path_name(), "materials", len(mats))
 
@@ -240,14 +280,14 @@ try:
     collection = character.get_editor_property("internal_collection")
     for part, mesh in meshes.items():
         name = f"WI_Fighter_{part}"
-        path = f"{GEAR}/{name}"
+        path = f"{PART_DIR}/{name}"
         # Existing items are updated in place: the character's collection references them, and
         # Creator lists them via Config/DefaultMetaHumanCharacter.ini (WardrobePaths).
         existed = EAL.does_asset_exist(path)
         if existed:
             item = EAL.load_asset(path)
         else:
-            item = tools.create_asset(name, GEAR, unreal.MetaHumanWardrobeItem, unreal.MetaHumanWardrobeItemFactory())
+            item = tools.create_asset(name, PART_DIR, unreal.MetaHumanWardrobeItem, unreal.MetaHumanWardrobeItemFactory())
         if item.get_editor_property("pipeline") is None:
             set_skeletal_mesh_pipeline(item)
         set_hidden_face_map(item, part)

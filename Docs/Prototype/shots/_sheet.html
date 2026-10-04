@@ -1,0 +1,17 @@
+<meta charset="utf-8"><style>
+body{margin:0;background:#e9edf3;font-family:"Segoe UI",Arial,sans-serif;padding:40px;width:3320px}
+h1{margin:0 0 6px;font-size:44px;color:#0b1220;letter-spacing:.04em}
+p{margin:0 0 28px;font-size:22px;color:#4a5568}
+.g{display:grid;grid-template-columns:repeat(4,760px);gap:36px 36px}
+.c{background:#fff;padding:14px;box-shadow:0 1px 4px rgba(0,0,0,.2)}
+.c img{width:732px;height:412px;display:block}
+.c b{display:block;margin-top:10px;font-size:26px;color:#0b1220}
+.c span{font-size:18px;color:#5b6678}
+</style>
+<h1>OPEN STANCE · MENU PROTOTYPE</h1>
+<p>Console UI mockups. Sparring and Tournament use premade fighters; the created fighter belongs to Career only. Sample content.</p>
+<div class="g" id="g"></div>
+<script>
+const L=[["01_title","Title","Press any button"],["02_main","Main menu","Play tab; tabs Play / Progress / Connected / Options"],["03_sparring","Sparring setup","Players, ruleset, difficulty, arena"],["04_tournament","Tournament setup","Bracket size, ruleset, difficulty, arena"],["05_select","Fighter select, men","Men and Women tabs; premade fighters"],["05b_select_women","Fighter select, women","Women roster; same Chung and Hong assignment"],["06_match","Match HUD","Scoreboard, penalties, stamina, referee"],["07_pause","Pause","Resume, Move list, Controls, Options, Restart, Quit"],["08_results","Results","Winner, rounds, technique points, penalties"],["13_bracket","Tournament bracket","Results and next pairing"],["09_training","Training","Lessons, drills, free practice"],["10_career","Career","Calendar, created fighter, events"],["11_customize","Fighter creator (Career)","Look and gear, gear on or off"],["11b_customize_female","Fighter creator, female (Career)","Sex option changes the preview"],["12_options","Options","Audio, Video, Controls"],["14_controls_0","Controls: Movement and guards",""],["14_controls_1","Controls: Modifiers",""],["14_controls_2","Controls: Standing kicks",""],["14_controls_3","Controls: Spinning and jump kicks","Stick icons show how far to turn"],["14_controls_4","Controls: Fakes","One tab for every fake kick"],["14_controls_5","Controls: Punches and defense",""]];
+document.getElementById('g').innerHTML=L.map(([f,t,s])=>`<div class="c"><img src="${f}.png"><b>${t}</b><span>${s}&nbsp;</span></div>`).join('');
+</script>

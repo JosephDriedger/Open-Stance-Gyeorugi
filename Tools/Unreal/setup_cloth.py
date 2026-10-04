@@ -6,7 +6,7 @@ Run after import_fighter_gear.py / import_referee_outfit.py (re-importing a mesh
 Each rule pins the garment where it is held (knot, belt, waistband) and lets it move lower down,
 with Max Distance fading in between; collisions come from the character's body physics asset.
 
-  Fighter:  belt tails swing, jacket skirt below the belt sways, pant hems flap
+  Fighter:  belt tails swing, jacket skirt below the belt sways, pant hems flap (all five body types)
   Referee:  tie swings from the knot, trouser legs move below the knee
   Rigid (skinned only): chest protector, helmet, gloves, foot guards, belt band, shirt, shoes
 """
@@ -55,19 +55,31 @@ def cloth(path, phys, pin_z, free_z, max_cm, box_min=(-BIG, -BIG, -BIG), box_max
 
 
 try:
-    # --- fighter (dobok) ---
-    gear = "/Game/Characters/Fighters/Gear"
-    phys = body_physics("/Game/Characters/Fighters/Export/MH_FighterBase_Body")
-    belt_lo, belt_hi = z_range(EAL.load_asset(f"{gear}/SK_Fighter_Belt"))
-    band_bottom = belt_hi - 7.0
-    # belt: band stays on the waist, the knot tails (front, below the band) swing
-    cloth(f"{gear}/SK_Fighter_Belt", phys, band_bottom, belt_lo, 10.0, box_min=(-25, -BIG, -BIG), box_max=(25, BIG, BIG))
-    jacket_lo, _ = z_range(EAL.load_asset(f"{gear}/SK_Fighter_Jacket"))
-    # jacket: only the skirt below the belt, within the torso width (sleeves stay skinned in A-pose)
-    # (pinned from the bottom of the belt band: the belt tails hang lower than the jacket hem)
-    cloth(f"{gear}/SK_Fighter_Jacket", phys, band_bottom - 2.0, jacket_lo, 4.0, box_min=(-24, -BIG, -BIG), box_max=(24, BIG, BIG))
-    pants_lo, pants_hi = z_range(EAL.load_asset(f"{gear}/SK_Fighter_Pants"))
-    cloth(f"{gear}/SK_Fighter_Pants", phys, pants_lo + 0.30 * (pants_hi - pants_lo), pants_lo, 3.0)
+    # --- fighters (dobok): the base (Medium) body, then each other body type ---
+    FIGHTERS = [("Medium", "/Game/Characters/Fighters/Gear/Medium", "MH_FighterBase")]
+    FIGHTERS += [(t, f"/Game/Characters/Fighters/Gear/{t}", f"MH_Fighter{t}") for t in ("Compact", "Stocky", "LeanTall", "Tall")]
+    base_belt_width = None
+    for label, gear, body in FIGHTERS:
+        if EAL.load_asset(f"{gear}/SK_Fighter_Belt") is None:
+            log("skipping", label, "(gear not imported)")
+            continue
+        phys = body_physics(f"/Game/Characters/Fighters/Export/{body}_Body")
+        belt = EAL.load_asset(f"{gear}/SK_Fighter_Belt")
+        belt_lo, belt_hi = z_range(belt)
+        # Torso-width limits below were tuned on the Medium body; scale them by the belt's width.
+        width = belt.get_bounds().box_extent.x
+        base_belt_width = base_belt_width or width
+        w = width / base_belt_width
+        log(label, f"torso width scale {w:.3f}")
+        band_bottom = belt_hi - 7.0
+        # belt: band stays on the waist, the knot tails (front, below the band) swing
+        cloth(f"{gear}/SK_Fighter_Belt", phys, band_bottom, belt_lo, 10.0, box_min=(-25 * w, -BIG, -BIG), box_max=(25 * w, BIG, BIG))
+        jacket_lo, _ = z_range(EAL.load_asset(f"{gear}/SK_Fighter_Jacket"))
+        # jacket: only the skirt below the belt, within the torso width (sleeves stay skinned in A-pose)
+        # (pinned from the bottom of the belt band: the belt tails hang lower than the jacket hem)
+        cloth(f"{gear}/SK_Fighter_Jacket", phys, band_bottom - 2.0, jacket_lo, 4.0, box_min=(-24 * w, -BIG, -BIG), box_max=(24 * w, BIG, BIG))
+        pants_lo, pants_hi = z_range(EAL.load_asset(f"{gear}/SK_Fighter_Pants"))
+        cloth(f"{gear}/SK_Fighter_Pants", phys, pants_lo + 0.30 * (pants_hi - pants_lo), pants_lo, 3.0)
 
     # --- referees ---
     for p in ROSTER:

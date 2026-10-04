@@ -1,18 +1,42 @@
-"""Run with MotionBuilder's mobupy.exe; creates a separate characterized test FBX."""
+"""Run with MotionBuilder's mobupy.exe; creates a separate characterized test FBX.
+
+    mobupy.exe Tools/MotionBuilder/prepare_test_character.py                  custom fighter (Fighter_Rigged.fbx)
+    mobupy.exe Tools/MotionBuilder/prepare_test_character.py --metahuman      MetaHuman test fighter with gear
+                                                                              (Resources/Models/TestFighter/, built by
+                                                                              Tools/Blender/build_test_model.py)
+Specific creator body export:
+    mobupy.exe Tools/MotionBuilder/prepare_test_character.py --source path/to/body.fbx --name FighterName --output-dir path/to/output
+
+Both skeletons use the same joint names, so one mapping serves both.
+"""
 from pathlib import Path
 import json
+import sys
 import pyfbstandalone
 
 pyfbstandalone.initialize()
 from pyfbsdk import *
 
 ROOT = Path(__file__).resolve().parents[2]
-OUT = ROOT / 'Resources/Models/MotionBuilder'
+import argparse
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument('--metahuman', action='store_true')
+parser.add_argument('--source', help='Specific body-animation FBX; absolute or repository relative')
+parser.add_argument('--name', help='Character and output filename')
+parser.add_argument('--output-dir', help='Output directory; absolute or repository relative')
+args = parser.parse_args()
+OUT = ROOT / (args.output_dir or 'Resources/Models/MotionBuilder')
 OUT.mkdir(parents=True, exist_ok=True)
+if args.metahuman:
+    SOURCE, NAME = 'Resources/Models/TestFighter/OpenStance_TestFighter_MH.fbx', 'OpenStance_TestFighter_MH'
+else:
+    SOURCE, NAME = 'Resources/Models/Fighter_Rigged.fbx', 'OpenStance_TestFighter'
+SOURCE = args.source or SOURCE
+NAME = args.name or NAME
 app = FBApplication()
-assert app.FileOpen(str(ROOT / 'Resources/Models/Fighter_Rigged.fbx'), False)
+assert app.FileOpen(str(ROOT / SOURCE), False)
 scene = FBSystem().Scene
-character = FBCharacter('OpenStance_TestFighter')
+character = FBCharacter(NAME)
 mapping = {
     'Reference': 'root', 'Hips': 'pelvis', 'Spine': 'spine_01',
     'Spine1': 'spine_02', 'Spine2': 'spine_03', 'Spine3': 'spine_04',
@@ -72,18 +96,18 @@ FBPlayerControl().Goto(FBTime(0, 0, 0, 0))
 FBSystem().CurrentTake.Name = 'Reference_ReadyForMocap'
 options = FBFbxOptions(False)
 options.EmbedMedia = True
-output = OUT / 'OpenStance_TestFighter.fbx'
+output = OUT / f'{NAME}.fbx'
 assert app.FileSave(str(output), options), 'FBX save failed'
 
 # Verify the delivered file, not just the in-memory setup.
 assert app.FileOpen(str(output), False)
-reopened = next(c for c in FBSystem().Scene.Characters if c.Name == 'OpenStance_TestFighter')
+reopened = next(c for c in FBSystem().Scene.Characters if c.Name == NAME)
 assert reopened.GetCharacterize(), 'Characterization lost on save'
 assert reopened.GetCurrentControlSet() is not None, 'Control rig lost on save'
-report = {'source': 'Resources/Models/Fighter_Rigged.fbx', 'output': str(output),
+report = {'source': SOURCE, 'output': str(output),
           'character': reopened.Name, 'mapped_slots': len(mapping),
           'characterized': True, 'control_rig': True, 'reopened_successfully': True,
           'wrist_control_hand_movement_cm': movement,
           'visual_deformation_checked': False, 'mocap_applied': False}
-(OUT / 'validation.json').write_text(json.dumps(report, indent=2))
+(OUT / ('validation.json' if NAME == 'OpenStance_TestFighter' else f'validation_{NAME}.json')).write_text(json.dumps(report, indent=2))
 print(json.dumps(report, indent=2))

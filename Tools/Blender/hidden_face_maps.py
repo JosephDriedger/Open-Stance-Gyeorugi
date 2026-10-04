@@ -24,11 +24,14 @@ log = cfg.open_log("hidden_face_maps")
 SIZE = 1024
 # max_gap: how far (m) outside the skin the garment may be and still count as covering it.
 # erode: vertex rings kept visible next to uncovered skin (openings).
+# allow: body bones (name prefixes) the garment can cover at all. Without it a long ray from skin outside the garment
+# can still reach it: from the toes up to the pants hem, from the fingers back to a sleeve, hiding fingers and toes.
 PARTS = {
-    "Jacket":     dict(max_gap=0.10, erode=3),
-    "Pants":      dict(max_gap=0.10, erode=3),
-    "Gloves":     dict(max_gap=0.03, erode=1),
-    "FootGuards": dict(max_gap=0.03, erode=1),
+    "Jacket":     dict(max_gap=0.10, erode=3, allow=("spine", "clavicle", "upperarm", "lowerarm", "pelvis", "thigh")),
+    "Pants":      dict(max_gap=0.10, erode=3, allow=("pelvis", "thigh", "calf")),
+    "Gloves":     dict(max_gap=0.03, erode=1, allow=("hand", "lowerarm", "thumb_01", "index_metacarpal",
+                                                     "middle_metacarpal", "ring_metacarpal", "pinky_metacarpal")),
+    "FootGuards": dict(max_gap=0.03, erode=1, allow=("foot", "calf")),
 }
 
 target_name = globals().get("TARGET_NAME", "MH_FighterBase_Body")
@@ -76,7 +79,16 @@ try:
         pbm.free()
 
         covered = np.zeros(len(body_bm.verts), dtype=bool)
+        allowed = None
+        if s.get("allow"):
+            gi = [g.index for g in body.vertex_groups if g.name.startswith(tuple(s["allow"]))]
+            allowed = np.zeros(len(body_bm.verts))
+            for v in body.data.vertices:
+                allowed[v.index] = sum(g.weight for g in v.groups if g.group in gi)
+            allowed = allowed >= 0.5
         for v in body_bm.verts:
+            if allowed is not None and not allowed[v.index]:
+                continue
             n = v.normal
             if n.length < 1e-6:
                 continue
@@ -129,7 +141,15 @@ try:
         path = os.path.join(out_dir, f"{name}.png")
         bimg.filepath_raw = path
         bimg.file_format = 'PNG'
-        bimg.save()
+        for attempt in range(8):                    # another process (scanner, sync) can hold the file briefly
+            try:
+                bimg.save()
+                break
+            except RuntimeError:
+                if attempt == 7:
+                    raise
+                import time
+                time.sleep(1.5)
         log(pname, "covered verts", int(covered.sum()), "hidden verts", int(hidden.sum()),
             "hidden faces", faces_hidden, "->", path)
     body_bm.free()

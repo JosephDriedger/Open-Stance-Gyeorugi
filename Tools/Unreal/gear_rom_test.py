@@ -16,7 +16,7 @@ import unreal
 
 ANIM = "/MetaHumanCharacter/Optional/Animation/TemplateAnimations/Technical_Loops/BodyROM/mhc_body_rom_body"
 BODY = "/Game/Characters/Fighters/Export/MH_FighterBase_Body"
-GEAR = "/Game/Characters/Fighters/Gear"
+GEAR = "/Game/Characters/Fighters/Gear/Medium"
 PARTS = ["Jacket", "Pants", "Belt", "Protector", "Helmet", "Gloves", "FootGuards"]
 ORIGIN = unreal.Vector(0, 0, 20000)
 

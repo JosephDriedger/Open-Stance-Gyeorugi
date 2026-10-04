@@ -22,7 +22,8 @@ Steps
    rigid parts smooth much harder so they inflate evenly instead of denting.
    The shirt shell that sat under the chest protector is also pulled in to hug the torso, so
    the jacket reads as a dobok when the protector is off.
-5. Weights copied from the target body; the helmet is rigid on the head skeleton's head bone.
+5. Weights copied from the target body; the helmet is rigid on the head skeleton's head bone. The gloves
+   are rebuilt from the body's hand surface (build_gloves.py) instead of fitted.
 6. Export to <output>/Fitted/<TargetName>/SK_Fighter_<Part>.fbx (helmet on the head skeleton).
 """
 import os
@@ -432,6 +433,21 @@ WEIGHT_SMOOTH = {"Jacket": 20, "Pants": 4, "Belt": 12, "Protector": 25, "Gloves"
 ARM_PARENTS = {b.name: (b.parent.name if b.parent else None) for b in tgt_arm.data.bones}
 COLLAR_BONES = {"spine_04", "spine_05", "neck_01", "neck_02", "clavicle_l", "clavicle_r"}
 SKIRT_TO_PELVIS = 0.5   # share of thigh influence moved to the pelvis on the jacket skirt
+# Rules below were tuned with Tools/Validation/check_gear_poses.py against the mocap shot list's
+# extreme poses (head-height kicks, splits, squat, seated, arms overhead).
+# Jacket: no thigh influence above the hip joint, or the torso above the belt is dragged along when
+# a knee comes up (chamber, squat, seated) and shows through the belt and protector.
+THIGH_FADE = (-0.08, 0.02)          # thigh weight kept fully below pelvis.z-8 cm, none above +2 cm
+# Pants: the dobok crotch hangs ~20 cm below the pelvis and its centre seam copied whole-leg weights
+# from whichever inner thigh was nearest, so lifting one leg tore it open (up to 38 cm).
+CROTCH_MIRROR_X = 0.14              # half-width (m) over which seam vertices share both legs' weights
+CROTCH_PELVIS = (0.5, 0.08)         # pelvis share on the seam, half-width (m) it fades over
+CROTCH_BOTTOM = 0.515               # below pelvis.z by this (m) the crotch rules fade out
+HIP_SMOOTH = 10                     # extra smoothing passes over the pants' hip and crotch
+# Jacket armpits: sleeve and side panel blend 5-6 bones; extra smoothing keeps neighbours on the same
+# bones when the arms go overhead (RES-08, REF-14, COA-04).
+ARMPIT_SMOOTH = 30
+MAX_INFLUENCES = 8                  # was 4: truncating armpit/hip blends to 4 bones re-opened tears
 
 
 def smoothstep(edge0, edge1, x):
@@ -459,18 +475,64 @@ def remap_to_allowed(w, allowed):
     return out
 
 
+def mirror_weights(w):
+    """Same weights on the other side's bones (thigh_l <-> thigh_r)."""
+    out = {}
+    for bone, val in w.items():
+        if bone.endswith(("_l", "_r")):
+            other = bone[:-2] + ("_r" if bone.endswith("_l") else "_l")
+            bone = other if other in ARM_PARENTS else bone
+        out[bone] = out.get(bone, 0.0) + val
+    return out
+
+
+def smooth_region(W, nbrs, mask, passes):
+    for _ in range(passes):
+        nxt = list(W)
+        for i in mask:
+            if not nbrs[i]:
+                continue
+            acc = {k: val * 0.5 for k, val in W[i].items()}
+            f = 0.5 / len(nbrs[i])
+            for j in nbrs[i]:
+                for k, val in W[j].items():
+                    acc[k] = acc.get(k, 0.0) + val * f
+            nxt[i] = acc
+        W = nxt
+    return W
+
+
 def postprocess_weights(pname, obj):
     me = obj.data
     names = {g.index: g.name for g in obj.vertex_groups}
     W = [{names[g.group]: g.weight for g in v.groups if g.weight > 0.0} for v in me.vertices]
     neck = J("neck_01")
     pelvis = J("pelvis")
-    rules = {"collar": 0, "skirt": 0}
+    rules = {"collar": 0, "skirt": 0, "thigh_fade": 0, "crotch": 0}
     for i, v in enumerate(me.vertices):
         w = W[i]
         if pname in RIGID_BONES:
             w = remap_to_allowed(w, RIGID_BONES[pname] - {"root"})
+        elif pname == "Pants" and pelvis is not None:
+            z_in = (smoothstep(pelvis.z - CROTCH_BOTTOM, pelvis.z - 0.08, v.co.z)
+                    * smoothstep(pelvis.z + 0.05, pelvis.z - 0.02, v.co.z))
+            t_mirror = 0.5 * smoothstep(CROTCH_MIRROR_X, 0.0, abs(v.co.x)) * z_in
+            if t_mirror > 0.0:
+                w = blend_weights(w, mirror_weights(w), t_mirror)
+                w = blend_weights(w, {"pelvis": 1.0},
+                                  CROTCH_PELVIS[0] * smoothstep(CROTCH_PELVIS[1], 0.0, abs(v.co.x)) * z_in)
+                rules["crotch"] += 1
         elif pname == "Jacket":
+            if pelvis is not None:
+                keep = smoothstep(pelvis.z + THIGH_FADE[1], pelvis.z + THIGH_FADE[0], v.co.z)
+                moved = 0.0
+                for bone in list(w):
+                    if bone.startswith("thigh") and keep < 1.0:
+                        moved += w[bone] * (1.0 - keep)
+                        w[bone] *= keep
+                if moved:
+                    w["pelvis"] = w.get("pelvis", 0.0) + moved
+                    rules["thigh_fade"] += 1
             # Soft regions: a hard boundary between rule and no-rule weights folds the cloth.
             t_collar = 0.0
             if neck is not None:
@@ -511,11 +573,20 @@ def postprocess_weights(pname, obj):
             nxt.append(acc)
         W = nxt
 
+    co = [v.co for v in me.vertices]
+    if pname == "Pants" and pelvis is not None:
+        hip = [i for i, p in enumerate(co) if pelvis.z - CROTCH_BOTTOM < p.z < pelvis.z + 0.08]
+        W = smooth_region(W, nbrs, hip, HIP_SMOOTH)
+    clav = J("clavicle_l")
+    if pname == "Jacket" and clav is not None:
+        pits = [i for i, p in enumerate(co) if 0.08 < abs(p.x) < 0.30 and clav.z - 0.30 < p.z < clav.z + 0.05]
+        W = smooth_region(W, nbrs, pits, ARMPIT_SMOOTH)
+
     for g in list(obj.vertex_groups):
         obj.vertex_groups.remove(g)
     groups = {}
     for i, w in enumerate(W):
-        keep = sorted(((k, val) for k, val in w.items() if val >= 0.02), key=lambda t: -t[1])[:4]
+        keep = sorted(((k, val) for k, val in w.items() if val >= 0.02), key=lambda t: -t[1])[:MAX_INFLUENCES]
         total = sum(val for _, val in keep) or 1.0
         for k, val in keep:
             if k not in groups:
@@ -535,6 +606,13 @@ for pname, obj in fitted:
         parent_arm = tgt_arm if "head" in tgt_arm.data.bones else (head_arm or tgt_arm)
         g = obj.vertex_groups.new(name="head")
         g.add(list(range(len(obj.data.vertices))), 1.0, 'REPLACE')
+    elif pname == "Gloves":
+        # Not the fitted Meshy shell: carved from the body's own hand, so it can't fold in a fist.
+        parent_arm = tgt_arm
+        import importlib
+        import build_gloves
+        importlib.reload(build_gloves)
+        build_gloves.rebuild(obj, tgt_body, log)
     else:
         parent_arm = tgt_arm
         dt = obj.modifiers.new("WeightTransfer", 'DATA_TRANSFER')
