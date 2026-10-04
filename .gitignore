@@ -99,3 +99,6 @@ Resources/Models/ProtectorStudy/
 Resources/Models/TestFighter/
 Resources/Models/MotionBuilder/*.bck/
 Resources/Models/MotionBuilder/*.fbm/
+
+# macOS Finder files
+.DS_Store
