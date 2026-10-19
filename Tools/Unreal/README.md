@@ -38,12 +38,14 @@ Scripts that write logs put them in `Saved/Logs/<script>.txt`.
 | `build_arenas.py` | Imports environment textures/props and builds the staging levels `L_CompetitionArena` and `L_TrainingDojang` (WT mat: 8 m octagon in a 12 m square). |
 | `build_venues.py` | Builds the six Career venues (GDD 6.2), one per tournament tier: `L_ClubDojang`, `L_SchoolGym`, `L_ProvincialHall`, `L_NationalArena`, `L_ContinentalArena`, `L_WorldFinalStage`. Environments only. Imports only new or writable assets, so it runs without checking out the read-only Perforce files; pass venue names (`club gym ...`) to build a subset. Needs `build_arenas.py` to have run once. |
 | `capture_levels.py` | Renders venue levels from fixed cameras to `Saved/Screenshots/Venues/` for review, with no editor window: `UnrealEditor-Cmd.exe <project> -RenderOffscreen -unattended -ExecCmds="py .../capture_levels.py [L_Name ...] quit"`. |
+| `build_menu_level.py` | Creates the empty level `/Game/Maps/L_MainMenu`, whose game mode override is the menu's `AOpenStanceMenuGameMode`. Project Settings use it as the default map. Safe to re-run. |
+| `capture_menu.py` | Renders every menu screen to `Saved/Screenshots/Menu/` at 1600 x 900, named like the files in `Docs/Prototype/shots` so each has a counterpart: `UnrealEditor-Cmd.exe <project> -RenderOffscreen -unattended -ExecCmds="py .../capture_menu.py [02_main ...] quit"`. Uses the C++ helper `unreal.OpenStanceMenuCaptureLibrary`, which draws a screen through Slate's widget renderer with no viewport. |
 | `env_common.py` | Shared helpers for the level scripts (placement, lights, material instances, asset locks). |
 
 ## C++ editor helper
 
 `Source/OpenStanceEditorTools` exposes cloth creation to Python (the engine only offers it in the mesh
-editor UI). After changing it, close the editor and build:
+editor UI) and the menu screenshot renderer used by `capture_menu.py`. After changing it, close the editor and build:
 `C:\UE_5.8.0\Engine\Build\BatchFiles\Build.bat OpenStanceEditor Win64 Development -Project="D:\Open-Stance-Gyeorugi\OpenStance.uproject" -WaitMutex`
 
 ## Pipeline position

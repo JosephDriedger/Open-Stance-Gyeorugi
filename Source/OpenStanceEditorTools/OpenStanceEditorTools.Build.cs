@@ -14,6 +14,11 @@ public class OpenStanceEditorTools : ModuleRules
 			"ClothingSystemRuntimeInterface",
 			"ClothingSystemEditorInterface",
 			"SkeletalMeshEditor",
+			"OpenStance",
+			"Slate",
+			"SlateCore",
+			"UMG",
+			"RenderCore",
 		});
 	}
 }

@@ -8,13 +8,14 @@ Open Stance covers sparring only. Forms (poomsae) and breaking are out of scope.
 
 ## Status
 
-Pre-production. The design is a draft and there is no gameplay prototype yet: `Source/OpenStance` has no gameplay code, so the Skill Stick is untested until Milestone 1. What exists today:
+Pre-production. The design is a draft and there is no gameplay prototype yet: `Source/OpenStance` holds the menu system but no gameplay code, so the Skill Stick is untested until Milestone 1. What exists today:
 
 - Game Design Document (v0.6 draft), controls layout, project plan and mocap shot list in `Docs/`.
 - A base MetaHuman fighter with a seven-piece wardrobe (dobok jacket and pants, belt, chest protector, helmet, gloves, foot guards) and Chung/Hong materials. It passes a full-body range-of-motion test.
 - A roster of six MetaHuman referees in uniform, with Chaos cloth on ties and trousers.
 - Staging levels `L_CompetitionArena` (8 m octagon mat in a 12 m square) and `L_TrainingDojang`, plus arena and dojang props.
 - A MotionBuilder test character for the first motion-capture session (`Docs/Vicon_Nexus_Test.md`).
+- The whole menu system (title, main menu, setup, fighter select, match HUD, results, bracket, training, Career, fighter creator, options, controls and the Future pages), written in C++ from the HTML prototype in `Docs/Prototype` and running in the empty level `L_MainMenu`. See [Docs/Menu_System.md](Docs/Menu_System.md).
 
 ## Design at a glance
 
@@ -31,10 +32,10 @@ The full design is in `Docs/GDD_Open_Stance.docx`.
 | Path | Contents |
 | --- | --- |
 | `OpenStance.uproject` | Unreal project (UE 5.8 source build) |
-| `Source/OpenStance` | Runtime game module |
-| `Source/OpenStanceEditorTools` | Editor module that exposes Chaos cloth creation to Python |
+| `Source/OpenStance` | Runtime game module: the menu system (`Public/Menu`, Slate and UMG written in C++); no gameplay yet |
+| `Source/OpenStanceEditorTools` | Editor module that exposes Chaos cloth creation and menu screenshots to Python |
 | `Config/` | Engine, editor, game, input and MetaHuman wardrobe configuration |
-| `Docs/` | Game Design Document, controls, project plan, mocap shot list, UML diagrams, [character customization rules](Docs/Character_Customization.md), [Vicon/Nexus test plan](Docs/Vicon_Nexus_Test.md) |
+| `Docs/` | Game Design Document, controls, project plan, mocap shot list, UML diagrams, [menu system notes](Docs/Menu_System.md), [character customization rules](Docs/Character_Customization.md), [Vicon/Nexus test plan](Docs/Vicon_Nexus_Test.md) |
 | `Resources/` | Source art outside the Unreal project: fighter and MetaHuman FBX files, fitted gear, referee outfits, environment meshes and textures, MotionBuilder test character, reference images |
 | `Tools/Blender/` | Rig, gear-fitting, hidden-face-map and environment-mesh scripts ([README](Tools/Blender/README.md)) |
 | `Tools/Unreal/` | Editor Python scripts for characters, wardrobe, referees, cloth and levels ([README](Tools/Unreal/README.md)) |
@@ -53,7 +54,7 @@ Requirements: Unreal Engine 5.8 (source build) on Windows with Visual Studio, pl
    ```
    C:\UE_5.8.0\Engine\Build\BatchFiles\Build.bat OpenStanceEditor Win64 Development -Project="D:\Open-Stance-Gyeorugi\OpenStance.uproject" -WaitMutex
    ```
-4. Open `OpenStance.uproject` and load `L_CompetitionArena` or `L_TrainingDojang`.
+4. Open `OpenStance.uproject` and load `L_CompetitionArena` or `L_TrainingDojang`, or press Play on `L_MainMenu` (the project's default map) to try the menu.
 
 If Unreal reports a plugin "could not be found" at startup, rebuild the editor as in step 3.
 
