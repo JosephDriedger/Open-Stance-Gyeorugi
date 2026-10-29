@@ -1,5 +1,7 @@
 # Vicon Nexus lab test — September 25, 2026
 
+> Historical setup notes. Use [Mocap_Test.md](Mocap_Test.md) for the limited readiness test and [Mocap_Record.md](Mocap_Record.md) for the separate recording day. The older TestFighter paths below describe the September setup.
+
 Objective: capture a short taekwondo motion and replay it on the Open Stance fighter
 in Unreal. A marker display or a connected stream alone does not establish success.
 

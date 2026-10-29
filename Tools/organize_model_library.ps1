@@ -5,23 +5,107 @@ $modelRoot = Join-Path $projectRoot 'Resources/Models'
 $shell = New-Object -ComObject WScript.Shell
 $entries = [System.Collections.Generic.List[object]]::new()
 
-function Add-AssetLink([string]$Category, [string]$Name, [string]$Target, [string]$Purpose) {
+# Keep the readiness test small. Recording-day material lives separately.
+$categoryFolders = [ordered]@{
+    '01 Mocap Today' = '01 Mocap Test'
+    '01 Mocap - MotionBuilder targets' = '02 Asset Library/MotionBuilder targets'
+    '02 Blender - Animation rigs' = '02 Asset Library/Blender animation rigs'
+    '03 Characters - Latest hair and gear' = '02 Asset Library/Character previews'
+    '04 Gameplay - LODs and exports' = '02 Asset Library/Gameplay exports'
+    '05 Crowd - Rigs and animations' = '02 Asset Library/Crowd'
+    '06 Gear - Editable libraries' = '02 Asset Library/Gear'
+    '07 Guides and validation' = '03 Technical and Experiments/Guides and validation'
+    '08 Sample animations' = '03 Technical and Experiments/Sample animations'
+    '09 Experimental - Belt physics' = '03 Technical and Experiments/Experimental belt physics'
+    '09 T-pose inspection' = '03 Technical and Experiments/T-pose inspection'
+    '90 Sources staging and legacy' = '03 Technical and Experiments/Sources and legacy'
+}
+foreach ($oldCategory in $categoryFolders.Keys) {
+    $oldPath = [IO.Path]::GetFullPath((Join-Path $libraryRoot $oldCategory))
+    $newPath = [IO.Path]::GetFullPath((Join-Path $libraryRoot $categoryFolders[$oldCategory]))
+    $boundary = [IO.Path]::GetFullPath($libraryRoot) + [IO.Path]::DirectorySeparatorChar
+    if (-not $oldPath.StartsWith($boundary, [StringComparison]::OrdinalIgnoreCase) -or
+        -not $newPath.StartsWith($boundary, [StringComparison]::OrdinalIgnoreCase)) {
+        throw 'Library migration must stay inside Models and Rigs.'
+    }
+    if (Test-Path -LiteralPath $oldPath) {
+        if (Test-Path -LiteralPath $newPath) { throw "Both library categories exist; preserve and reconcile manually: $oldPath / $newPath" }
+        New-Item -ItemType Directory -Path (Split-Path $newPath -Parent) -Force | Out-Null
+        Move-Item -LiteralPath $oldPath -Destination $newPath
+    }
+}
+foreach ($oldName in @('3 Lab shot list.pdf.lnk', '4 Marker placement.png.lnk', '5 Matching Blender cleanup rig.lnk')) {
+    $oldLink = Join-Path $libraryRoot "01 Mocap Test/$oldName"
+    if (Test-Path -LiteralPath $oldLink) {
+        $recordFolder = Join-Path $libraryRoot '03 Technical and Experiments/Mocap Record'
+        New-Item -ItemType Directory -Path $recordFolder -Force | Out-Null
+        $newLink = Join-Path $recordFolder $oldName.Substring(2)
+        if (Test-Path -LiteralPath $newLink) { throw "Both recording shortcuts exist: $oldLink / $newLink" }
+        Move-Item -LiteralPath $oldLink -Destination $newLink
+    }
+}
+New-Item -ItemType Directory -Path (Join-Path $libraryRoot '03 Technical and Experiments') -Force | Out-Null
+$indexPath = Join-Path $libraryRoot '03 Technical and Experiments/asset_index.json'
+$oldIndex = Join-Path $libraryRoot 'asset_index.json'
+if (Test-Path -LiteralPath $oldIndex) {
+    if (Test-Path -LiteralPath $indexPath) { throw 'Both asset indexes exist; preserve and reconcile manually.' }
+    Move-Item -LiteralPath $oldIndex -Destination $indexPath
+}
+
+function Add-AssetLink([string]$Category, [string]$Name, [string]$Target, [string]$Purpose, [string]$OpenWith = '') {
+    foreach ($prefix in $categoryFolders.Keys) {
+        if ($Category -eq $prefix -or $Category.StartsWith($prefix + '/')) {
+            $Category = $categoryFolders[$prefix] + $Category.Substring($prefix.Length)
+            break
+        }
+    }
     $absoluteTarget = [System.IO.Path]::GetFullPath((Join-Path $projectRoot $Target))
     if (-not (Test-Path -LiteralPath $absoluteTarget)) { throw "Missing asset: $absoluteTarget" }
     $folder = Join-Path $libraryRoot $Category
     New-Item -ItemType Directory -Path $folder -Force | Out-Null
     $linkPath = Join-Path $folder "$Name.lnk"
     $link = $shell.CreateShortcut($linkPath)
-    $link.TargetPath = $absoluteTarget
+    $shortcutTarget = if ($OpenWith) { $OpenWith } else { $absoluteTarget }
+    $link.TargetPath = $shortcutTarget
+    if ($OpenWith) { $link.Arguments = '"' + $absoluteTarget + '"' } else { $link.Arguments = '' }
     $link.WorkingDirectory = if (Test-Path -LiteralPath $absoluteTarget -PathType Container) { $absoluteTarget } else { Split-Path $absoluteTarget -Parent }
     $link.Description = $Purpose
     $link.Save()
     $verified = $shell.CreateShortcut($linkPath)
-    if ($verified.TargetPath -ne $absoluteTarget -or -not (Test-Path -LiteralPath $verified.WorkingDirectory)) {
+    if ($verified.TargetPath -ne $shortcutTarget -or -not (Test-Path -LiteralPath $verified.TargetPath) -or
+        $verified.Arguments -ne $link.Arguments -or -not (Test-Path -LiteralPath $verified.WorkingDirectory)) {
         throw "Shortcut verification failed: $linkPath"
     }
     $entries.Add([ordered]@{ category=$Category; name=$Name; target=$Target; purpose=$Purpose; shortcut=$linkPath.Substring($projectRoot.Length + 1) })
 }
+
+$motionBuilder = Get-ChildItem -Path "$env:ProgramFiles/Autodesk/MotionBuilder */bin/x64/motionbuilder.exe" -File -ErrorAction SilentlyContinue |
+    Sort-Object FullName -Descending | Select-Object -First 1 -ExpandProperty FullName
+Add-AssetLink '01 Mocap Test' '1 OPEN IN MOTIONBUILDER - Medium Sparring' 'Resources/Models/Animation/MotionBuilder/Medium/OpenStance_Medium_Sparring.fbx' 'Readiness test: open the target, check simple rig movement, save and reopen a test copy.' $motionBuilder
+$testChecklist = Get-Content -LiteralPath (Join-Path $projectRoot 'Docs/Mocap_Test.md') -Raw
+$testChecklist.Replace('(Mocap_Record.md)', '(../../Docs/Mocap_Record.md)') | Set-Content -LiteralPath (Join-Path $libraryRoot '01 Mocap Test/2 READ ME - Test checklist.md') -Encoding UTF8
+Add-AssetLink '03 Technical and Experiments/Mocap Record' 'Recording day guide.md' 'Docs/Mocap_Record.md' 'Separate recording-day workflow and capture handoff.'
+Add-AssetLink '03 Technical and Experiments/Mocap Record' 'Lab shot list.pdf' 'Docs/Open_Stance_Mocap_Shot_List.pdf' 'Shot list for the separate recording day.'
+Add-AssetLink '03 Technical and Experiments/Mocap Record' 'Marker placement.png' 'Docs/Mocap_Marker_Set_Anatomical.png' 'Proposed marker placement for recording; confirm with the lab.'
+Add-AssetLink '03 Technical and Experiments/Mocap Record' 'Matching Blender cleanup rig' 'Resources/Models/Animation/OpenStance_Medium_Animation.blend' 'Matching Medium rig for cleanup after the recording is solved.'
+@'
+# Models and rigs
+
+For the mocap readiness test, open **01 Mocap Test**, then **1 OPEN IN MOTIONBUILDER - Medium Sparring**.
+It opens the characterized Medium fighter with sparring gear in MotionBuilder when installed.
+Read **2 READ ME - Test checklist.md** for three simple model/rig checks.
+
+| Folder | Use it for |
+| --- | --- |
+| 01 Mocap Test | One Medium Sparring target and a short readiness checklist. |
+| 02 Asset Library | Other body presets, uniform choices, Blender rigs, characters, gameplay, crowd and gear. |
+| 03 Technical and Experiments | Mocap Record (separate recording day), reports, samples, physics experiments and legacy assets. |
+
+The folders contain shortcuts. Source files stay in Resources/Models so scripts and textures keep working.
+Save test work under a new name. Recording-day instructions and the shot list are in **03 Technical and Experiments / Mocap Record**.
+
+Regenerate shortcuts after relocating the project with `powershell -ExecutionPolicy Bypass -File Tools/organize_model_library.ps1` from the project root.
+'@ | Set-Content -LiteralPath (Join-Path $libraryRoot 'START HERE.md') -Encoding UTF8
 
 $bodies = @('Compact','Medium','Stocky','LeanTall','Tall','Male_Athletic','Male_Lean','Female_Athletic','Female_Strong')
 if (Test-Path -LiteralPath (Join-Path $modelRoot 'FinalRefinement/UniformGeometryDelivery/published.json')) {
@@ -181,5 +265,5 @@ $manifest = [ordered]@{
     validation = 'Every shortcut was reopened; target and working directory verified. Original assets are not moved or modified.'
     entries = $entries
 }
-$manifest | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $libraryRoot 'asset_index.json') -Encoding UTF8
+$manifest | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $indexPath -Encoding UTF8
 Write-Output "Verified $($entries.Count) shortcuts in $libraryRoot"

@@ -8,6 +8,10 @@ Open Stance covers sparring only. Forms (poomsae) and breaking are out of scope.
 
 ## Status
 
+**Mocap test:** open `Models and Rigs/01 Mocap Test/1 OPEN IN MOTIONBUILDER - Medium Sparring`.
+Use the characterized `Resources/Models/Animation/MotionBuilder/Medium/OpenStance_Medium_Sparring.fbx` in MotionBuilder.
+The [test checklist](Docs/Mocap_Test.md) covers opening the target, simple rig movement and save/reopen. The separate [recording-day workflow](Docs/Mocap_Record.md) and shot list are under `Models and Rigs/03 Technical and Experiments/Mocap Record`. The full asset library is under `02 Asset Library`.
+
 Pre-production. The design is a draft and there is no gameplay prototype yet: `Source/OpenStance` holds the menu system but no gameplay code, so the Skill Stick is untested until Milestone 1. What exists today:
 
 - Game Design Document (v0.6 draft), controls layout, project plan and mocap shot list in `Docs/`.
