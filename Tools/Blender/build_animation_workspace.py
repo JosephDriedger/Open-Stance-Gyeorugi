@@ -237,7 +237,8 @@ def build(kind):
     bpy.ops.wm.save_as_mainfile(filepath=str(OUT/f'OpenStance_{kind}_Animation.blend'),compress=True)
     log(kind,'DONE',report['body_bones'],report['face_bones'],body_move,jaw_move)
 
-try:
-    for kind in TYPES:build(kind)
-except Exception:
-    log(traceback.format_exc());raise
+if __name__=='__main__':
+    try:
+        for kind in TYPES:build(kind)
+    except Exception:
+        log(traceback.format_exc());raise

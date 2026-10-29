@@ -20,7 +20,12 @@ def surface(a,t,offset=0,quilt=False):
  flare=max(0,min(1,(1.10-z)/.10));flare=flare*flare*(3-2*flare)
  ry+=.076*flare*math.exp(-(abs(a)/.55)**4)
  groove=sum(.0011*math.exp(-((z-q)/.0035)**2) for q in [1.055,1.175,1.295]) if quilt else 0
- return Vector(((rx+offset-groove)*math.sin(a),-.006-(ry+offset-groove)*math.cos(a),z))
+ p=Vector(((rx+offset-groove)*math.sin(a),-.006-(ry+offset-groove)*math.cos(a),z))
+ # Keep the apron close to the belt rather than projecting forward like a shelf.
+ def ease(v):
+  v=max(0,min(1,v));return v*v*(3-2*v)
+ p.y+=.092*ease((1.23-p.z)/.27)*ease((-p.y-.07)/.10)
+ return p
 
 def yoke_point(a,t):
  # Broad continuous shoulder yoke surrounding an actual oval neck opening.

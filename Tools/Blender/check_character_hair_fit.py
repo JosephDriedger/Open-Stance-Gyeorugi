@@ -8,7 +8,7 @@ OUT=Path(__file__).resolve().parents[2]/'Resources/Models/CharacterVariations'
 try:
  report={}
  for preset in PRESETS:
-  name=preset[0];bpy.ops.wm.open_mainfile(filepath=str(OUT/name/'Character.blend'));rig=bpy.data.objects['RIG_Body_Medium'];scene=bpy.context.scene
+  name=preset[0];bpy.ops.wm.open_mainfile(filepath=str(OUT/name/'Character.blend'));rig=next(o for o in bpy.context.scene.objects if o.type=='ARMATURE' and o.name.startswith('RIG_Body_'));scene=bpy.context.scene
   checks=[]
   for helmet in range(3):
    for style in range(6):

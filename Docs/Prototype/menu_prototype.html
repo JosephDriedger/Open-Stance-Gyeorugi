@@ -129,7 +129,7 @@ h2.t{font:italic 800 calc(var(--u)*4.2)/1 var(--display);letter-spacing:.05em;te
 .wk .t{background:var(--panel2);color:var(--bone);padding:calc(var(--u)*.3) calc(var(--u)*.5)}
 .wk.now{outline:calc(var(--u)*.25) solid var(--warn)}
 /* sliders */
-.sl{display:grid;grid-template-columns:calc(var(--u)*14) 1fr calc(var(--u)*5);align-items:center;gap:calc(var(--u)*1.2);background:var(--panel);padding:calc(var(--u)*.9) calc(var(--u)*1.6);font:600 calc(var(--u)*1.5) var(--display);letter-spacing:.07em;text-transform:uppercase}
+.sl{display:grid;grid-template-columns:calc(var(--u)*20) 1fr calc(var(--u)*5);align-items:center;gap:calc(var(--u)*1.2);background:var(--panel);padding:calc(var(--u)*.9) calc(var(--u)*1.6);font:600 calc(var(--u)*1.5) var(--display);letter-spacing:.07em;text-transform:uppercase}
 .sl output{text-align:right;color:var(--chung);font-variant-numeric:tabular-nums}
 .sl input{width:100%;accent-color:var(--chung);min-width:0}
 .sw{display:flex;gap:calc(var(--u)*.6);flex-wrap:wrap}
@@ -212,6 +212,20 @@ h2.t{font:italic 800 calc(var(--u)*4.2)/1 var(--display);letter-spacing:.05em;te
 .crow:hover .gs .head,.crow:focus-visible .gs .head{fill:#1b3f8a}
 .crow:hover .gs .dot,.crow:focus-visible .gs .dot{fill:#0b1220}
 .crow:hover .gl,.crow:focus-visible .gl{color:#3b465a}
+.tag.fut{color:var(--warn);border-color:var(--warn)}
+.opt>.tag{margin-right:auto;margin-left:calc(var(--u)*1)}
+.rv{position:absolute;top:calc(var(--u)*2);width:calc(var(--u)*9.5);padding:calc(var(--u)*.7) calc(var(--u)*.9);background:rgba(15,25,44,.9);border:1px solid var(--line);display:flex;flex-direction:column;gap:calc(var(--u)*.4);font:600 calc(var(--u)*1)/1.1 var(--body);letter-spacing:.06em;text-transform:uppercase;color:var(--mute)}
+.rv b{font:700 calc(var(--u)*1.2)/1 var(--display);color:var(--bone)}
+.rv .tag{align-self:flex-start}
+.rating{position:absolute;top:calc(var(--u)*13);left:calc(var(--u)*4);width:calc(var(--u)*24);display:flex;flex-direction:column;gap:calc(var(--u)*.5)}
+.rating b{font:700 calc(var(--u)*1.2)/1 var(--display);letter-spacing:.1em;text-transform:uppercase;display:flex;gap:calc(var(--u)*.6);align-items:center}
+.rating .tag{font-size:calc(var(--u)*.85);padding:calc(var(--u)*.35) calc(var(--u)*.6)}
+.rating span{font:800 calc(var(--u)*2.4)/1 var(--display);color:var(--ok)}
+.cmds{position:absolute;left:calc(var(--u)*4);right:calc(var(--u)*4);bottom:calc(var(--u)*5);display:flex;flex-wrap:wrap;gap:calc(var(--u)*.6) calc(var(--u)*1.4);justify-content:center}
+.cmd{display:flex;align-items:center;gap:calc(var(--u)*.5);background:rgba(5,7,11,.8);padding:calc(var(--u)*.4) calc(var(--u)*.8)}
+.cmd em{font:700 calc(var(--u)*1.05)/1 var(--display);font-style:normal;letter-spacing:.06em;text-transform:uppercase}
+.tiles.dense .lab b{font-size:calc(var(--u)*2.2)}
+.ctab .tag{margin-left:calc(var(--u)*.4);vertical-align:middle;font-style:normal}
 /* capture mode (?bare#screen): the stage fills the window, no page chrome */
 body.bare{padding:0}
 body.bare .wrap{max-width:none;gap:0}
@@ -280,14 +294,16 @@ const HUBS={
  Play:[
   {n:'Sparring',s:'Local match, 1P or 2P',go:'sparring',c:['#1e56c8','#0a1d4a'],k:true},
   {n:'Tournament',s:'8, 16 or 32 fighter bracket',go:'tournament',c:['#c8323a','#4a0c12'],k:false},
-  {n:'Challenges',s:'Set scenarios',f:1,c:['#555','#222']},
-  {n:'Referee Mode',s:'Call the match',f:1,c:['#555','#222']}],
+  {n:'Team Championship',s:'Tag-team format, shared score',go:'team',fut:1,c:['#6a35c8','#1c0c4a'],k:false},
+  {n:'Challenges',s:'Set scenarios, medals',go:'challenges',fut:1,c:['#c8841f','#4a2c08'],k:true},
+  {n:'Referee Mode',s:'Call the match',go:'refmode',fut:1,c:['#1f8a62','#082c20'],k:false}],
  Progress:[
   {n:'Career',s:'Your created fighter: seasons and events',go:'career',c:['#1e56c8','#0a1d4a'],k:true},
   {n:'Training',s:'Lessons, drills and free practice',go:'training',c:['#1f8a62','#082c20'],k:false}],
  Connected:[
-  {n:'Online',s:'Ranked and friendly matches',f:1,c:['#555','#222']},
-  {n:'Replays',s:'Watch and share',f:1,c:['#555','#222']}],
+  {n:'Online',s:'Casual, ranked, clubs',go:'online',fut:1,c:['#1e56c8','#0a1d4a'],k:true},
+  {n:'Replays',s:'Watch, photo mode, share',go:'replays',fut:1,c:['#c8323a','#4a0c12'],k:false},
+  {n:'Broadcast',s:'Tools for community tournaments',go:'broadcast',fut:1,c:['#2a6fa0','#0b2236'],k:false}],
  Options:[
   {n:'Options',s:'Audio, video and controls',go:'options',c:['#2a6fa0','#0b2236'],k:false},
   {n:'Controls',s:'Every input, by group',go:'controls',c:['#1e56c8','#0a1d4a'],k:false},
@@ -297,8 +313,8 @@ S.main=()=>{const hub=state.hub||'Play';
   return `<div class="bg"></div><div class="screen">
   <div class="head"><div class="kick">Open Stance · Main menu</div>
    <div class="hubtabs"><i class="btn">LB</i>${HUB_NAMES.map(h=>`<button class="hubtab ${h===hub?'on':''}" data-hub="${h}">${h}</button>`).join('')}<i class="btn">RB</i></div></div>
-  <div class="tiles">${HUBS[hub].map(t=>`<button class="tile hubt ${t.f?'future':''}" ${t.f?'disabled':''} ${t.go?'data-go="'+t.go+'"':''} ${t.act?'data-act="'+t.act+'"':''} style="--c1:${t.c[0]};--c2:${t.c[1]}">
-     ${t.f?'<span class="tag">Future</span>':''}<div class="art">${fig('#e7e5de','#bdb9ad',false,!!t.k)}</div><div class="glow"></div>
+  <div class="tiles ${HUBS[hub].length>3?'dense':''}">${HUBS[hub].map(t=>`<button class="tile hubt" ${t.go?'data-go="'+t.go+'"':''} ${t.act?'data-act="'+t.act+'"':''} style="--c1:${t.c[0]};--c2:${t.c[1]}">
+     ${t.fut?'<span class="tag fut">Future</span>':''}<div class="art">${fig('#e7e5de','#bdb9ad',false,!!t.k)}</div><div class="glow"></div>
      <div class="lab"><b>${t.n}</b><small>${t.s}</small></div></button>`).join('')}</div>
   <div class="strip">
    <div class="card"><b>Up next</b><p>City Open · Career week 3. Enter your fighter before the calendar advances.</p></div>
@@ -306,11 +322,11 @@ S.main=()=>{const hub=state.hub||'Play';
   </div>${hint([['A','a','Select'],['B','b','Back'],['LB','','Previous tab'],['RB','','Next tab']])}`};
 
 S.sparring=()=>setup('Sparring','Players, ruleset, difficulty and arena.',[
-  ['Players',['1P vs AI','1P vs 2P']],['Ruleset',['World Taekwondo','Casual (no Gam-jeom)','Golden Point']],
-  ['AI difficulty',['Easy','Normal','Hard','Master']],['Arena',['Training dojang','Club dojang','National arena','Olympic arena']]]);
+  ['Players',['1P vs AI','1P vs 2P','Online [Future]']],['Ruleset',['World Taekwondo','Casual (no Gam-jeom)','Golden Point','Custom rules [Future]','Historical WT rules [Future]','Para taekwondo [Future]']],
+  ['AI difficulty',['Easy','Normal','Hard','Master']],['Arena',['Training dojang','Club dojang','National arena','Olympic arena','World games stadium [Future]']]]);
 S.tournament=()=>setup('Tournament','Bracket, ruleset, difficulty and arena.',[
-  ['Bracket size',['8','16','32']],['Ruleset',['World Taekwondo','Casual (no Gam-jeom)','Golden Point']],
-  ['AI difficulty',['Easy','Normal','Hard','Master']],['Arena',['Club dojang','National arena','Olympic arena']]]);
+  ['Bracket size',['8','16','32']],['Ruleset',['World Taekwondo','Casual (no Gam-jeom)','Golden Point','Custom rules [Future]','Historical WT rules [Future]','Para taekwondo [Future]']],
+  ['AI difficulty',['Easy','Normal','Hard','Master']],['Arena',['Club dojang','National arena','Olympic arena','World games stadium [Future]']]]);
 function setup(t,sub,rows){
   const o=state.opt;
   return `<div class="bg"></div><div class="screen">
@@ -321,7 +337,7 @@ function setup(t,sub,rows){
   </div>
   <div class="grow col"><div class="card"><h3>${t}</h3><p>${sub}</p>
    ${t==='Tournament'?`<p>Between matches a bracket view shows results and the next pairing.</p>`:`<p>Sides are assigned by the game: Chung on the left in blue, Hong on the right in red.</p>`}
-  </div><div class="card"><h3>Ruleset note</h3><p>Rounds are 3 × 2:00 with 1:00 breaks. A 12-point gap ends the match. Head kicks score more than body kicks; turning kicks score more than straight ones.</p></div></div>
+  </div><div class="card"><h3>Ruleset note</h3><p>Rounds are 3 × 2:00 with 1:00 breaks. A 12-point gap ends the match. Head kicks score more than body kicks; turning kicks score more than straight ones.</p><p>Values tagged [Future] come after v1.0.</p></div></div>
   </div></div>${HINT_SEL}`}
 
 S.select=()=>{
@@ -350,6 +366,7 @@ S.match=()=>{
   <div class="score"><div class="s c" id="sc0">0</div>
     <div class="mid"><b>ROUND <span id="rd" style="font:inherit">1</span> / 3</b><span id="clk">2:00</span></div>
     <div class="s h" id="sc1">0</div></div>
+  <div class="rv" style="left:calc(50% - 37.5cqw)"><b>Video review</b><span>1 left</span><i class="tag fut">Future</i></div><div class="rv" style="right:calc(50% - 37.5cqw)"><b>Video review</b><span>1 left</span><i class="tag fut">Future</i></div>
   <div class="pen" style="left:calc(50% - 27cqw)">Gam-jeom 0</div><div class="pen" style="right:calc(50% - 27cqw)">Gam-jeom 0</div>
   <div class="nm" style="left:4cqw"><b class="blue">${state.p[0]}</b><div class="bar" id="st0"><i style="width:82%"></i></div><small style="color:var(--mute);font-size:1cqw">Stamina</small></div>
   <div class="nm" style="right:4cqw;text-align:right;align-items:stretch"><b class="red">${state.p[1]}</b><div class="bar" id="st1"><i style="width:64%"></i></div><small style="color:var(--mute);font-size:1cqw">Stamina</small></div>
@@ -397,7 +414,7 @@ S.career=()=>{
   <div class="body">
    <div class="col" style="width:26cqw"><div class="card"><h3>Jae-won Choi</h3><div class="row"><span class="tag">Your fighter</span><span class="tag">Green belt</span><span class="tag">OVR 74</span></div>
      <div class="stat"><span>Season</span><div class="bar"><i style="width:35%"></i></div><em>3/8</em></div></div>
-    <button class="opt">Training slots</button><button class="opt">Enter event<small>City Open</small></button><button class="opt">Grading</button><button class="opt">Post-match review</button><button class="opt" data-go="customize">Fighter creator<small>Look and gear</small></button></div>
+    <button class="opt">Training slots</button><button class="opt">Enter event<small>City Open</small></button><button class="opt">Grading</button><button class="opt">Post-match review</button><button class="opt" data-go="customize">Fighter creator<small>Look and gear</small></button><button class="opt" data-go="longterm">Long-term career<span class="tag fut">Future</span></button></div>
    <div class="col grow"><div class="kick">Season calendar · sample</div><div class="cal">
     ${wk.map(([a,k,n],i)=>`<div class="wk ${i===2?'now':''}"><b>${a}</b><span class="${k}">${n}</span></div>`).join('')}</div></div>
   </div></div>${hint([['A','a','Select'],['B','b','Back'],['Y','y','Advance week']])}`};
@@ -412,17 +429,15 @@ S.customize=()=>{const g=state.opt.gear??true;return `<div class="bg"></div><div
     <button class="opt sel" data-key="sex" data-vals='["Male","Female"]'>Sex<span class="v">${['Male','Female'][state.opt.sex||0]}</span></button>
     <button class="opt sel" data-key="body" data-vals='["Compact","Lean tall","Stocky","Tall"]'>Body type<span class="v">${['Compact','Lean tall','Stocky','Tall'][state.opt.body||0]}</span></button>
     <button class="opt sel" data-key="style" data-vals='["Counter","Kicker","Pressure"]'>Fighting style<span class="v">${['Counter','Kicker','Pressure'][state.opt.style||0]}</span></button>
-    <div class="card"><h3>Skin</h3><div class="sw">${SKIN.map((c,i)=>`<button style="background:${c}" class="${i===1?'on':''}" aria-label="Skin ${i+1}"></button>`).join('')}</div>
-     <h3>Hair</h3><div class="sw">${HAIR.map((c,i)=>`<button style="background:${c}" class="${i===0?'on':''}" aria-label="Hair ${i+1}"></button>`).join('')}</div>
-     <h3>Eyes</h3><div class="sw">${EYE.map((c,i)=>`<button style="background:${c}" class="${i===0?'on':''}" aria-label="Eyes ${i+1}"></button>`).join('')}</div>
-     <h3>Protector and helmet</h3><div class="sw"><button style="background:var(--chung)" class="on" aria-label="Chung blue"></button><button style="background:var(--hong)" aria-label="Hong red"></button></div></div>
+    <div class="card" style="display:grid;grid-template-columns:1fr 1fr;gap:1cqw 3cqw"><div><h3>Skin</h3><div class="sw">${SKIN.map((c,i)=>`<button style="background:${c}" class="${i===1?'on':''}" aria-label="Skin ${i+1}"></button>`).join('')}</div></div><div><h3>Hair</h3><div class="sw">${HAIR.map((c,i)=>`<button style="background:${c}" class="${i===0?'on':''}" aria-label="Hair ${i+1}"></button>`).join('')}</div></div><div><h3>Eyes</h3><div class="sw">${EYE.map((c,i)=>`<button style="background:${c}" class="${i===0?'on':''}" aria-label="Eyes ${i+1}"></button>`).join('')}</div></div><div><h3>Protector and helmet</h3><div class="sw"><button style="background:var(--chung)" class="on" aria-label="Chung blue"></button><button style="background:var(--hong)" aria-label="Hong red"></button></div></div></div>
     <p style="font-size:1cqw;color:var(--mute);margin:0">Appearance never changes attributes. Body type and style shift Career base ratings only.</p>
+    <div class="row" style="flex-wrap:wrap;gap:.8cqw"><span class="kick">Later</span><span class="tag fut">Gear styles · Future</span><span class="tag fut">Dojang · Future</span><span class="tag fut">Ceremony · Future</span></div>
    </div></div></div>${HINT_SEL}`};
 
 S.options=()=>{const tab=state.opt.tab||'Audio';
   const sl=(k,v,u='')=>`<label class="sl">${k}<input type="range" min="0" max="100" value="${v}" oninput="this.nextElementSibling.value=this.value+'${u}'"><output>${v}${u}</output></label>`;
   const bodies={
-   Audio:['Master',80,'Effects',90,'Referee voice',100,'Crowd',60,'Music',50].reduce((a,x,i,arr)=>i%2?a:a+sl(x,arr[i+1]),''),
+   Audio:['Master',80,'Effects',90,'Referee voice',100,'Crowd',60,'Music',50,'Commentary '+FUT,40].reduce((a,x,i,arr)=>i%2?a:a+sl(x,arr[i+1]),''),
    Video:`<button class="opt sel" data-key="res" data-vals='["1920×1080","2560×1440","3840×2160"]'>Resolution<span class="v">${['1920×1080','2560×1440','3840×2160'][state.opt.res||0]}</span></button>
     <button class="opt sel" data-key="win" data-vals='["Fullscreen","Borderless","Windowed"]'>Window mode<span class="v">${['Fullscreen','Borderless','Windowed'][state.opt.win||0]}</span></button>
     <button class="opt sel" data-key="q" data-vals='["Low","Medium","High","Epic"]'>Quality preset<span class="v">${['Low','Medium','High','Epic'][state.opt.q??2]}</span></button>
@@ -431,10 +446,18 @@ S.options=()=>{const tab=state.opt.tab||'Audio';
    Controls:`<button class="opt sel" data-key="vib" data-vals='["On","Off"]'>Vibration<span class="v">${['On','Off'][state.opt.vib||0]}</span></button>
     <label class="sl">Skill Stick dead zone<input type="range" min="0" max="40" value="15" oninput="this.nextElementSibling.value=this.value+'%'"><output>15%</output></label>
     <label class="sl">Stick input window<input type="range" min="20" max="40" value="25" oninput="this.nextElementSibling.value=(this.value/100).toFixed(2)+' s'"><output>0.25 s</output></label>
-    <button class="opt" data-go="controls" style="margin-top:.6cqw">Open controls reference<small>All inputs, by group</small></button><p style="font-size:1cqw;color:var(--mute);margin:0">Button remapping is Future.</p>`};
+    <button class="opt" data-go="controls" style="margin-top:.6cqw">Open controls reference<small>All inputs, by group</small></button><p style="font-size:1cqw;color:var(--mute);margin:0">Sticks and triggers are fixed in v1.0.</p>
+    <button class="opt">Button remapping ${FUT}<small>Remap every button</small></button>
+    <button class="opt sel" data-key="htt" data-vals='["Off","On"]'>Hold-to-toggle for held modifiers ${FUT}<span class="v">${['Off','On'][state.opt.htt||0]}</span></button>`,
+   Accessibility:`<button class="opt sel" data-key="sub" data-vals='["On","Off"]'>Subtitles for referee commands<span class="v">${['On','Off'][state.opt.sub||0]}</span></button>
+    <button class="opt sel" data-key="rcm" data-vals='["Off","On"]'>Reduced camera motion ${FUT}<span class="v">${['Off','On'][state.opt.rcm||0]}</span></button>
+    <button class="opt sel" data-key="rss" data-vals='["Off","On"]'>Reduced screen shake ${FUT}<span class="v">${['Off','On'][state.opt.rss||0]}</span></button>
+    <button class="opt sel" data-key="acA" data-vals='["Off","On"]'>Audio cues for incoming attacks ${FUT}<span class="v">${['Off','On'][state.opt.acA||0]}</span></button>
+    <button class="opt sel" data-key="acS" data-vals='["Off","On"]'>Audio cues for stamina state ${FUT}<span class="v">${['Off','On'][state.opt.acS||0]}</span></button>
+    <button class="opt">Button remapping ${FUT}<small>Remap every button</small></button>`};
   return `<div class="bg"></div><div class="screen">
   <div class="head"><div class="kick">Settings save automatically</div><h2 class="t">Options</h2></div>
-  <div class="tabs">${['Audio','Video','Controls'].map(x=>`<button class="opt ${x===tab?'cur':''}" data-tab="${x}">${x}</button>`).join('')}</div>
+  <div class="tabs">${['Audio','Video','Controls','Accessibility'].map(x=>`<button class="opt ${x===tab?'cur':''}" data-tab="${x}">${x}</button>`).join('')}</div>
   <div class="body"><div class="col grow" style="max-width:60cqw">${bodies[tab]}</div></div></div>${HINT_SEL}`};
 
 /* ---------- controls page ---------- */
@@ -501,7 +524,7 @@ S.controls=()=>{
   const tab=CTR[state.tab]?state.tab:CTAB_NAMES[0], d=CTR[tab];
   return `<div class="bg"></div><div class="screen">
   <div class="head"><div class="kick">Options · Controls</div><h2 class="t">Controls</h2></div>
-  <div class="ctabs"><i class="btn">LB</i>${CTAB_NAMES.map(n=>`<button class="ctab ${n===tab?'on':''}" data-ctab="${n}">${n}</button>`).join('')}<button class="ctab f" disabled>Referee [Future]</button><i class="btn">RB</i></div>
+  <div class="ctabs"><i class="btn">LB</i>${CTAB_NAMES.map(n=>`<button class="ctab ${n===tab?'on':''}" data-ctab="${n}">${n}${n==='Referee mode'?FUT:''}</button>`).join('')}<i class="btn">RB</i></div>
   <div class="ctl">
    <div class="pad">${gamepad()}<p class="hint">Point at a row and its buttons light up. Stick icons start at the dot and turn the way the arrow points. The icons show the → side; mirror them for ←.</p></div>
    <div class="clist"><div class="chead"><span>${d.cols[0]}</span><span>${d.cols[1]}</span><span>${d.cols[2]}</span></div>
@@ -514,8 +537,86 @@ function padHL(keys){
 stage.addEventListener('mouseover',e=>{const r=e.target.closest?.('.crow');if(r)padHL(r.dataset.keys.split(',').filter(Boolean))});
 stage.addEventListener('focusin',e=>{const r=e.target.closest?.('.crow');if(r)padHL(r.dataset.keys.split(',').filter(Boolean))});
 
+/* ---------- Future features (every one carries the Future tag) ---------- */
+const FUT='<span class="tag fut">Future</span>';
+function listScreen(o){
+  return `<div class="bg"></div><div class="screen">
+  <div class="head"><div class="kick">${o.kick}</div><div class="row"><h2 class="t">${o.title}</h2>${FUT}</div></div>
+  <div class="body"><div class="col" style="width:${o.w||46}cqw">${o.items.map(i=>`<button class="opt"${i[2]?' data-go="'+i[2]+'"':''}>${i[0]}${i[1]?'<small>'+i[1]+'</small>':''}</button>`).join('')}</div>
+  <div class="grow col">${o.cards.map(c=>`<div class="card"><h3>${c[0]}</h3>${c[1]}</div>`).join('')}</div></div></div>${o.hint||HINT_STD}`;
+}
+S.team=()=>listScreen({kick:'Play',title:'Team Championship',items:[
+  ['Team type','Club or national'],['Format','Tag team: fighters rotate in and out'],['Team size','Up to three local players per team'],['Match result','One shared team score decides it']],
+  cards:[['About','<p>Modelled on WT team events. Fighters rotate in and out during a bout, and a shared team score decides the match.</p>'],
+         ['Fighters','<p>Teams are built from the premade men’s and women’s fighters.</p>']]});
+S.challenges=()=>listScreen({kick:'Play',title:'Challenges',items:[
+  ['Win the round from 5 points down','30 seconds left'],['Score a spin hook kick','Right after switching sides'],
+  ['Counter three kicks in one round','Sample'],['Finish a round with no penalties','Sample']],
+  cards:[['Medals','<p>Each challenge awards a medal. Medals unlock cosmetics.</p>'],
+         ['Scenarios','<p>Short scenarios with a goal. The first two are from the design; the others are samples.</p>']]});
+S.online=()=>listScreen({kick:'Connected',title:'Online',items:[
+  ['Casual match','Quick match'],['Private room','Invite code, rematch'],['Ranked','Seasons with a skill rating, Equal Terms on'],
+  ['Community tournaments','Brackets and check-in'],['Clubs','Online dojangs, ladders, club vs club']],
+  cards:[['Season rank','<p>Silver II · rating 1,540 (sample). Shown on a nameplate, never as a belt.</p>'],
+         ['Fair play','<p>Disconnect penalties, report tools, name and emblem moderation. PC and consoles share one player pool.</p>']]});
+S.replays=()=>listScreen({kick:'Connected',title:'Replays',items:[
+  ['Chung 14–7 Hong','Club dojang · today'],['Chung 9–11 Hong','National arena · yesterday'],['Chung 12–2 Hong','Training dojang · 2 days ago']],
+  cards:[['Viewer','<p>Saved matches replay from inputs and scoring events, with a free camera, slow motion and clips of scoring exchanges.</p>'],
+         ['Photo mode and sharing '+FUT,'<p>Take a photo at any moment of a replay, then share it.</p>']]});
+S.broadcast=()=>listScreen({kick:'Connected',title:'Broadcast',items:[
+  ['Director camera'],['Live scoreboard overlays'],['Instant replay'],['Bracket display']],
+  cards:[['About','<p>Spectator and commentator tools for community tournaments.</p>']]});
+S.longterm=()=>listScreen({kick:'Career',title:'Long-term career',items:[
+  ['Age divisions','Cadet 12–14, junior 15–17, senior'],['Ageing','Peak years, gradual decline, retirement'],
+  ['Fatigue and minor injuries','Rest and physio choices, never graphic'],['Hall of fame','Records, medals, signature techniques'],['World games','Career tier 7, every four years']],
+  cards:[['Hall of fame','<p>Retired fighters’ records, medals and signature techniques are kept here.</p>'],
+         ['Ageing','<p>Attributes peak, then decline gradually over a long Career.</p>']]});
+
+S.refmode=()=>{
+  const rows=[['Match',['Two AI fighters','Two local players','Online [Future]']],['Camera',['Over-the-shoulder','Side-on']],
+              ['Ruleset',['World Taekwondo','Casual (no Gam-jeom)']],['Arena',['Club dojang','National arena','Olympic arena']]];
+  return `<div class="bg"></div><div class="screen">
+  <div class="head"><div class="kick">Play</div><div class="row"><h2 class="t">Referee Mode setup</h2>${FUT}</div></div>
+  <div class="body"><div class="col" style="width:46cqw">
+   ${rows.map(([k,v])=>{const key='Ref'+k;const i=state.opt[key]??0;return `<button class="opt sel" data-key="${key}" data-vals='${JSON.stringify(v)}'>${k}<span class="v">${v[i]}</span></button>`}).join('')}
+   <button class="opt" data-go="refmatch" style="margin-top:1cqw;background:var(--chung);color:#fff">Start as referee</button></div>
+  <div class="grow col"><div class="card"><h3>Calls decide the match</h3><p>Only the penalties you declare are applied. Automatic detection runs only as the answer key for your grade.</p></div>
+   <div class="card"><h3>Players</h3><p>Up to three controllers: Chung, Hong and the referee. The referee has its own layout (Controls, Referee mode).</p></div></div></div></div>${HINT_SEL}`;
+};
+S.refmatch=()=>{
+  const cmd=[['A','SHI-JAK / KYE-SOK'],['B','KAL-YEO'],['Hold X, RS','GAM-JEOM'],['Y','KEU-MAN'],['Hold LT','Knockdown count'],['RT','Raise hand'],['D-pad ↑','CHARYEOT'],['D-pad ↓','JOON-BI']];
+  return `<div class="screen hud" data-hud><div class="arena"></div><div class="mat"></div>
+  <div class="score"><div class="s c">7</div><div class="mid"><b>ROUND 2 / 3</b><span>1:12</span></div><div class="s h">4</div></div>
+  <div class="rating"><b>Referee rating ${FUT}</b><div class="bar"><i style="width:86%"></i></div><span>86</span></div>
+  <div class="fighter" style="left:26%">${fig('#2f6fe4','#1b3f8a',true,true,sexOf(state.p[0]))}</div>
+  <div class="fighter" style="right:26%;transform:scaleX(-1)">${fig('#e03a40','#8c1f25',true,false,sexOf(state.p[1]))}</div>
+  <div class="sub" style="bottom:calc(var(--u)*14)"><b>You called</b> KAL-YEO · +2 correct call</div>
+  <div class="cmds">${cmd.map(([k,t])=>`<span class="cmd">${chips(k)}<em>${t}</em></span>`).join('')}</div></div>
+  ${hint([['A','a','End match (demo)'],['☰','','Pause']])}`;
+};
+S.refrating=()=>{
+  const ev=[['Correct call','3','+6'],['Late call','2','−6'],['Missed penalty','1','−6'],['Wrong penalty','1','−10'],['Blocked the camera','2','−4']];
+  return `<div class="bg"></div><div class="screen">
+  <div class="head"><div class="kick">Referee Mode</div><div class="row"><h2 class="t">Referee grade</h2>${FUT}</div></div>
+  <div class="body"><div class="col" style="width:34cqw">
+   <div class="card"><h3>Grade</h3><div class="row"><span class="big" style="font-size:9cqw">B</span><div><div class="big" style="font-size:2.6cqw">Rating 80</div><small style="font-size:1.1cqw;color:var(--mute)">Started at 100</small></div></div>
+    <div class="bar"><i style="width:80%"></i></div>
+    <div class="stat"><span>Call accuracy</span><div></div><em>B</em></div><div class="stat"><span>Call timing</span><div></div><em>C</em></div><div class="stat"><span>Positioning</span><div></div><em>B</em></div></div>
+   <div class="card"><h3>Thresholds</h3><p>Below 40: a warning from the technical delegate. Below 20: removal at the next break and a grade of F.</p></div></div>
+  <div class="grow col"><div class="card"><h3>Rating changes</h3>
+   ${ev.map(e=>`<div class="stat" style="grid-template-columns:1fr calc(var(--u)*5) calc(var(--u)*6)"><span style="color:var(--bone)">${e[0]}</span><em>${e[1]}</em><em>${e[2]}</em></div>`).join('')}
+   <div class="stat" style="grid-template-columns:1fr calc(var(--u)*5) calc(var(--u)*6);border-top:1px solid var(--line);padding-top:.5cqw"><span style="color:var(--bone)">Rating</span><em></em><em>100 → 80</em></div></div>
+   <div class="row" style="margin-top:auto"><button class="opt grow" data-go="refmode">Play again</button><button class="opt grow" data-go="main" data-reset>Main menu</button></div></div></div></div>${HINT_STD}`;
+};
+CTR['Referee mode']={cols:['Action','Input','Command'],rows:[
+  ['Move, look','LS, RS','Step around the fighters'],['Select a fighter','LB for Chung, RB for Hong',''],
+  ['Start or continue','A','SHI-JAK, KYE-SOK'],['Break','B','KAL-YEO'],['Penalty','Hold X, RS, release','GAM-JEOM, reason on the wheel'],
+  ['Stop','Y','KEU-MAN'],['Knockdown count','Hold LT',''],['Raise the winner’s hand','RT','After the final KEU-MAN'],
+  ['Attention, bow, ready','D-pad ↑, D-pad ↓','CHARYEOT, KYEONGRYE, JOON-BI']]};
+CTAB_NAMES.push('Referee mode');
+
 /* ---------- engine ---------- */
-const NAMES={title:'Title',main:'Main menu',sparring:'Sparring setup',tournament:'Tournament setup',select:'Fighter select',match:'Match',results:'Results',controls:'Controls',training:'Training',career:'Career',customize:'Customize',options:'Options'};
+const NAMES={title:'Title',main:'Main menu',sparring:'Sparring setup',tournament:'Tournament setup',select:'Fighter select',match:'Match',results:'Results',controls:'Controls',training:'Training',career:'Career',customize:'Customize',options:'Options',challenges:'Challenges [Future]',team:'Team Championship [Future]',refmode:'Referee setup [Future]',refmatch:'Referee match [Future]',refrating:'Referee grade [Future]',online:'Online [Future]',replays:'Replays [Future]',broadcast:'Broadcast [Future]',longterm:'Long-term career [Future]'};
 $('#jump').innerHTML=Object.entries(NAMES).map(([k,v])=>`<button data-j="${k}">${v}</button><!---->`).join('')+`<button data-j="pause">Pause</button><button data-j="bracket">Bracket</button>`;
 
 function stopClock(){clearInterval(clock);clock=null}
@@ -525,7 +626,7 @@ function show(name,push=true){
   state.cur=name; state.sel=0;
   const kept=name==='match'&&state.keep;if(name==='match')state.keep=false;if(name==='match'&&!kept){t=120;sc=[0,0];rd=1}
   stage.innerHTML=S[name]();
-  if(['career','customize'].includes(name))stage.insertAdjacentHTML('beforeend',`<div class="pbar"><div><b>Jae-won Choi</b><small>Your fighter · Green belt · OVR 74</small></div><div class="av">JC</div></div>`);
+  if(['career','customize','longterm'].includes(name))stage.insertAdjacentHTML('beforeend',`<div class="pbar"><div><b>Jae-won Choi</b><small>Your fighter · Green belt · OVR 74</small></div><div class="av">JC</div></div>`);
   wire();
   $$('#jump button').forEach(b=>b.setAttribute('aria-current',b.dataset.j===name));
   if(name==='match'){if(kept){$('#sc0').textContent=sc[0];$('#sc1').textContent=sc[1];$('#clk').textContent=Math.floor(t/60)+':'+String(t%60).padStart(2,'0');$('#rd').textContent=rd;pause()}else startClock()}
@@ -622,6 +723,7 @@ document.addEventListener('keydown',e=>{
   if(state.cur==='main'&&!$('[data-veil]',stage)&&['q','e','PageUp','PageDown','[',']'].includes(k)){e.preventDefault();const i=HUB_NAMES.indexOf(state.hub||'Play'),d=['q','PageUp','['].includes(k)?-1:1;state.hub=HUB_NAMES[(i+d+HUB_NAMES.length)%HUB_NAMES.length];return show('main',false)}
   if(state.cur==='controls'&&['q','e','PageUp','PageDown','[',']'].includes(k)){e.preventDefault();const i=CTAB_NAMES.indexOf(CTR[state.tab]?state.tab:CTAB_NAMES[0]),d=['q','PageUp','['].includes(k)?-1:1;state.tab=CTAB_NAMES[(i+d+CTAB_NAMES.length)%CTAB_NAMES.length];return show('controls',false)}
   if(state.cur==='select'&&['q','e','PageUp','PageDown','[',']'].includes(k)){e.preventDefault();return setCat(['q','PageUp','['].includes(k)?'Men':'Women')}
+  if(state.cur==='refmatch'&&(k==='Enter'||k===' ')){e.preventDefault();return show('refrating')}
   const root=$('[data-veil]',stage)||stage;
   const items=$$('.opt:not(.future),.tile:not(.future)',root);const i=items.indexOf(document.activeElement);
   if(['ArrowDown','ArrowRight','ArrowUp','ArrowLeft'].includes(k)){
@@ -642,6 +744,7 @@ $('#jump').onclick=e=>{const j=e.target.dataset?.j;if(!j)return;
   const tp=new URLSearchParams(location.search).get('tab');if(tp!==null)state.tab=CTAB_NAMES[+tp];
   const cp=new URLSearchParams(location.search).get("cat");if(cp&&CATS[cp]){state.cat=cp;const l=inCat(cp);state.p=[l[0].n,l[1].n]}
   if(new URLSearchParams(location.search).get("sex")=="1")state.opt.sex=1;
+  { const q=new URLSearchParams(location.search); if(q.get("otab"))state.opt.tab=q.get("otab"); if(q.get("hub"))state.hub=q.get("hub"); }
   if(j&&NAMES[j]||j==='pause'||j==='bracket'){
     $('#jump [data-j='+j+']').click();
     if(bare&&j==='match'||bare&&j==='pause'){stopClock();sc=[7,4];t=72;rd=2;

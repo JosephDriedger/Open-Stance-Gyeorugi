@@ -134,6 +134,8 @@ def run():
     suite.driver(o,attr,rig,'ProtectorDesign',f'x != {index}');d=o.animation_data.drivers.find(attr).driver;v=d.variables.new();v.name='wear';v.targets[0].id=rig;v.targets[0].data_path='["Wear_Protector"]';d.expression=f'(x != {index}) or not wear'
  scene.render.resolution_x=1100;scene.render.resolution_y=1100
  base.camera(scene,(.70,-1.8,1.58),(0,0,1.27),.94);rig.update_tag();scene.frame_set(2);scene.frame_set(1)
+ from repair_protector_binding import repair as repair_binding
+ repair_binding(scene)
  bpy.ops.wm.save_as_mainfile(filepath=str(OUT/'Chest_Protector_Library.blend'),compress=True)
  bpy.ops.wm.open_mainfile(filepath=str(OUT/'Chest_Protector_Library.blend'))
  rig=bpy.data.objects['RIG_Body_Medium'];scene=bpy.context.scene

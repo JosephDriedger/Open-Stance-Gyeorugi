@@ -7,11 +7,45 @@ p{margin:0 0 28px;font-size:22px;color:#4a5568}
 .c img{width:732px;height:412px;display:block}
 .c b{display:block;margin-top:10px;font-size:26px;color:#0b1220}
 .c span{font-size:18px;color:#5b6678}
+.f b::after{content:" [Future]";color:#b8741a}
 </style>
 <h1>OPEN STANCE · MENU PROTOTYPE</h1>
-<p>Console UI mockups. Sparring and Tournament use premade fighters; the created fighter belongs to Career only. Sample content.</p>
+<p>Console UI mockups. Sparring and Tournament use premade fighters; the created fighter belongs to Career only. Screens tagged [Future] come after v1.0. Sample content.</p>
 <div class="g" id="g"></div>
 <script>
-const L=[["01_title","Title","Press any button"],["02_main","Main menu","Play tab; tabs Play / Progress / Connected / Options"],["03_sparring","Sparring setup","Players, ruleset, difficulty, arena"],["04_tournament","Tournament setup","Bracket size, ruleset, difficulty, arena"],["05_select","Fighter select, men","Men and Women tabs; premade fighters"],["05b_select_women","Fighter select, women","Women roster; same Chung and Hong assignment"],["06_match","Match HUD","Scoreboard, penalties, stamina, referee"],["07_pause","Pause","Resume, Move list, Controls, Options, Restart, Quit"],["08_results","Results","Winner, rounds, technique points, penalties"],["13_bracket","Tournament bracket","Results and next pairing"],["09_training","Training","Lessons, drills, free practice"],["10_career","Career","Calendar, created fighter, events"],["11_customize","Fighter creator (Career)","Look and gear, gear on or off"],["11b_customize_female","Fighter creator, female (Career)","Sex option changes the preview"],["12_options","Options","Audio, Video, Controls"],["14_controls_0","Controls: Movement and guards",""],["14_controls_1","Controls: Modifiers",""],["14_controls_2","Controls: Standing kicks",""],["14_controls_3","Controls: Spinning and jump kicks","Stick icons show how far to turn"],["14_controls_4","Controls: Fakes","One tab for every fake kick"],["14_controls_5","Controls: Punches and defense",""]];
-document.getElementById('g').innerHTML=L.map(([f,t,s])=>`<div class="c"><img src="${f}.png"><b>${t}</b><span>${s}&nbsp;</span></div>`).join('');
+const L=[
+["01_title","Title","Game name and start prompt only"],
+["02_main","Main menu, Play","Hub tabs; Team Championship, Challenges and Referee Mode are Future"],
+["15_main_connected","Main menu, Connected","Online, Replays and Broadcast are Future"],
+["03_sparring","Sparring setup","Future values appear in the lists, tagged"],
+["04_tournament","Tournament setup","Bracket size, ruleset, difficulty, arena"],
+["05_select","Fighter select, men","Men and Women tabs; premade fighters"],
+["05b_select_women","Fighter select, women","Women roster; same Chung and Hong assignment"],
+["06_match","Match HUD","Video review cards are Future"],
+["07_pause","Pause","Resume, Move list, Controls, Options, Restart, Quit"],
+["08_results","Results","Winner, rounds, technique points, penalties"],
+["13_bracket","Tournament bracket","Results and next pairing"],
+["09_training","Training","Lessons, drills, free practice"],
+["10_career","Career","Calendar, created fighter; long-term career is Future"],
+["11_customize","Fighter creator (Career)","Gear styles, dojang and ceremony are Future"],
+["11b_customize_female","Fighter creator, female (Career)","Sex option changes the preview"],
+["12_options","Options, Audio","Commentary is Future"],
+["16_options_access","Options, Accessibility","Remapping, reduced motion and audio cues are Future"],
+["14_controls_0","Controls: Movement and guards",""],
+["14_controls_1","Controls: Modifiers",""],
+["14_controls_2","Controls: Standing kicks",""],
+["14_controls_3","Controls: Spinning and jump kicks","Stick icons show how far to turn"],
+["14_controls_4","Controls: Fakes","One tab for every fake kick"],
+["14_controls_5","Controls: Punches and defense",""],
+["14_controls_6","Controls: Referee mode","Own layout; Future","f"],
+["21_team","Team Championship","Tag-team format, shared score","f"],
+["22_challenges","Challenges","Scenarios and medals","f"],
+["23_refmode","Referee Mode setup","Match, camera, ruleset, arena","f"],
+["24_refmatch","Referee match","Rating meter and the command ribbon","f"],
+["25_refrating","Referee grade","Rating changes and thresholds","f"],
+["26_online","Online","Casual, ranked, tournaments, clubs","f"],
+["27_replays","Replays","Free camera, slow motion, photo mode","f"],
+["28_broadcast","Broadcast","Tools for community tournaments","f"],
+["29_longterm","Long-term career","Ageing, injuries, hall of fame, world games","f"]];
+document.getElementById('g').innerHTML=L.map(([f,t,s,c])=>`<div class="c ${c||''}"><img src="${f}.png"><b>${t}</b><span>${s}&nbsp;</span></div>`).join('');
 </script>

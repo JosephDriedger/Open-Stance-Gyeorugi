@@ -1,3 +1,5 @@
+> Legacy test-character folder. For the current nine-preset library, use `../Animation/MotionBuilder/Medium/OpenStance_Medium_Sparring.fbx` or the matching preset, and read `../Animation/README.md`. The older files described below are retained pipeline history.
+
 # Open Stance animation test character
 
 Open **OpenStance_TestFighter.fbx** in Autodesk MotionBuilder.
@@ -24,3 +26,12 @@ Full-body visual deformation and BCIT capture retargeting remain unverified.
 
 Regenerate with MotionBuilder's `mobupy.exe` and
 `Tools/MotionBuilder/prepare_test_character.py` from the project root.
+
+## MetaHuman test fighter (production skeleton)
+
+`OpenStance_TestFighter_MH.fbx` is the textured Medium MetaHuman fighter in dobok and WT sparring gear, on the
+production `metahuman_base_skel` skeleton, characterized as `OpenStance_TestFighter_MH` (56 slots, FK/IK control
+rig; verified with a keyed wrist move of 28.3 cm and save/reopen, `validation_OpenStance_TestFighter_MH.json`).
+Prefer it for captures headed to the game: plotted animation imports onto the Unreal fighters without a retarget.
+Regenerate with `mobupy.exe Tools/MotionBuilder/prepare_test_character.py --metahuman` after
+`Tools/Blender/build_test_model.py`. See `Resources/Models/TestFighter/README.md`.

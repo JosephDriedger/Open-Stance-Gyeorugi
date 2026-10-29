@@ -98,13 +98,24 @@ def crowd_shoes(rig):
    if g:g.add([v.index for v in body.data.vertices if (body.matrix_world@v.co).z<.145*(foot.z/.08276)],1,'REPLACE')
  return o
 def export(rig,meshes,path,animation=False):
+ from repair_uniform_export_data import fabric_uv,clean_export_body
  copies=[];update();deps=bpy.context.evaluated_depsgraph_get()
  for o in meshes:
   if o.hide_render:continue
   mods=[m for m in o.modifiers if m.type=='ARMATURE']
   for m in mods:m.show_viewport=False
-  update();data=bpy.data.meshes.new_from_object(o.evaluated_get(deps),preserve_all_data_layers=True,depsgraph=deps)
+  update();data=o.data.copy() if o.get('PreserveExportShapeKeys') else bpy.data.meshes.new_from_object(o.evaluated_get(deps),preserve_all_data_layers=True,depsgraph=deps)
   c=o.copy();c.data=data;c.animation_data_clear();c.modifiers.clear();bpy.context.scene.collection.objects.link(c);c.hide_viewport=c.hide_render=False;c.hide_set(False);suite.weights(c,rig,2 if len(rig.data.bones)<30 else 4);copies.append(c)
+  # Portable material snapshots can request an explicit primary UV set.
+  fabric_uv(c);clean_export_body(c)
+  export_uv=c.get('ExportUV')
+  if export_uv and c.data.uv_layers.get(export_uv):
+   for layer in list(c.data.uv_layers):
+    if layer.name!=export_uv:c.data.uv_layers.remove(layer)
+   if o.get('ExportNormalizeUVTile'):
+    layer=c.data.uv_layers.active
+    tile=(math.floor(min(d.uv.x for d in layer.data)),math.floor(min(d.uv.y for d in layer.data)))
+    for d in layer.data:d.uv.x-=tile[0];d.uv.y-=tile[1]
   for m in mods:m.show_viewport=True
  bpy.ops.object.select_all(action='DESELECT');rig.hide_set(False);rig.select_set(True)
  for c in copies:c.select_set(True)

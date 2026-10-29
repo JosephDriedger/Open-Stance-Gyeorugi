@@ -11,6 +11,7 @@ Both skeletons use the same joint names, so one mapping serves both.
 """
 from pathlib import Path
 import json
+import hashlib
 import sys
 import pyfbstandalone
 
@@ -34,7 +35,9 @@ else:
 SOURCE = args.source or SOURCE
 NAME = args.name or NAME
 app = FBApplication()
+print('Opening source '+str(ROOT / SOURCE), flush=True)
 assert app.FileOpen(str(ROOT / SOURCE), False)
+print('Source opened', flush=True)
 scene = FBSystem().Scene
 character = FBCharacter(NAME)
 mapping = {
@@ -53,6 +56,13 @@ for prefix, side in [('Left', 'l'), ('Right', 'r')]:
             mapping[f'{prefix}Hand{finger}{joint}'] = f'{finger.lower()}_{joint:02}_{side}'
 for slot, bone in mapping.items():
     model = FBFindModelByLabelName(bone)
+    if slot == 'Reference' and model is None:
+        # Blender animation exports name the armature RIG_Body_<preset>.
+        # Some MetaHuman sources use that model as the reference root rather
+        # than a separate bone literally named root.
+        hips = FBFindModelByLabelName('pelvis')
+        if hips is not None:
+            model = hips.Parent
     prop = character.PropertyList.Find(slot + 'Link')
     if model is None or prop is None:
         raise RuntimeError(f'Missing mapping: {slot} -> {bone}')
@@ -61,6 +71,7 @@ scene.Evaluate()
 if not character.SetCharacterizeOn(True):
     raise RuntimeError(character.GetCharacterizeError())
 assert character.CreateControlRig(True), 'Control rig creation failed'
+print('Characterized and control rig created', flush=True)
 app.CurrentCharacter = character
 character.InputType = FBCharacterInputType.kFBCharacterInputMarkerSet
 character.ActiveInput = True
@@ -87,6 +98,7 @@ scene.Evaluate()
 after = position(hand)
 movement = sum((b-a)**2 for a,b in zip(before, after))**.5
 assert movement > 5, f'Wrist control did not drive the hand: {movement}'
+print('Wrist test passed', flush=True)
 for node, value in zip(effector.Translation.GetAnimationNode().Nodes, original_local):
     node.FCurve.EditClear()
     node.FCurve.KeyAdd(FBTime(0), value)
@@ -98,6 +110,7 @@ options = FBFbxOptions(False)
 options.EmbedMedia = True
 output = OUT / f'{NAME}.fbx'
 assert app.FileSave(str(output), options), 'FBX save failed'
+print('Saved target', flush=True)
 
 # Verify the delivered file, not just the in-memory setup.
 assert app.FileOpen(str(output), False)
@@ -105,6 +118,7 @@ reopened = next(c for c in FBSystem().Scene.Characters if c.Name == NAME)
 assert reopened.GetCharacterize(), 'Characterization lost on save'
 assert reopened.GetCurrentControlSet() is not None, 'Control rig lost on save'
 report = {'source': SOURCE, 'output': str(output),
+          'source_sha256': hashlib.sha256((ROOT / SOURCE).read_bytes()).hexdigest(),
           'character': reopened.Name, 'mapped_slots': len(mapping),
           'characterized': True, 'control_rig': True, 'reopened_successfully': True,
           'wrist_control_hand_movement_cm': movement,

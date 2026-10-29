@@ -1,0 +1,14 @@
+"""Install only the validated, reviewed sparring-fit delivery, keeping backups."""
+from pathlib import Path
+p=Path(__file__).with_name('publish_tailored_doboks.py');s=p.read_text()
+s=s.replace('TailoredDoboks','CollarEarRepair').replace('Before_Tailored_Doboks_20261015_','Before_Collar_Ear_Repair_20261020_').replace('dobok_fit_revision','collar_ear_revision').replace('2026-10-15','2026-10-20')
+s=s.replace('Tailored dobok fit, 2026-10-20: both uniform styles now have less torso, sleeve and trouser bulk, with original body shapes and rigs retained. Current files, animations and characterized targets use the updated fit.','Collar and ear-pad repair, 2026-10-20: fitted collar clearance and rounded gameplay ear padding across the character library. Body geometry, rigs and authored animation keyframes retained.')
+s=s.replace('is the current slimmer-fit revision.','contains the current collar and ear-pad repair.')
+s=s.replace("for folder in ['ROMRepair','GarmentRollout','AlternateJacketRepair']:","for folder in ['SparringFitRepair']:")
+s=s.replace("native=check(S/'delivery_validation.json',63)","assert read(S/'visual_review.json')['passed']\nassert read(S/'ear_topology_validation.json')['passed']\nassert read(S/'cloth_pilot.json')['completed']\nassert sha(S/'LiveCloth_Pilot.blend')==read(S/'cloth_pilot.json')['sha256']\nnative=check(S/'delivery_validation.json',63)")
+s=s.replace("archive=M/'Archive'", "for kind in KINDS:\n r=read(S/kind/'Tpose_validation.json');src=S/kind/r['file'];assert r['passed'] and sha(src)==r['sha256'];add(src,M/'TPose'/src.name)\nadd(S/'LiveCloth_Pilot.blend',M/'Animation/Physics/LiveCloth_Pilot.blend')\ngear=read(S/'Gear/validation.json');assert gear['passed'] and sha(S/'Gear'/gear['file'])==gear['sha256']\nadd(S/'Gear'/gear['file'],M/'ProtectorReferenceV2'/gear['file'])\narchive=M/'Archive'")
+s=s.replace('for _,p in mapping:backup(p)',"print('Backing up '+str(len(mapping))+' assets',flush=True)\nfor i,(_,p) in enumerate(mapping,1):\n backup(p)\n if i%100==0:print('Backup '+str(i),flush=True)")
+s=s.replace("records.append({'file':str(dest.relative_to(ROOT)),'sha256':digest})","records.append({'file':str(dest.relative_to(ROOT)),'sha256':digest})\n if len(records)%100==0:print('Installed '+str(len(records)),flush=True)")
+s+="\np=M/'SparringStyleReview_20261016/REPORT.md'\nwrite(p,'> Follow-up: [CollarEarRepair](../CollarEarRepair/README.md) contains the installed repairs. Findings below describe the preceding models.\\n\\n'+p.read_text(encoding='utf-8'))\n"
+s=s.replace("archive=M/'Archive'", "bun=check(S/'exports_validation.json',18)\nfor row in bun['files']:\n src=S/row['file'];add(src,M/'CharacterSuite'/src.parent.name/'HairstyleSamples'/src.name)\narchive=M/'Archive'")
+exec(compile(s,str(p),'exec'),{'__file__':str(p),'__name__':'__main__'})

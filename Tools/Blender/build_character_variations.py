@@ -138,16 +138,19 @@ def build_hair(fit,style,mat):
   parts.append(u.tube('Hair_Tie',[(.023*math.cos(math.tau*i/48),.111+.023*math.sin(math.tau*i/48),1.666) for i in range(49)],.003,tie))
  return parts
 
-def eyebrows(fit,mat,male):
+EYEBROW_STYLES=['Natural','Straight','Full','Soft_Arch','High_Arch','Thin_Groomed']
+
+def eyebrows(fit,mat,male,style=0):
  # Dense fine fibers follow the facial surface instead of a row of thick dashes.
  paths=[];rng=random.Random(88)
+ arch,width_scale,density,tail_drop=[(.0048,1,1,.003),(.0012,1.05,1.05,.0008),(.0035,1.85,1.65,.002),(.0065,1.1,1.1,.0025),(.010, .85,1,.003),(.006,.48,.70,.002)][style]
  for sign in [-1,1]:
-  for i in range(660 if male else 560):
+  for i in range(round((660 if male else 560)*density)):
    t=rng.betavariate(1.25,1.65)
-   def center(q):return 1.651+.0048*math.sin(math.pi*q)-.003*q
-   width=(.0048 if male else .0038)*(1-.87*t**1.6)
+   def center(q):return 1.651+arch*math.sin(math.pi*q)-tail_drop*q
+   width=(.0048 if male else .0038)*width_scale*(1-.87*t**1.6)
    x=.013+.044*t;z=center(t)+rng.uniform(-.5,.5)*width
-   length=rng.uniform(.0027,.0048)*(1-.35*t)
+   length=rng.uniform(.0027,.0048)*(1-.35*t)*(.70 if style==5 else 1)
    angle=math.radians(65*(1-t)**2-13*t)
    path=[]
    for j in range(6):
@@ -164,7 +167,27 @@ def eyebrows(fit,mat,male):
  shader.inputs['Roughness'].default_value=.72
  o=strands_mesh('Eyebrows',paths,browmat,.000070 if male else .000060)
  o['GroomVersion']=2;o['FiberCount']=len(paths)
+ o['EyebrowStyle']=EYEBROW_STYLES[style]
  return o
+
+def add_eyebrow_styles(head,mat,rig,male):
+ for o in list(bpy.data.objects):
+  if o.type=='MESH' and 'eyebrow' in o.name.lower():bpy.data.objects.remove(o,do_unlink=True)
+ rig['EyebrowStyle']=0;rig['Wear_Eyebrows']=True
+ rig.id_properties_ui('EyebrowStyle').update(min=0,max=len(EYEBROW_STYLES)-1,description='; '.join(f'{i}: {s.replace("_"," ")}' for i,s in enumerate(EYEBROW_STYLES)))
+ fit=Hair(head);result=[]
+ for index,style in enumerate(EYEBROW_STYLES):
+  o=eyebrows(fit,mat,male,index);o.name='Eyebrows_'+style;bind_eyebrows(o,head)
+  coll=bpy.data.collections.get('Eyebrows_'+style)
+  if coll is None:coll=bpy.data.collections.new('Eyebrows_'+style);bpy.context.scene.collection.children.link(coll)
+  for c in list(o.users_collection):c.objects.unlink(o)
+  coll.objects.link(o)
+  for attr in ['hide_render','hide_viewport']:
+   suite.driver(o,attr,rig,'EyebrowStyle',f'x != {index}')
+   d=o.animation_data.drivers.find(attr).driver;v=d.variables.new();v.name='wear';v.targets[0].id=rig;v.targets[0].data_path='["Wear_Eyebrows"]';d.expression=f'(x != {index}) or not wear'
+  result.append(o)
+ rig.update_tag();bpy.context.view_layer.update()
+ return result
 
 def bind_eyebrows(o,head):
  # Inherit nearby facial skin weights so brows participate in facial animation.
@@ -212,7 +235,7 @@ def run(preset):
  for o in list(bpy.data.objects):
   if o.type=='MESH' and o.name.startswith('Hair'):bpy.data.objects.remove(o,do_unlink=True)
  warp_all(preset);fit=Hair(bpy.data.objects['Head']);mat=material(rig)
- brow=eyebrows(fit,mat,name.startswith('Male'));bind_eyebrows(brow,bpy.data.objects['Head'])
+ add_eyebrow_styles(bpy.data.objects['Head'],mat,rig,name.startswith('Male'))
  rig['HairStyle']=preset[-1];rig['HairColor']=1;rig['Wear_Hair']=True;rig['Wear_Helmet']=False;rig['Wear_Protector']=False;rig['Wear_Gloves']=False;rig['Wear_FootGuards']=False
  rig['CharacterPreset']=name;rig.id_properties_ui('HairStyle').update(min=0,max=5,description='; '.join(f'{i}: {s}' for i,s in enumerate(STYLES)))
  for index,style in enumerate(STYLES):

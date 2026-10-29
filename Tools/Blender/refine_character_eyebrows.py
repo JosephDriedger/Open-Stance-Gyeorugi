@@ -16,7 +16,7 @@ def run(name):
  backup.parent.mkdir(parents=True,exist_ok=True)
  if not backup.exists():shutil.copy2(path,backup)
  bpy.ops.wm.open_mainfile(filepath=str(path))
- scene=bpy.context.scene;head=bpy.data.objects['Head'];rig=bpy.data.objects['RIG_Body_Medium']
+ scene=bpy.context.scene;head=bpy.data.objects['Head'];rig=next(o for o in bpy.context.scene.objects if o.type=='ARMATURE' and o.name.startswith('RIG_Body_'))
  old=[o for o in bpy.data.objects if o.type=='MESH' and 'eyebrow' in o.name.lower()]
  mat=next(o for o in bpy.data.objects if o.name.startswith('Hair_') and len(o.data.materials)).data.materials[0]
  collections=list(old[0].users_collection) if old else []

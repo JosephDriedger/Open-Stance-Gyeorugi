@@ -1,0 +1,16 @@
+from pathlib import Path
+p=Path(__file__).with_name('publish_tailored_doboks.py');s=p.read_text()
+s=s.replace('TailoredDoboks','VisualFitRepair').replace('Before_Tailored_Doboks_20261015_','Before_Visual_Fit_20261016_').replace('dobok_fit_revision','visual_fit_revision').replace('2026-10-15','2026-10-16')
+s=s.replace('Tailored dobok fit, 2026-10-16: both uniform styles now have less torso, sleeve and trouser bulk, with original body shapes and rigs retained. Current files, animations and characterized targets use the updated fit.','Visual fit repairs, 2026-10-16: sleeves now clear the forearms, coarse crowd scalp coverage is repaired, and the lower chest protector sits closer to the belt. Rigs and authored animations are retained.')
+s=s.replace('is the current slimmer-fit revision.','is the current visual-fit repair revision.')
+s=s.replace("for folder in ['ROMRepair','GarmentRollout','AlternateJacketRepair']:","for folder in ['ROMRepair','GarmentRollout','AlternateJacketRepair','TailoredDoboks','OpeningRepair','HairClothRevision']:")
+s=s.replace("native=check(S/'delivery_validation.json',63)","assert read(S/'visual_review.json')['passed']\nassert read(S/'cloth_pilot.json')['completed']\nassert read(S/'fbx_hair_validation.json')['passed']\nnative=check(S/'delivery_validation.json',63)")
+s=s.replace("native=check(S/'delivery_validation.json',63)","assert sha(S/'LiveCloth_Pilot.blend')==read(S/'cloth_pilot.json')['sha256']\nnative=check(S/'delivery_validation.json',63)")
+s=s.replace("archive=M/'Archive'", "for kind in KINDS:\n r=read(S/kind/'Tpose_validation.json');src=S/kind/r['file'];assert r['passed'] and sha(src)==r['sha256'];add(src,M/'TPose'/src.name)\nadd(S/'LiveCloth_Pilot.blend',M/'Animation/Physics/LiveCloth_Pilot.blend')\nadd(S/'README.md',M/'Animation/Physics/README.md')\narchive=M/'Archive'")
+s=s.replace("archive=M/'Archive'", "gear=read(S/'Gear/validation.json');assert gear['passed'] and sha(S/'Gear'/gear['file'])==gear['sha256']\nadd(S/'Gear'/gear['file'],M/'ProtectorReferenceV2'/gear['file'])\nfor image in (S/'Gear').glob('*.png'):add(image,M/'ProtectorReferenceV2'/image.name)\nadd(S/'Gear/validation.json',M/'ProtectorReferenceV2/visual_fit_validation.json')\narchive=M/'Archive'")
+s=s.replace('for _,p in mapping:backup(p)',"print('Backing up '+str(len(mapping))+' mapped assets',flush=True)\nfor i,(_,p) in enumerate(mapping,1):\n backup(p)\n if i%100==0:print('Backup '+str(i)+'/'+str(len(mapping)),flush=True)")
+s=s.replace('for src,dest in mapping:',"print('Installing and verifying corrected assets',flush=True)\nfor src,dest in mapping:")
+s=s.replace("records.append({'file':str(dest.relative_to(ROOT)),'sha256':digest})","records.append({'file':str(dest.relative_to(ROOT)),'sha256':digest})\n if len(records)%100==0:print('Installed '+str(len(records))+'/'+str(len(mapping)),flush=True)")
+s += "\np=M/'VisualReview_20261016/REPORT.md'\nwrite(p,'> Follow-up: the findings below describe the pre-repair models. See [VisualFitRepair](../VisualFitRepair/README.md) for the installed repairs and their reviewed scope.\\n\\n'+p.read_text(encoding='utf-8'))\n"
+print('Verifying staged file hashes and approval reports',flush=True)
+exec(compile(s,str(p),'exec'),{'__file__':str(p),'__name__':'__main__'})

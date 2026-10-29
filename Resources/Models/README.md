@@ -1,7 +1,15 @@
-# Model library entry point
+# Model library
 
-Use **Models and Rigs** at the project root for the organized model library. Open `Models and Rigs/START HERE.md` for the mocap workflow and the distinction between animation targets and the latest appearance previews.
+Open Models and Rigs/START HERE.md at the repository root for categorized shortcuts and the mocap workflow.
 
-Numbered folders provide Windows shortcuts to characterized MotionBuilder targets, Blender animation rigs, current hair/character previews, gameplay LODs, animated crowds and editable gear. Existing assets remain here so texture and build-script paths continue to work.
+The updated nine-preset library is published here:
 
-Original source folders and older review/staging files are not interchangeable with the current entry points. In particular, the latest character hair and extended chest protectors have not yet been propagated to the full gameplay suite or the older animation workspaces.
+- Animation: Blender body/face rigs and MotionBuilder dobok/sparring targets.
+- CharacterSuite: full previews, three gameplay LODs, two crowd LODs and five crowd clips per preset.
+- CharacterVariations: four editable male/female character previews.
+- OpenStance_Characters_Workspace.blend: combined nine-scene workspace.
+- HelmetVariants and ProtectorReferenceV2: editable gear libraries.
+
+Updated hair, eyebrows and extended chest protectors are included throughout the published animation and gameplay families. Native Blender files hold modular choices; exported FBXs contain the default selected appearance. See Animation/README.md for controls and capture preparation, and CharacterSuite/REBUILD_REPORT.md for validation, limitations and the archive of replaced files.
+
+UpdatedBuild is rebuild staging. Archive, earlier studies and older fighter folders retain pipeline history. Use the categorized current entry points for animation work. No actual capture take or Unreal Content reimport was completed by the asset rebuild.

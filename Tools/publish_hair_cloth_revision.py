@@ -1,0 +1,13 @@
+from pathlib import Path
+p=Path(__file__).with_name('publish_tailored_doboks.py');s=p.read_text()
+s=s.replace("S=M/'TailoredDoboks'","S=M/'HairClothRevision'")
+s=s.replace('Before_Tailored_Doboks_20261015_','Before_Hair_Cloth_20261016_')
+s=s.replace('dobok_fit_revision','hair_cloth_revision').replace('2026-10-15','2026-10-16')
+s=s.replace('../TailoredDoboks/README.md','../HairClothRevision/README.md').replace('Resources/Models/TailoredDoboks/README.md','Resources/Models/HairClothRevision/README.md')
+s=s.replace('Tailored dobok fit, 2026-10-16: both uniform styles now have less torso, sleeve and trouser bulk, with original body shapes and rigs retained. Current files, animations and characterized targets use the updated fit.', 'Hair and Blender cloth, 2026-10-16: crew-cut coverage is repaired and optional live cloth is available on the body rig. Skeletal FBXs do not contain a live cloth solver.')
+s=s.replace('[TailoredDoboks](../HairClothRevision/README.md) is the current slimmer-fit revision.','[HairClothRevision](../HairClothRevision/README.md) is the current hair and optional Blender cloth revision.')
+s=s.replace("for folder in ['ROMRepair','GarmentRollout','AlternateJacketRepair']:","for folder in ['ROMRepair','GarmentRollout','AlternateJacketRepair','TailoredDoboks','OpeningRepair']:")
+s=s.replace("native=check(S/'delivery_validation.json',63)","assert read(S/'visual_review.json')['passed']\nassert read(S/'cloth_pilot.json')['completed']\nnative=check(S/'delivery_validation.json',63)")
+s=s.replace("native=check(S/'delivery_validation.json',63)","assert read(S/'fbx_hair_validation.json')['passed']\nnative=check(S/'delivery_validation.json',63)")
+s=s.replace("archive=M/'Archive'", "for kind in KINDS:\n r=read(S/kind/'Tpose_validation.json');src=S/kind/r['file'];assert r['passed'] and sha(src)==r['sha256'];add(src,M/'TPose'/src.name)\nadd(S/'LiveCloth_Pilot.blend',M/'Animation/Physics/LiveCloth_Pilot.blend')\nadd(S/'README.md',M/'Animation/Physics/README.md')\narchive=M/'Archive'")
+exec(compile(s,str(p),'exec'),{'__file__':str(p),'__name__':'__main__'})
