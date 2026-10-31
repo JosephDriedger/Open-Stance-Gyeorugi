@@ -73,10 +73,14 @@ Recognizer.AddGesture(Axe);
 Circle motions are written as steps (a quarter circle from the side down is Toward, Down). Techniques without an
 approved input (GDD 9.4) are not registered.
 
-## Provisional decisions (issue 2)
+## Control decisions (GDD v0.12, 18.2)
 
-These stand until the GDD records the decision: kicks without RT use the lead leg; left stick movement; the spin hook's
-RT requirement is not decided, so the spin hook is not registered.
+Kicks without RT use the lead leg. The left stick moves the fighter, the Menu button pauses, and L3 and R3 are unused
+in v1.0. The spin hook requires RT, because the back leg throws it; its gesture is a half circle down, from either
+side, mirrored like any back-leg kick (GDD 7.2).
+
+The spin hook is not registered yet. It needs a gesture flag that makes RT mandatory for a match, and a `SpinHook` row
+in `DT_MoveData.csv`, so it goes in with the Milestone 2 technique pass.
 
 # Footwork and stance
 
