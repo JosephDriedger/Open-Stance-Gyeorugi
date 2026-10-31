@@ -36,10 +36,10 @@ The full design is in `Docs/GDD_Open_Stance.docx`.
 | Path | Contents |
 | --- | --- |
 | `OpenStance.uproject` | Unreal project (UE 5.8 source build) |
-| `Source/OpenStance` | Runtime game module: the menu system (`Public/Menu`, Slate and UMG written in C++); no gameplay yet |
+| `Source/OpenStance` | Runtime game module: the menu system (`Public/Menu`, Slate and UMG written in C++) and the combat data contracts (`Public/Combat`) |
 | `Source/OpenStanceEditorTools` | Editor module that exposes Chaos cloth creation and menu screenshots to Python |
 | `Config/` | Engine, editor, game, input and MetaHuman wardrobe configuration |
-| `Docs/` | Game Design Document, controls, project plan, mocap shot list, UML diagrams, [menu system notes](Docs/Menu_System.md), [character customization rules](Docs/Character_Customization.md), [Vicon/Nexus test plan](Docs/Vicon_Nexus_Test.md) |
+| `Docs/` | Game Design Document, controls, project plan, mocap shot list, UML diagrams, [menu system notes](Docs/Menu_System.md), [combat data](Docs/Combat_Data.md), [character customization rules](Docs/Character_Customization.md), [Vicon/Nexus test plan](Docs/Vicon_Nexus_Test.md) |
 | `Resources/` | Source art outside the Unreal project: fighter and MetaHuman FBX files, fitted gear, referee outfits, environment meshes and textures, MotionBuilder test character, reference images |
 | `Tools/Blender/` | Rig, gear-fitting, hidden-face-map and environment-mesh scripts ([README](Tools/Blender/README.md)) |
 | `Tools/Unreal/` | Editor Python scripts for characters, wardrobe, referees, cloth and levels ([README](Tools/Unreal/README.md)) |
