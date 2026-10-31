@@ -14,7 +14,7 @@ The [test checklist](Docs/Mocap_Test.md) covers opening the target, simple rig m
 
 Pre-production. The design is a draft and there is no gameplay prototype yet: `Source/OpenStance` holds the menu system but no gameplay code, so the Skill Stick is untested until Milestone 1. What exists today:
 
-- Game Design Document (v0.6 draft), controls layout, project plan and mocap shot list in `Docs/`.
+- Game Design Document (v0.12 draft), controls layout, project plan and mocap shot list in `Docs/`.
 - A base MetaHuman fighter with a seven-piece wardrobe (dobok jacket and pants, belt, chest protector, helmet, gloves, foot guards) and Chung/Hong materials. It passes a full-body range-of-motion test.
 - A roster of six MetaHuman referees in uniform, with Chaos cloth on ties and trousers.
 - Staging levels `L_CompetitionArena` (8 m octagon mat in a 12 m square) and `L_TrainingDojang`, plus arena and dojang props.
