@@ -63,14 +63,14 @@ FOpenStanceSkillStickRecognizer::FOpenStanceSkillStickRecognizer()
 
 TArray<FOpenStanceGestureDef> FOpenStanceSkillStickRecognizer::MakeDefaultGestures()
 {
-	using S = EOpenStanceGestureStep;
+	using Gs = EOpenStanceGestureStep;
 	using T = EOpenStanceTechnique;
 
-	auto Make = [](T Technique, std::initializer_list<S> Steps, bool bCanJump)
+	auto Make = [](T Technique, std::initializer_list<Gs> Steps, bool bCanJump)
 	{
 		FOpenStanceGestureDef Def;
 		Def.Technique = Technique;
-		Def.Steps = TArray<S>(Steps);
+		Def.Steps = TArray<Gs>(Steps);
 		Def.bCanJump = bCanJump;
 		return Def;
 	};
@@ -78,10 +78,10 @@ TArray<FOpenStanceGestureDef> FOpenStanceSkillStickRecognizer::MakeDefaultGestur
 	// RS Up is the side or cut kick, RS toward the throwing leg's side the roundhouse and the other side the hook,
 	// RS Down then Up the spin side kick (GDD 7.2). Jump covers side, roundhouse and hook, not spin side (GDD 7.4).
 	return {
-		Make(T::SideKick, { S::Up }, true),
-		Make(T::Roundhouse, { S::Toward }, true),
-		Make(T::Hook, { S::Away }, true),
-		Make(T::SpinSide, { S::Down, S::Up }, false),
+		Make(T::SideKick, { Gs::Up }, true),
+		Make(T::Roundhouse, { Gs::Toward }, true),
+		Make(T::Hook, { Gs::Away }, true),
+		Make(T::SpinSide, { Gs::Down, Gs::Up }, false),
 	};
 }
 
