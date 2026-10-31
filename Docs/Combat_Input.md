@@ -77,3 +77,24 @@ approved input (GDD 9.4) are not registered.
 
 These stand until the GDD records the decision: kicks without RT use the lead leg; left stick movement; the spin hook's
 RT requirement is not decided, so the spin hook is not registered.
+
+# Footwork and stance
+
+Code: `OpenStanceFootwork`, tuning in `UOpenStanceCombatSettings` (Project Settings > Game > Open Stance Combat, saved
+to `Config/DefaultGame.ini`). Tests: `OpenStance.Footwork.*`. All numbers are GDD 6.4's starting values, editable, and
+are replaced by the Milestone 1 capture's measurements.
+
+| Rule | Behaviour |
+| --- | --- |
+| Tap | A press owes a whole step: 40 cm forward or back, 35 cm sideways. Releasing early finishes the step. |
+| Hold | 1.2 m/s while the stick is held. |
+| Circling | Sideways motion swings round the opponent at the same distance; the fighter keeps facing them. |
+| Dash (B) | 1.0 m in 0.3 s along the stick or toward the opponent, 12 stamina; held B dashes once. |
+| Switch Sides (A) | Takes 0.35 s; lead and back swap halfway, `SwitchBlend` rises smoothly 0 to 1 for the mirrored pose, no technique can start meanwhile, and none can be switched into mid-technique. |
+| Technique | A neutral stick roots the fighter. A held stick slides it at the step speed (120 cm/s); it never steers toward the opponent, so an out-of-range attack stays out of range. |
+| Guard | D-pad Up high, Left cross, Right mixed, Down low. The runtime state holds it at once; `GuardTransitionLeft` and `PreviousGuard` are there for the transition the M2 defence adds. |
+| Collision | Capsule radius 35 cm. `SeparateFighters` pushes overlapping fighters apart; they never overlap. |
+| Reach | `ScaleReachCm` scales the table's reach (written for 175 cm) by the fighter's height. |
+
+The same RT kick after switching sides is checked by `OpenStance.Footwork.SameKickAfterSwitch`: in Right Lead the RT
+roundhouse is RS Left with the left leg; after the switch it is RS Right with the right leg, and RS Left is the hook.
