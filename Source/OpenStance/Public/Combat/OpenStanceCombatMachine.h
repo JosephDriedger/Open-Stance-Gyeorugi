@@ -143,6 +143,9 @@ public:
 	/** Why the fighter is down, or None. Stays set until the fighter is back on its feet. */
 	EOpenStanceKnockdownCause GetKnockdownCause() const { return Cause; }
 
+	/** Counts up with every technique started, so hit registration can tell one attack's traces from the next's. */
+	int32 GetAttackSerial() const { return AttackSerial; }
+
 	/** Seconds spent in the current state. */
 	float GetStateElapsed() const { return Elapsed; }
 
@@ -157,6 +160,7 @@ private:
 
 	FOpenStanceAttackRequest Attack;
 	bool bHasAttack = false;
+	int32 AttackSerial = 0;
 	float Elapsed = 0.0f;
 	EOpenStanceKnockdownCause Cause = EOpenStanceKnockdownCause::None;
 };

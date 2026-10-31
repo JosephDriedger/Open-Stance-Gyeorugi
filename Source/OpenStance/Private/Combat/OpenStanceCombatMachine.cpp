@@ -189,6 +189,7 @@ bool FOpenStanceCombatMachine::RequestAttack(const FOpenStanceAttackRequest& Req
 	State.Stamina = FMath::Max(0.0f, State.Stamina - Request.Row.StaminaCost);
 	Attack = Request;
 	bHasAttack = true;
+	++AttackSerial;
 
 	FOpenStanceCombatEvent& Event = OutEvents.AddDefaulted_GetRef();
 	Event.Type = Request.bFake ? EOpenStanceCombatEventType::FakeStarted : EOpenStanceCombatEventType::AttackStarted;
