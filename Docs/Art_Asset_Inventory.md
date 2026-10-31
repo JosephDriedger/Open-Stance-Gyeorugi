@@ -9,13 +9,14 @@ on a machine with Perforce synced) and the tracked source folders, and keeps wha
 | Column | Filled by |
 | --- | --- |
 | Category, Name, Type, Unreal path, Source path, Version control, Origin, Status, Notes | the script, from folders and naming |
-| Revision (Perforce changelist or Git commit), Milestone, Acceptance owner, Review, Usage rights | the team, by hand; kept on every rebuild |
+| Revision (head revision and change) | the script, from Perforce when `p4` can reach the server; otherwise the old value is kept. Git rows stay blank |
+| Milestone, Acceptance owner, Review, Usage rights | the team, by hand; kept on every rebuild |
 
 Status says what an asset is, never that it is final: **Generated** (made by a project script, not hand-authored art),
 **Generated (working)** (exports kept for the Blender refit, not shipped), **Test asset**, **Placeholder**, **Reference**,
 **Plan**, **Engine**, **Test data**. A row moves to **Production** when its acceptance owner has signed it off, which is how
-the placeholder replacements and the credits and licence list are tracked. Perforce was not reachable when the CSV was
-first built, so every Revision, owner, review and rights cell starts blank rather than guessed.
+the placeholder replacements and the credits and licence list are tracked. Owner, review and rights cells start blank
+rather than guessed. Revisions were filled from Perforce on 2026-10-31.
 
 ## What is in it (590 rows)
 
@@ -57,6 +58,6 @@ Each of these was checked against the repository (no matching file in `Content/`
 
 ## Using it
 
-- Replacing a placeholder: set Status to Production, fill Review and Revision, and update the row's Usage rights.
+- Replacing a placeholder: set Status to Production, fill Review, rebuild to refresh Revision, and update the row's Usage rights.
 - Release credits and licences: filter on Usage rights (MetaHuman characters carry Epic's MetaHuman licence; the fonts ship with
   the engine) and on any row still blank before release.
