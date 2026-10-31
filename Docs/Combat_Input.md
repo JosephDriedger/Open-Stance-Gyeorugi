@@ -20,7 +20,7 @@ The recognizer touches no engine objects, so scripted frames test it and the AI 
   Between the two it keeps its direction, so a wobble on the way back to centre is not a step.
 - Dead zone and window come from the Options screen: `FOpenStanceSkillStickConfig::FromSettings(DeadZonePercent,
   WindowSeconds)`; the window is clamped to 0.20-0.40 s (default 0.25 s).
-- A gesture is the sequence of steps starting at the first step. Steps that arrive after the window starts a new gesture.
+- A gesture is the sequence of steps starting at the first step. A step that arrives after the window starts a new gesture.
 
 ## No prefix misfires
 
