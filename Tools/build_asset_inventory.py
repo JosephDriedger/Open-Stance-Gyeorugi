@@ -3,14 +3,16 @@
   py -3 Tools/build_asset_inventory.py
 
 It walks Content/ (Perforce, so only on a machine with it synced) and the tracked source folders and writes one row per
-asset. Everything it cannot know from the files is left blank for the team to fill in and is kept when the script is
-run again: the columns Revision, Status override, Milestone, Acceptance owner, Review and Usage rights (see MANUAL below)
-are copied across from the existing CSV by Unreal path or name. Nothing here claims an asset is missing unless the Gaps
+asset. The Revision column is read from Perforce (head revision and change) when p4 can reach the server; otherwise the
+existing value is kept. Everything else it cannot know from the files is left blank for the team to fill in and is kept
+when the script is run again: the columns Milestone, Acceptance owner, Review and Usage rights (see MANUAL below) are
+copied across from the existing CSV by Unreal path or name. Nothing here claims an asset is missing unless the Gaps
 section of Docs/Art_Asset_Inventory.md says why.
 """
 import csv
 import os
 import re
+import subprocess
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -20,7 +22,7 @@ COLUMNS = [
     "Category", "Name", "Type", "Unreal path", "Source path", "Version control", "Revision", "Origin", "Status",
     "Milestone", "Acceptance owner", "Review", "Usage rights", "Notes",
 ]
-MANUAL = ["Revision", "Milestone", "Acceptance owner", "Review", "Usage rights"]
+MANUAL = ["Milestone", "Acceptance owner", "Review", "Usage rights"]
 
 TYPES = [
     ("SK_", "Skeletal mesh"), ("SM_", "Static mesh"), ("MI_", "Material instance"), ("M_", "Material"), ("T_", "Texture"),
@@ -80,6 +82,24 @@ def read_existing():
     return existing
 
 
+def perforce_revisions():
+    """Head revision of each Content file from Perforce, keyed by its Unreal path; empty if p4 cannot be reached."""
+    try:
+        out = subprocess.run(["p4", "-ztag", "fstat", "-T", "depotFile,headRev,headChange,headAction", "//depot/..."],
+                             capture_output=True, text=True, timeout=60, check=True).stdout
+    except (OSError, subprocess.SubprocessError) as error:
+        print("Perforce not reachable, keeping the existing Revision values: %s" % error)
+        return {}
+    revisions = {}
+    for block in out.split("\n\n"):
+        fields = dict(re.findall(r"^\.\.\. (\w+) (.*)$", block, flags=re.M))
+        depot = fields.get("depotFile", "")
+        if depot.startswith("//depot/") and fields.get("headAction") != "delete":
+            game_path = "/Game/" + os.path.splitext(depot[len("//depot/"):])[0]
+            revisions[game_path] = "#%s (change %s)" % (fields["headRev"], fields["headChange"])
+    return revisions
+
+
 def source_index():
     """Resources/Environment files by stem, so a mesh or texture can point at its source."""
     index = {}
@@ -94,6 +114,7 @@ def source_index():
 def main():
     existing = read_existing()
     sources = source_index()
+    revisions = perforce_revisions()
     rows = []
 
     content = os.path.join(ROOT, "Content")
@@ -144,6 +165,7 @@ def main():
             row.setdefault(column, "")
         for column in MANUAL:
             row[column] = old.get(column, "")
+        row["Revision"] = revisions.get(row["Unreal path"], old.get("Revision", ""))
 
     rows.sort(key=lambda r: (r["Category"], r["Unreal path"], r["Name"]))
     with open(OUT, "w", newline="", encoding="utf-8") as f:
