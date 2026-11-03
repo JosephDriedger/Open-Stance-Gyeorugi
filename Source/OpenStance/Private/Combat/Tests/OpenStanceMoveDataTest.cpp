@@ -34,7 +34,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FOpenStanceMoveDataSeedTest, "OpenStance.MoveDa
 bool FOpenStanceMoveDataSeedTest::RunTest(const FString& Parameters)
 {
 	const TMap<FName, FOpenStanceMoveRow> Rows = FOpenStanceMoveData::BuildSeedRows();
-	TestEqual(TEXT("six seed rows: side, roundhouse and spin side, each to trunk and head"), Rows.Num(), 6);
+	TestEqual(TEXT("23 seed rows: every standing, spinning, jump and punch move the Controls screen lists"), Rows.Num(), 23);
 
 	TArray<FOpenStanceMoveIssue> Issues = FOpenStanceMoveData::Validate(Rows, FOpenStanceMoveCheckOptions());
 	TestEqual(TEXT("the seed passes with placeholder animation"), CountErrors(Issues), 0);
@@ -48,6 +48,11 @@ bool FOpenStanceMoveDataSeedTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("side kick head"), Rows[TEXT("SideKick_Head")].Points, 3);
 	TestEqual(TEXT("spin side trunk"), Rows[TEXT("SpinSide_Trunk")].Points, 4);
 	TestEqual(TEXT("spin side head"), Rows[TEXT("SpinSide_Head")].Points, 6);
+	TestEqual(TEXT("spin hook trunk"), Rows[TEXT("SpinHook_Trunk")].Points, 4);
+	TestEqual(TEXT("spin hook head"), Rows[TEXT("SpinHook_Head")].Points, 6);
+	TestEqual(TEXT("tornado trunk"), Rows[TEXT("Tornado_Trunk")].Points, 4);
+	TestEqual(TEXT("tornado head"), Rows[TEXT("Tornado_Head")].Points, 6);
+	TestTrue(TEXT("the tornado is always airborne"), Rows[TEXT("Tornado_Trunk")].bJump && Rows[TEXT("Tornado_Head")].bJump);
 	return true;
 }
 
@@ -134,6 +139,8 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FOpenStanceMoveDataCsvTest, "OpenStance.MoveDat
 bool FOpenStanceMoveDataCsvTest::RunTest(const FString& Parameters)
 {
 	UDataTable* Source = FOpenStanceMoveData::CreateSeedTable(GetTransientPackage());
+	const FString QuotedDisplayName = TEXT("Spin, \"side\"\nHead variant");
+	Source->FindRow<FOpenStanceMoveRow>(TEXT("SpinSide_Head"), TEXT("CSV export test"))->DisplayName = QuotedDisplayName;
 	const FString Csv = FOpenStanceMoveData::ExportCsv(*Source);
 	TestTrue(TEXT("the export has a header and a row per move"), Csv.Contains(TEXT("SideKick_Trunk")) && Csv.Contains(TEXT("StartupSeconds")));
 
@@ -149,6 +156,7 @@ bool FOpenStanceMoveDataCsvTest::RunTest(const FString& Parameters)
 		TestEqual(TEXT("row name survives"), RowName, FName(TEXT("SpinSide_Head")));
 		TestEqual(TEXT("points survive"), Spin->Points, 6);
 		TestEqual(TEXT("timing survives"), Spin->StartupSeconds, 0.43f);
+		TestEqual(TEXT("commas, quotes and newlines survive"), Spin->DisplayName, QuotedDisplayName);
 		TestEqual(TEXT("placeholder path survives"), Spin->PlaceholderMontage.ToSoftObjectPath(), FOpenStanceMoveData::BuildSeedRows()[TEXT("SpinSide_Head")].PlaceholderMontage.ToSoftObjectPath());
 	}
 	TestNull(TEXT("an unmapped technique has no row"), FOpenStanceMoveData::Find(*Copy, EOpenStanceTechnique::Tornado, EOpenStanceTarget::Head, false));

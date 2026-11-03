@@ -29,7 +29,7 @@ void UOpenStanceMatchModel::Reset(const FString& ChungName, const FString& HongN
 	TimeRemaining = RoundSeconds;
 	bPaused = false;
 	bFinished = false;
-	CallTerm = TEXT("SI-JAK");
+	CallTerm = TEXT("SHI-JAK");
 	CallMeaning = TEXT("Begin");
 }
 
@@ -45,10 +45,10 @@ void UOpenStanceMatchModel::PopulateSample()
 		AddPoints(Side, Points, Technique, bHead);
 	};
 	Score(EOpenStanceSide::Chung, 1, 2, TEXT("Roundhouse"), false);
-	Score(EOpenStanceSide::Chung, 1, 4, TEXT("Spinning hook"), false);
-	Score(EOpenStanceSide::Hong, 1, 2, TEXT("Back kick"), false);
-	Score(EOpenStanceSide::Chung, 2, 3, TEXT("Axe kick"), true);
-	Score(EOpenStanceSide::Hong, 2, 4, TEXT("Back kick"), false);
+	Score(EOpenStanceSide::Chung, 1, 4, TEXT("Spinning Hook"), false);
+	Score(EOpenStanceSide::Hong, 1, 2, TEXT("Back Kick"), false);
+	Score(EOpenStanceSide::Chung, 2, 3, TEXT("Axe Kick"), true);
+	Score(EOpenStanceSide::Hong, 2, 4, TEXT("Back Kick"), false);
 	Score(EOpenStanceSide::Chung, 3, 2, TEXT("Roundhouse"), false);
 	Score(EOpenStanceSide::Chung, 3, 1, TEXT("Punch"), false);
 	Score(EOpenStanceSide::Chung, 3, 2, TEXT("Roundhouse"), false);
@@ -74,7 +74,7 @@ bool UOpenStanceMatchModel::Advance(float DeltaSeconds)
 		{
 			++Round;
 			TimeRemaining = RoundSeconds;
-			SetCall(TEXT("SI-JAK"), TEXT("Begin"));
+			SetCall(TEXT("SHI-JAK"), TEXT("Begin"));
 		}
 		else
 		{
@@ -113,7 +113,18 @@ void UOpenStanceMatchModel::AddPoints(EOpenStanceSide Side, int32 Points, const 
 	Event.bHead = bHead;
 	Events.Add(Event);
 
-	SetCall(bHead ? TEXT("Head kick") : TEXT("Body kick"), FString::Printf(TEXT("%d points"), Points), TEXT(" · "));
+	// The call names the scoring category, which the points decide: 6 spinning head, 4 spinning body, 3 head, 2 body, 1 punch (GDD 8.3).
+	const TCHAR* Category = TEXT("Point");
+	switch (Points)
+	{
+	case 6: Category = TEXT("Spin Head Kick"); break;
+	case 4: Category = TEXT("Spin Body Kick"); break;
+	case 3: Category = TEXT("Head Kick"); break;
+	case 2: Category = TEXT("Body Kick"); break;
+	case 1: Category = Technique == TEXT("Punch") ? TEXT("Punch") : TEXT("Point"); break;
+	default: break;
+	}
+	SetCall(Category, FString::Printf(TEXT("%d %s"), Points, Points == 1 ? TEXT("Point") : TEXT("Points")), TEXT(" · "));
 	CheckForEnd();
 }
 
@@ -139,6 +150,17 @@ void UOpenStanceMatchModel::SetCall(const FString& Term, const FString& Meaning,
 void UOpenStanceMatchModel::SetPaused(bool bInPaused)
 {
 	bPaused = bInPaused;
+}
+
+void UOpenStanceMatchModel::ForceFinish()
+{
+	if (bFinished)
+	{
+		return;
+	}
+	bFinished = true;
+	SetCall(TEXT("KEU-MAN"), TEXT("Stop"));
+	OnFinished.Broadcast();
 }
 
 void UOpenStanceMatchModel::SetClock(int32 InRound, float SecondsRemaining)

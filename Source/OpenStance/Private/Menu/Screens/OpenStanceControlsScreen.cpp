@@ -141,7 +141,7 @@ namespace
 
 TArray<FOpenStanceHint> UOpenStanceControlsScreen::GetHints() const
 {
-	return TabHints(TEXT("Previous tab"), TEXT("Next tab"));
+	return TabHints(TEXT("Previous Tab"), TEXT("Next Tab"));
 }
 
 TSharedRef<SWidget> UOpenStanceControlsScreen::BuildContent()

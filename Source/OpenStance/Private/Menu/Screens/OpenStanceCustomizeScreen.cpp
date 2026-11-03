@@ -103,10 +103,10 @@ TSharedRef<SWidget> UOpenStanceCustomizeScreen::BuildContent()
 	TSharedRef<SOpenStanceOption> SexRow = BuildChoiceRow(TEXT("Sex"), { TEXT("Male"), TEXT("Female") },
 		[Appearance]() { return static_cast<int32>(Appearance().Sex); },
 		[Appearance](int32 Index) { Appearance().Sex = static_cast<EOpenStanceSex>(Index); });
-	TSharedRef<SWidget> BodyRow = BuildChoiceRow(TEXT("Body type"), { TEXT("Compact"), TEXT("Lean tall"), TEXT("Stocky"), TEXT("Tall") },
+	TSharedRef<SWidget> BodyRow = BuildChoiceRow(TEXT("Body Type"), { TEXT("Compact"), TEXT("Lean Tall"), TEXT("Stocky"), TEXT("Tall") },
 		[Appearance]() { return static_cast<int32>(Appearance().BodyType); },
 		[Appearance](int32 Index) { Appearance().BodyType = static_cast<EOpenStanceBodyType>(Index); });
-	TSharedRef<SWidget> StyleRow = BuildChoiceRow(TEXT("Fighting style"), { TEXT("Counter"), TEXT("Kicker"), TEXT("Pressure") },
+	TSharedRef<SWidget> StyleRow = BuildChoiceRow(TEXT("Fighting Style"), { TEXT("Counter"), TEXT("Kicker"), TEXT("Pressure") },
 		[Appearance]() { return static_cast<int32>(Appearance().Style); },
 		[Appearance](int32 Index) { Appearance().Style = static_cast<EOpenStanceFightingStyle>(Index); });
 	SetDefaultFocus(SexRow);
@@ -137,7 +137,7 @@ TSharedRef<SWidget> UOpenStanceCustomizeScreen::BuildContent()
 			]
 			+ SHorizontalBox::Slot().FillWidth(1.0f).Padding(U(1.5f), 0.0f, 0.0f, 0.0f)
 			[
-				BuildSwatchGroup(TEXT("Protector and helmet"), ProtectorColours,
+				BuildSwatchGroup(TEXT("Protector and Helmet"), ProtectorColours,
 					[Appearance]() { return static_cast<int32>(Appearance().ProtectorSide); },
 					[Appearance](int32 Index) { Appearance().ProtectorSide = static_cast<EOpenStanceSide>(Index); })
 			]
@@ -149,7 +149,7 @@ TSharedRef<SWidget> UOpenStanceCustomizeScreen::BuildContent()
 	TSharedRef<SWidget> Body = SNew(SVerticalBox)
 		+ SVerticalBox::Slot().AutoHeight()
 		[
-			Head(TEXT("Career · created fighter"), TEXT("Fighter creator"))
+			Head(TEXT("Career · Created Fighter"), TEXT("Fighter Creator"))
 		]
 		+ SVerticalBox::Slot().FillHeight(1.0f).Padding(0.0f, U(1.6f), 0.0f, 0.0f)
 		[
@@ -173,11 +173,11 @@ TSharedRef<SWidget> UOpenStanceCustomizeScreen::BuildContent()
 						SNew(SHorizontalBox)
 						+ SHorizontalBox::Slot().FillWidth(1.0f)
 						[
-							MakeGearButton(TEXT("Gear on"), true)
+							MakeGearButton(TEXT("Gear On"), true)
 						]
 						+ SHorizontalBox::Slot().FillWidth(1.0f).Padding(U(0.4f), 0.0f, 0.0f, 0.0f)
 						[
-							MakeGearButton(TEXT("Gear off"), false)
+							MakeGearButton(TEXT("Gear Off"), false)
 						]
 					]
 				]
@@ -219,7 +219,7 @@ TSharedRef<SWidget> UOpenStanceCustomizeScreen::BuildContent()
 					]
 					+ SHorizontalBox::Slot().AutoWidth().Padding(0.0f, 0.0f, U(0.8f), 0.0f)
 					[
-						Tag(TEXT("Gear styles · Future"), EOpenStanceTagLook::Future)
+						Tag(TEXT("Gear Styles · Future"), EOpenStanceTagLook::Future)
 					]
 					+ SHorizontalBox::Slot().AutoWidth().Padding(0.0f, 0.0f, U(0.8f), 0.0f)
 					[
@@ -240,6 +240,6 @@ TSharedRef<SWidget> UOpenStanceCustomizeScreen::BuildContent()
 		]
 		+ SOverlay::Slot().HAlign(HAlign_Right).VAlign(VAlign_Top)
 		[
-			PlayerBar(Name, TEXT("Your fighter · Green belt · OVR 74"), TEXT("JC"))
+			PlayerBar(Name, TEXT("Your Fighter · Green Belt · OVR 74"), TEXT("JC"))
 		];
 }

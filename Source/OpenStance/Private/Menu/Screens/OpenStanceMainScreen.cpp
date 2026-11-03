@@ -48,7 +48,7 @@ namespace
 
 TArray<FOpenStanceHint> UOpenStanceMainScreen::GetHints() const
 {
-	return TabHints(TEXT("Previous tab"), TEXT("Next tab"));
+	return TabHints(TEXT("Previous Tab"), TEXT("Next Tab"));
 }
 
 TSharedRef<SWidget> UOpenStanceMainScreen::BuildContent()
@@ -121,7 +121,7 @@ TSharedRef<SWidget> UOpenStanceMainScreen::BuildContent()
 			SNew(SVerticalBox)
 			+ SVerticalBox::Slot().AutoHeight()
 			[
-				Kicker(TEXT("Open Stance · Main menu"))
+				Kicker(TEXT("Open Stance · Main Menu"))
 			]
 			+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, U(0.7f), 0.0f, 0.0f)
 			[
@@ -139,7 +139,7 @@ TSharedRef<SWidget> UOpenStanceMainScreen::BuildContent()
 				SNew(SHorizontalBox)
 				+ SHorizontalBox::Slot().FillWidth(1.0f)
 				[
-					MakeInfoCard(TEXT("Up next"), TEXT("City Open · Career week 3. Enter your fighter before the calendar advances."))
+					MakeInfoCard(TEXT("Up Next"), TEXT("City Open · Career week 3. Enter your fighter before the calendar advances."))
 				]
 				+ SHorizontalBox::Slot().FillWidth(1.0f).Padding(U(1.2f), 0.0f, 0.0f, 0.0f)
 				[

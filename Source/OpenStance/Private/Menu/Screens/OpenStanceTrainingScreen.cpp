@@ -47,16 +47,16 @@ TSharedRef<SWidget> UOpenStanceTrainingScreen::BuildContent()
 {
 	const TArray<FLesson> Lessons =
 	{
-		{ TEXT("1 · Stance and footwork"), TEXT("Done"), false },
-		{ TEXT("2 · Roundhouse kick"), TEXT("Done"), false },
-		{ TEXT("3 · Back kick"), TEXT("Next"), false },
-		{ TEXT("4 · Active defence"), TEXT("Locked"), true }
+		{ TEXT("1 · Stance and Footwork"), TEXT("Done"), false },
+		{ TEXT("2 · Roundhouse Kick"), TEXT("Done"), false },
+		{ TEXT("3 · Back Kick"), TEXT("Next"), false },
+		{ TEXT("4 · Active Defense"), TEXT("Locked"), true }
 	};
 	const TArray<FDrill> Drills =
 	{
-		{ TEXT("Kick accuracy"), TEXT("B") },
-		{ TEXT("Counter timing"), TEXT("C") },
-		{ TEXT("Stamina management"), TEXT("—") }
+		{ TEXT("Kick Accuracy"), TEXT("B") },
+		{ TEXT("Counter Timing"), TEXT("C") },
+		{ TEXT("Stamina Management"), TEXT("—") }
 	};
 
 	TSharedPtr<SOpenStanceInteractive> FirstItem;
@@ -102,8 +102,8 @@ TSharedRef<SWidget> UOpenStanceTrainingScreen::BuildContent()
 	DrillColumn->AddSlot().AutoHeight()
 	[
 		SNew(SOpenStanceOption)
-		.Label(TEXT("Free practice"))
-		.Small(TEXT("AI partner"))
+		.Label(TEXT("Free Practice"))
+		.Small(TEXT("AI Partner"))
 	];
 	SetDefaultFocus(FirstItem);
 
@@ -134,7 +134,7 @@ TSharedRef<SWidget> UOpenStanceTrainingScreen::BuildContent()
 				SNew(SVerticalBox)
 				+ SVerticalBox::Slot().AutoHeight()
 				[
-					Card(TEXT("Lesson 3 · Back kick"),
+					Card(TEXT("Lesson 3 · Back Kick"),
 						SNew(SVerticalBox)
 						+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, U(0.7f))
 						[
@@ -147,7 +147,7 @@ TSharedRef<SWidget> UOpenStanceTrainingScreen::BuildContent()
 				]
 				+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, U(0.8f), 0.0f, 0.0f)
 				[
-					TextCard(TEXT("Coach feedback"), { TEXT("Your last three matches lost most points to counters. Try the Counter timing drill.") })
+					TextCard(TEXT("Coach Feedback"), { TEXT("Your last three matches lost most points to counters. Try the Counter timing drill.") })
 				]
 			]
 		];

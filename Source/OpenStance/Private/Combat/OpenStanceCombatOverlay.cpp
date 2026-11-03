@@ -29,7 +29,7 @@ namespace
 	{
 		switch (Technique)
 		{
-		case EOpenStanceTechnique::SideKick: return TEXT("Side Kick");
+		case EOpenStanceTechnique::SideKick: return TEXT("Cut Kick (Side)");
 		case EOpenStanceTechnique::Roundhouse: return TEXT("Roundhouse");
 		case EOpenStanceTechnique::Hook: return TEXT("Hook Kick");
 		case EOpenStanceTechnique::Axe: return TEXT("Axe Kick");
@@ -90,6 +90,11 @@ FString FOpenStanceCombatOverlay::DescribeInput(const FOpenStanceInputEvent& Eve
 	switch (Event.Type)
 	{
 	case EOpenStanceInputEventType::Attack:
+		if (Event.Technique == EOpenStanceTechnique::Punch)
+		{
+			// A punch has no leg to name.
+			return FString::Printf(TEXT("%sPunch, Trunk"), Event.bFake ? TEXT("Fake: ") : TEXT("Attack: "));
+		}
 		return FString::Printf(TEXT("%s%s, %s, %s%s"), Event.bFake ? TEXT("Fake: ") : TEXT("Attack: "), TechniqueText(Event.Technique), *LegWords(Event),
 			Event.Target == EOpenStanceTarget::Head ? TEXT("Head") : TEXT("Trunk"), Event.bJump ? TEXT(", jump") : TEXT(""));
 	case EOpenStanceInputEventType::GenericFake:
@@ -105,7 +110,7 @@ FString FOpenStanceCombatOverlay::DescribeInput(const FOpenStanceInputEvent& Eve
 	case EOpenStanceInputEventType::GestureExpired:
 		return FString::Printf(TEXT("Expired: %s"), *Event.Path);
 	default:
-		return TEXT("Cancelled by LT");
+		return TEXT("Canceled by LT");
 	}
 }
 
@@ -132,6 +137,10 @@ TArray<FString> FOpenStanceCombatOverlay::BuildLines(const FOpenStanceMatchSim& 
 	Lines.Add(FString::Printf(TEXT("%s  score %d  gam-jeom %d"), Name, F.State.Score, F.State.GamJeom));
 	Lines.Add(FString::Printf(TEXT("%s | %s guard | %s%s"), F.State.Stance == EOpenStanceStance::LeftLead ? TEXT("Left Lead") : TEXT("Right Lead"),
 		GuardText(F.State.Guard), *StateName(F.State.CombatState), F.Motion.bSwitching ? TEXT(" | switching sides") : TEXT("")));
+	if (Sim.IsInClinch())
+	{
+		Lines.Add(FString::Printf(TEXT("CLINCH: %s %.1f s"), Sim.ClinchPhase == EOpenStanceClinchPhase::Held ? TEXT("held, the referee is coming") : TEXT("kal-yeo, separating"), Sim.ClinchElapsed));
+	}
 	Lines.Add(FString::Printf(TEXT("Held: %s"), *HeldButtons(F.State)));
 	Lines.Add(FString::Printf(TEXT("Stick: %s"), *StickHistory(F.Recognizer)));
 	Lines.Add(FString::Printf(TEXT("Input: %s"), *Last));

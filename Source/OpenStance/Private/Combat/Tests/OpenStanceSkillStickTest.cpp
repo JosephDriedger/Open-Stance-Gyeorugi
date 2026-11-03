@@ -479,4 +479,266 @@ bool FOpenStanceSkillStickResetTest::RunTest(const FString& Parameters)
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FOpenStanceSkillStickCentreCrossingTest, "OpenStance.SkillStick.CentreCrossing", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FOpenStanceSkillStickCentreCrossingTest::RunTest(const FString& Parameters)
+{
+	// A real thumb swinging from Down to Up passes through the centre for a frame or two. That is not a release.
+	{
+		FSkillStickRig Rig;
+		Rig.Hold(0.05f, Rig.Down());
+		Rig.Neutral(0.03f);
+		Rig.Hold(0.05f, Rig.Up());
+		Rig.Neutral();
+		if (TestEqual(TEXT("Down, a quick pass through the centre, Up is one attack"), Rig.Attacks(), 1))
+		{
+			TestEqual(TEXT("the spin side kick"), Rig.LastAttack().Technique, EOpenStanceTechnique::SpinSide);
+		}
+		TestEqual(TEXT("and nothing expired"), Rig.CountOf(EOpenStanceInputEventType::GestureExpired), 0);
+	}
+
+	// A real pause at the centre still ends the gesture: Down on its own expires, and a later Up is a side kick.
+	{
+		FSkillStickRig Rig;
+		Rig.Hold(0.05f, Rig.Down());
+		Rig.Neutral(0.15f);
+		Rig.Hold(0.05f, Rig.Up());
+		Rig.Neutral();
+		TestEqual(TEXT("a Down that rested at the centre expired"), Rig.CountOf(EOpenStanceInputEventType::GestureExpired), 1);
+		if (TestEqual(TEXT("and the Up is its own attack"), Rig.Attacks(), 1))
+		{
+			TestEqual(TEXT("a side kick"), Rig.LastAttack().Technique, EOpenStanceTechnique::SideKick);
+		}
+	}
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FOpenStanceSkillStickCircleTest, "OpenStance.SkillStick.TornadoCircle", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FOpenStanceSkillStickCircleTest::RunTest(const FString& Parameters)
+{
+	// A thumb sweeping one smooth circle at full travel, starting at the side and going down: the stick passes through every
+	// diagonal on the way. Right Lead, so Right is the lead-leg side: Right, Down, Left, Up, Right.
+	const auto SweepTornado = [](FSkillStickRig& Rig, float CircleSeconds)
+	{
+		Rig.Frame.bY = true;
+		Rig.Neutral(0.05f);
+		Rig.Frame.bY = false;
+		Rig.Neutral(0.05f);
+		const int32 Frames = FMath::Max(1, FMath::RoundToInt(CircleSeconds / FSkillStickRig::Tick));
+		for (int32 Frame = 0; Frame <= Frames; ++Frame)
+		{
+			const double Angle = 2.0 * PI * Frame / Frames;
+			Rig.Hold(FSkillStickRig::Tick, FVector2D(FMath::Cos(Angle), -FMath::Sin(Angle)));
+		}
+		Rig.Neutral();
+	};
+
+	// A comfortable 0.36 s circle needs the window raised to 0.40 s in Options (GDD 7.8): the tornado is the hardest input.
+	{
+		FSkillStickRig Rig;
+		Rig.Recognizer.Config.WindowSeconds = 0.40f;
+		SweepTornado(Rig, 0.36f);
+		if (TestEqual(TEXT("a 0.36 s circle at a 0.40 s window is one attack"), Rig.Attacks(), 1))
+		{
+			TestEqual(TEXT("the tornado kick"), Rig.LastAttack().Technique, EOpenStanceTechnique::Tornado);
+			TestTrue(TEXT("airborne"), Rig.LastAttack().bJump);
+		}
+	}
+
+	// A very fast circle works at the default 0.25 s window.
+	{
+		FSkillStickRig Rig;
+		SweepTornado(Rig, 0.22f);
+		TestEqual(TEXT("a 0.22 s circle at the default window is a tornado kick"), Rig.Attacks() == 1 ? static_cast<int32>(Rig.LastAttack().Technique) : -1, static_cast<int32>(EOpenStanceTechnique::Tornado));
+	}
+
+	// A real thumb wobbles near the diagonals. Direction changes must not flicker back and forth and add steps.
+	{
+		FSkillStickRig Rig;
+		Rig.Recognizer.Config.WindowSeconds = 0.40f;
+		Rig.Frame.bY = true;
+		Rig.Neutral(0.05f);
+		Rig.Frame.bY = false;
+		Rig.Neutral(0.05f);
+		const int32 Frames = FMath::RoundToInt(0.36f / FSkillStickRig::Tick);
+		for (int32 Frame = 0; Frame <= Frames; ++Frame)
+		{
+			const double Angle = 2.0 * PI * Frame / Frames + 0.22 * FMath::Sin(Frame * 2.3);
+			Rig.Hold(FSkillStickRig::Tick, FVector2D(0.85 * FMath::Cos(Angle), -0.85 * FMath::Sin(Angle)));
+		}
+		Rig.Neutral();
+		TestEqual(TEXT("a wobbly 0.36 s circle at 85% travel is still a tornado"), Rig.Attacks() == 1 ? static_cast<int32>(Rig.LastAttack().Technique) : -1, static_cast<int32>(EOpenStanceTechnique::Tornado));
+	}
+
+	// The thumb needs time to get from the Y button to the stick: a tap of Y still counts 0.4 s later.
+	{
+		FSkillStickRig Rig;
+		Rig.Frame.bY = true;
+		Rig.Neutral(0.05f);
+		Rig.Frame.bY = false;
+		Rig.Neutral(0.4f);
+		Rig.Flick(Rig.Up());
+		if (TestEqual(TEXT("a flick 0.4 s after the Y tap is one attack"), Rig.Attacks(), 1))
+		{
+			TestTrue(TEXT("and it is airborne"), Rig.LastAttack().bJump);
+		}
+	}
+
+	// The window runs between steps, so a steady slow circle still counts; a pause longer than the window does not.
+	{
+		FSkillStickRig Rig;
+		SweepTornado(Rig, 0.8f);
+		TestEqual(TEXT("a steady 0.8 s circle at the default window is a tornado kick"), Rig.Attacks() == 1 ? static_cast<int32>(Rig.LastAttack().Technique) : -1, static_cast<int32>(EOpenStanceTechnique::Tornado));
+	}
+	{
+		FSkillStickRig Rig;
+		Rig.Frame.bY = true;
+		Rig.Neutral(0.05f);
+		Rig.Frame.bY = false;
+		Rig.Neutral(0.05f);
+		Rig.Hold(0.04f, Rig.Right());
+		Rig.Hold(0.04f, Rig.Down());
+		Rig.Hold(0.5f, Rig.Left()); // a pause at the third step, longer than the 0.25 s window
+		Rig.Hold(0.04f, Rig.Up());
+		Rig.Hold(0.04f, Rig.Right());
+		Rig.Neutral();
+		TestEqual(TEXT("a pause longer than the window is not a tornado"), Rig.Of(EOpenStanceInputEventType::Attack).FilterByPredicate([](const FOpenStanceInputEvent& Event) { return Event.Technique == EOpenStanceTechnique::Tornado; }).Num(), 0);
+	}
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FOpenStanceSkillStickAxeTest,"OpenStance.SkillStick.Axe", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FOpenStanceSkillStickAxeTest::RunTest(const FString& Parameters)
+{
+	constexpr float Step = 0.04f;
+
+	// GDD 7.2: RS Left/Right, forward quarter circle (3 o'clock to 12 o'clock), Down. It works from either side.
+	for (const bool bFromRight : { true, false })
+	{
+		FSkillStickRig Rig;
+		Rig.Hold(Step, bFromRight ? Rig.Right() : Rig.Left());
+		Rig.Hold(Step, Rig.Up());
+		Rig.Hold(Step, Rig.Down());
+		Rig.Neutral();
+		if (TestEqual(bFromRight ? TEXT("side (right), up, down is one attack") : TEXT("side (left), up, down is one attack"), Rig.Attacks(), 1))
+		{
+			TestEqual(TEXT("the axe kick"), Rig.LastAttack().Technique, EOpenStanceTechnique::Axe);
+			TestEqual(TEXT("always to the head, without RB"), Rig.LastAttack().Target, EOpenStanceTarget::Head);
+			TestEqual(TEXT("with the lead leg"), Rig.LastAttack().LegRole, EOpenStanceLegRole::Lead);
+		}
+	}
+
+	// With RT the back leg throws it, from either side.
+	{
+		FSkillStickRig Rig;
+		Rig.Frame.bRT = true;
+		Rig.Hold(Step, Rig.Left());
+		Rig.Hold(Step, Rig.Up());
+		Rig.Hold(Step, Rig.Down());
+		Rig.Neutral();
+		if (TestEqual(TEXT("RT axe is one attack"), Rig.Attacks(), 1))
+		{
+			TestEqual(TEXT("the axe kick"), Rig.LastAttack().Technique, EOpenStanceTechnique::Axe);
+			TestEqual(TEXT("with the back leg"), Rig.LastAttack().LegRole, EOpenStanceLegRole::Back);
+		}
+	}
+
+	// Tap Y first and the axe is airborne.
+	{
+		FSkillStickRig Rig;
+		Rig.Frame.bY = true;
+		Rig.Neutral(0.05f);
+		Rig.Frame.bY = false;
+		Rig.Neutral(0.05f);
+		Rig.Hold(Step, Rig.Right());
+		Rig.Hold(Step, Rig.Up());
+		Rig.Hold(Step, Rig.Down());
+		Rig.Neutral();
+		if (TestEqual(TEXT("jump axe is one attack"), Rig.Attacks(), 1))
+		{
+			TestEqual(TEXT("the axe kick"), Rig.LastAttack().Technique, EOpenStanceTechnique::Axe);
+			TestTrue(TEXT("airborne"), Rig.LastAttack().bJump);
+		}
+	}
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FOpenStanceSkillStickSpinKicksTest,"OpenStance.SkillStick.SpinHookAndTornado", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FOpenStanceSkillStickSpinKicksTest::RunTest(const FString& Parameters)
+{
+	constexpr float Step = 0.04f;
+
+	// Spin hook: RT and a half circle down, from either side. Right Lead, so RT makes the left leg throw it.
+	for (const bool bFromLeft : { true, false })
+	{
+		FSkillStickRig Rig;
+		const FVector2D From = bFromLeft ? Rig.Left() : Rig.Right();
+		const FVector2D To = bFromLeft ? Rig.Right() : Rig.Left();
+		Rig.Frame.bRT = true;
+		Rig.Hold(Step, From);
+		Rig.Hold(Step, Rig.Down());
+		Rig.Hold(Step, To);
+		Rig.Neutral();
+		if (TestEqual(bFromLeft ? TEXT("RT + half circle down from the left is one attack") : TEXT("RT + half circle down from the right is one attack"), Rig.Attacks(), 1))
+		{
+			TestEqual(TEXT("the spin hook"), Rig.LastAttack().Technique, EOpenStanceTechnique::SpinHook);
+			TestEqual(TEXT("with the back leg"), Rig.LastAttack().LegRole, EOpenStanceLegRole::Back);
+			TestFalse(TEXT("grounded"), Rig.LastAttack().bJump);
+		}
+	}
+
+	// Without RT the same stick path is only the hook kick on its first step; there is no spin hook.
+	{
+		FSkillStickRig Rig;
+		Rig.Hold(Step, Rig.Left());
+		Rig.Hold(Step, Rig.Down());
+		Rig.Hold(Step, Rig.Right());
+		Rig.Neutral();
+		TestEqual(TEXT("no RT, no spin hook"), Rig.Of(EOpenStanceInputEventType::Attack).FilterByPredicate([](const FOpenStanceInputEvent& Event) { return Event.Technique == EOpenStanceTechnique::SpinHook; }).Num(), 0);
+	}
+
+	// Tornado: a tap of Y, then a full circle that starts downward from either side.
+	for (const bool bFromLeft : { true, false })
+	{
+		FSkillStickRig Rig;
+		const FVector2D From = bFromLeft ? Rig.Left() : Rig.Right();
+		const FVector2D To = bFromLeft ? Rig.Right() : Rig.Left();
+		Rig.Frame.bY = true;
+		Rig.Neutral(0.05f);
+		Rig.Frame.bY = false;
+		Rig.Neutral(0.05f);
+		Rig.Hold(Step, From);
+		Rig.Hold(Step, Rig.Down());
+		Rig.Hold(Step, To);
+		Rig.Hold(Step, Rig.Up());
+		Rig.Hold(Step, From);
+		Rig.Neutral();
+		if (TestEqual(bFromLeft ? TEXT("Y + a full circle from the left is one attack") : TEXT("Y + a full circle from the right is one attack"), Rig.Attacks(), 1))
+		{
+			TestEqual(TEXT("the tornado kick"), Rig.LastAttack().Technique, EOpenStanceTechnique::Tornado);
+			TestTrue(TEXT("always airborne"), Rig.LastAttack().bJump);
+			TestFalse(TEXT("the tap is spent"), Rig.State.bJumpPrimed);
+		}
+	}
+
+	// Without the Y tap the circle is not a tornado kick.
+	{
+		FSkillStickRig Rig;
+		Rig.Hold(Step, Rig.Left());
+		Rig.Hold(Step, Rig.Down());
+		Rig.Hold(Step, Rig.Right());
+		Rig.Hold(Step, Rig.Up());
+		Rig.Hold(Step, Rig.Left());
+		Rig.Neutral();
+		TestEqual(TEXT("no Y, no tornado"), Rig.Of(EOpenStanceInputEventType::Attack).FilterByPredicate([](const FOpenStanceInputEvent& Event) { return Event.Technique == EOpenStanceTechnique::Tornado; }).Num(), 0);
+	}
+
+	// A plain roundhouse or hook still fires the moment the stick is released: only a gesture that can exist delays it.
+	{
+		FSkillStickRig Rig;
+		Rig.Flick(Rig.Right());
+		TestEqual(TEXT("a lead-leg roundhouse is unchanged by the new gestures"), Rig.Attacks(), 1);
+	}
+	return true;
+}
+
 #endif

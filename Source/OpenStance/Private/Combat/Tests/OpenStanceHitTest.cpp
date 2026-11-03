@@ -140,7 +140,8 @@ bool FOpenStanceHitDedupTest::RunTest(const FString& Parameters)
 {
 	// The trace overlaps the defender on every active frame; the technique still scores once.
 	FHitRig Rig;
-	const FOpenStanceAttackRequest Kick = FHitRig::Request(TEXT("SideKick_Trunk"));
+	FOpenStanceAttackRequest Kick = FHitRig::Request(TEXT("SideKick_Trunk"));
+	Kick.Row.AnimationSeconds = 0.0f; // this test is about scoring, not the animation cooldown that would delay the second kick
 	Rig.Throw(Kick);
 	TestEqual(TEXT("one score for the whole technique"), Rig.Contacts.Num(), 1);
 

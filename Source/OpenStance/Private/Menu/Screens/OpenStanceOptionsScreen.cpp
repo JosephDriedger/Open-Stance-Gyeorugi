@@ -147,7 +147,7 @@ TSharedRef<SWidget> UOpenStanceOptionsScreen::BuildAudioTab()
 	};
 	Add(MakeSliderRow(TEXT("Master"), &UOpenStanceUserSettings::MasterVolume, 0.0f, 100.0f, 5.0f, Percent));
 	Add(MakeSliderRow(TEXT("Effects"), &UOpenStanceUserSettings::EffectsVolume, 0.0f, 100.0f, 5.0f, Percent));
-	Add(MakeSliderRow(TEXT("Referee voice"), &UOpenStanceUserSettings::RefereeVoiceVolume, 0.0f, 100.0f, 5.0f, Percent));
+	Add(MakeSliderRow(TEXT("Referee Voice"), &UOpenStanceUserSettings::RefereeVoiceVolume, 0.0f, 100.0f, 5.0f, Percent));
 	Add(MakeSliderRow(TEXT("Crowd"), &UOpenStanceUserSettings::CrowdVolume, 0.0f, 100.0f, 5.0f, Percent));
 	Add(MakeSliderRow(TEXT("Music"), &UOpenStanceUserSettings::MusicVolume, 0.0f, 100.0f, 5.0f, Percent));
 	Add(MakeSliderRow(TEXT("Commentary"), &UOpenStanceUserSettings::CommentaryVolume, 0.0f, 100.0f, 5.0f, Percent, true));
@@ -183,7 +183,7 @@ TSharedRef<SWidget> UOpenStanceOptionsScreen::BuildVideoTab()
 				Current->SetScreenResolution(GetResolutions()[Index]);
 			}
 		}, false, true));
-	Add(MakeChoiceRow(TEXT("Window mode"), { TEXT("Fullscreen"), TEXT("Borderless"), TEXT("Windowed") },
+	Add(MakeChoiceRow(TEXT("Window Mode"), { TEXT("Fullscreen"), TEXT("Borderless"), TEXT("Windowed") },
 		[Settings]()
 		{
 			const UOpenStanceUserSettings* Current = Settings();
@@ -196,7 +196,7 @@ TSharedRef<SWidget> UOpenStanceOptionsScreen::BuildVideoTab()
 				Current->SetFullscreenMode(GetWindowModes()[Index]);
 			}
 		}, false, true));
-	Add(MakeChoiceRow(TEXT("Quality preset"), { TEXT("Low"), TEXT("Medium"), TEXT("High"), TEXT("Epic") },
+	Add(MakeChoiceRow(TEXT("Quality Preset"), { TEXT("Low"), TEXT("Medium"), TEXT("High"), TEXT("Epic") },
 		[Settings]()
 		{
 			// A custom scalability mix reports -1; show it as High, the prototype's default
@@ -211,7 +211,7 @@ TSharedRef<SWidget> UOpenStanceOptionsScreen::BuildVideoTab()
 				Current->SetOverallScalabilityLevel(Index);
 			}
 		}, false, true));
-	Add(MakeChoiceRow(TEXT("Frame-rate cap"), { TEXT("30"), TEXT("60"), TEXT("120"), TEXT("Unlimited") },
+	Add(MakeChoiceRow(TEXT("Frame-Rate Cap"), { TEXT("30"), TEXT("60"), TEXT("120"), TEXT("Unlimited") },
 		[Settings]()
 		{
 			const UOpenStanceUserSettings* Current = Settings();
@@ -251,12 +251,12 @@ TSharedRef<SWidget> UOpenStanceOptionsScreen::BuildControlsTab()
 	};
 
 	Add(MakeToggleRow(TEXT("Vibration"), &UOpenStanceUserSettings::bVibration, true));
-	Add(MakeSliderRow(TEXT("Skill Stick dead zone"), &UOpenStanceUserSettings::SkillStickDeadZone, 0.0f, 40.0f, 1.0f,
+	Add(MakeSliderRow(TEXT("Skill Stick Dead Zone"), &UOpenStanceUserSettings::SkillStickDeadZone, 0.0f, 40.0f, 1.0f,
 		[](float Value) { return FString::Printf(TEXT("%d%%"), FMath::RoundToInt(Value)); }));
-	Add(MakeSliderRow(TEXT("Stick input window"), &UOpenStanceUserSettings::StickInputWindow, 0.20f, 0.40f, 0.01f,
+	Add(MakeSliderRow(TEXT("Stick Input Window"), &UOpenStanceUserSettings::StickInputWindow, 0.20f, 0.40f, 0.01f,
 		[](float Value) { return FString::Printf(TEXT("%.2f s"), Value); }));
 	Add(SNew(SOpenStanceOption)
-		.Label(TEXT("Open controls reference"))
+		.Label(TEXT("Open Controls Reference"))
 		.Small(TEXT("All inputs, by group"))
 		.OnPressed(FSimpleDelegate::CreateWeakLambda(this, [this]()
 		{
@@ -270,10 +270,10 @@ TSharedRef<SWidget> UOpenStanceOptionsScreen::BuildControlsTab()
 		MakeText(TEXT("Sticks and triggers are fixed in v1.0."), { EFont::Body, 1.0f }, Palette::Mute)
 	];
 	Add(SNew(SOpenStanceOption)
-		.Label(TEXT("Button remapping"))
+		.Label(TEXT("Button Remapping"))
 		.TagWidget(FutureTag())
 		.Small(TEXT("Remap every button")));
-	Add(MakeToggleRow(TEXT("Hold-to-toggle for held modifiers"), &UOpenStanceUserSettings::bHoldToToggleModifiers, false, true));
+	Add(MakeToggleRow(TEXT("Hold-to-Toggle for Held Modifiers"), &UOpenStanceUserSettings::bHoldToToggleModifiers, false, true));
 	return Rows;
 }
 
@@ -286,13 +286,13 @@ TSharedRef<SWidget> UOpenStanceOptionsScreen::BuildAccessibilityTab()
 		Rows->AddSlot().AutoHeight().Padding(0.0f, Rows->NumSlots() == 0 ? 0.0f : U(0.8f), 0.0f, 0.0f)[Row];
 	};
 
-	Add(MakeToggleRow(TEXT("Subtitles for referee commands"), &UOpenStanceUserSettings::bRefereeSubtitles, true));
-	Add(MakeToggleRow(TEXT("Reduced camera motion"), &UOpenStanceUserSettings::bReducedCameraMotion, false, true));
-	Add(MakeToggleRow(TEXT("Reduced screen shake"), &UOpenStanceUserSettings::bReducedScreenShake, false, true));
-	Add(MakeToggleRow(TEXT("Audio cues for incoming attacks"), &UOpenStanceUserSettings::bAudioCuesIncomingAttacks, false, true));
-	Add(MakeToggleRow(TEXT("Audio cues for stamina state"), &UOpenStanceUserSettings::bAudioCuesStaminaState, false, true));
+	Add(MakeToggleRow(TEXT("Subtitles for Referee Commands"), &UOpenStanceUserSettings::bRefereeSubtitles, true));
+	Add(MakeToggleRow(TEXT("Reduced Camera Motion"), &UOpenStanceUserSettings::bReducedCameraMotion, false, true));
+	Add(MakeToggleRow(TEXT("Reduced Screen Shake"), &UOpenStanceUserSettings::bReducedScreenShake, false, true));
+	Add(MakeToggleRow(TEXT("Audio Cues for Incoming Attacks"), &UOpenStanceUserSettings::bAudioCuesIncomingAttacks, false, true));
+	Add(MakeToggleRow(TEXT("Audio Cues for Stamina State"), &UOpenStanceUserSettings::bAudioCuesStaminaState, false, true));
 	Add(SNew(SOpenStanceOption)
-		.Label(TEXT("Button remapping"))
+		.Label(TEXT("Button Remapping"))
 		.TagWidget(FutureTag())
 		.Small(TEXT("Remap every button")));
 	return Rows;

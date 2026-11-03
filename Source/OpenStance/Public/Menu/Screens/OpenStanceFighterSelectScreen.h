@@ -6,8 +6,8 @@
 #include "OpenStanceFighterSelectScreen.generated.h"
 
 /**
- * Pick a premade fighter for Sparring or Tournament. The game assigns sides: Chung (blue, left) is the fighter you
- * pick, Hong (red, right) is the opponent. LB and RB switch between the men's and women's rosters.
+ * Pick a premade fighter for Sparring or Tournament. The fighter you pick takes the side you chose on Side Select (Chung,
+ * blue and left, by default); the other side is the opponent. LB and RB switch between the men's and women's rosters.
  */
 UCLASS()
 class OPENSTANCE_API UOpenStanceFighterSelectScreen : public UOpenStanceScreen

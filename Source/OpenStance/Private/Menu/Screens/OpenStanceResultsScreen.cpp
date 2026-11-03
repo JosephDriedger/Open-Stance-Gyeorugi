@@ -92,7 +92,7 @@ TSharedRef<SWidget> UOpenStanceResultsScreen::BuildContent()
 	// In a tournament the next step is the bracket, which shows the result and the next pairing
 	const bool bTournament = Menu->GetSession().Mode == EOpenStanceMatchMode::Tournament;
 	TSharedRef<SOpenStanceOption> Rematch = SNew(SOpenStanceOption)
-		.Label(bTournament ? TEXT("View bracket") : TEXT("Rematch"))
+		.Label(bTournament ? TEXT("View Bracket") : TEXT("Rematch"))
 		.FontSize(1.6f)
 		.OnPressed(FSimpleDelegate::CreateWeakLambda(this, [Menu, bTournament]()
 		{
@@ -110,7 +110,7 @@ TSharedRef<SWidget> UOpenStanceResultsScreen::BuildContent()
 	return SNew(SVerticalBox)
 		+ SVerticalBox::Slot().AutoHeight()
 		[
-			Head(TEXT("Match over"), TEXT("Results"))
+			Head(TEXT("Match Over"), TEXT("Results"))
 		]
 		+ SVerticalBox::Slot().FillHeight(1.0f).Padding(0.0f, U(1.6f), 0.0f, 0.0f)
 		[
@@ -126,7 +126,7 @@ TSharedRef<SWidget> UOpenStanceResultsScreen::BuildContent()
 					]
 					+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, U(0.8f), 0.0f, 0.0f)
 					[
-						Card(TEXT("Round scores"), RoundRows)
+						Card(TEXT("Round Scores"), RoundRows)
 					]
 				]
 			]
@@ -135,7 +135,7 @@ TSharedRef<SWidget> UOpenStanceResultsScreen::BuildContent()
 				SNew(SVerticalBox)
 				+ SVerticalBox::Slot().AutoHeight()
 				[
-					Card(TEXT("Points by technique"), Techniques)
+					Card(TEXT("Points by Technique"), Techniques)
 				]
 				+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, U(0.8f), 0.0f, 0.0f)
 				[
@@ -153,14 +153,14 @@ TSharedRef<SWidget> UOpenStanceResultsScreen::BuildContent()
 						+ SHorizontalBox::Slot().FillWidth(1.0f).Padding(U(0.8f), 0.0f, 0.0f, 0.0f)
 						[
 							SNew(SOpenStanceOption)
-							.Label(TEXT("Change fighters"))
+							.Label(TEXT("Change Fighters"))
 							.FontSize(1.6f)
 							.OnPressed(FSimpleDelegate::CreateWeakLambda(this, [Menu]() { Menu->ShowScreen(EOpenStanceMenuScreen::FighterSelect); }))
 						]
 						+ SHorizontalBox::Slot().FillWidth(1.0f).Padding(U(0.8f), 0.0f, 0.0f, 0.0f)
 						[
 							SNew(SOpenStanceOption)
-							.Label(TEXT("Main menu"))
+							.Label(TEXT("Main Menu"))
 							.FontSize(1.6f)
 							.OnPressed(FSimpleDelegate::CreateWeakLambda(this, [Menu]() { Menu->ReturnToMain(); }))
 						]

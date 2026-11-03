@@ -38,7 +38,8 @@ namespace
 			{
 				Sim.Step(Tick, Chung, Hong);
 				if (Sim.Fighters[0].State.CombatState == EOpenStanceCombatState::IdleMovement
-					&& Sim.Fighters[1].State.CombatState == EOpenStanceCombatState::IdleMovement)
+					&& Sim.Fighters[1].State.CombatState == EOpenStanceCombatState::IdleMovement
+					&& Sim.Fighters[0].Machine.GetCooldownLeft() <= 0.0f && Sim.Fighters[1].Machine.GetCooldownLeft() <= 0.0f)
 				{
 					return;
 				}
@@ -95,14 +96,9 @@ TArray<FOpenStanceGreyboxProof::FStage> FOpenStanceGreyboxProof::Run(FOpenStance
 	Run.Settle();
 	Scored(TEXT("Spin side kick (RS Down, Up)"), Before, 4, TEXT("Right (lead)"), TEXT("Spin Side"));
 
-	// 4. A switches sides: a visible switch, then the other leg leads.
-	Run.Chung.bA = true;
-	Run.Hold(0.1f);
-	const bool bMidSwitch = Run.Chung0().Motion.bSwitching && Run.Chung0().State.Stance == EOpenStanceStance::RightLead;
-	Run.Chung.bA = false;
-	Run.Hold(0.6f);
-	Run.Stage(TEXT("Switch sides (A)"), bMidSwitch && Run.Chung0().State.Stance == EOpenStanceStance::LeftLead && !Run.Chung0().Motion.bSwitching,
-		FString::Printf(TEXT("switching without an instant mirror, then %s"), Run.Chung0().State.Stance == EOpenStanceStance::LeftLead ? TEXT("Left Lead") : TEXT("Right Lead")));
+	// 4. A spin side kick lands facing the front, so it switches sides: the other leg leads when the fighter has settled.
+	Run.Stage(TEXT("Spin side kick lands in front: sides switched"), Run.Chung0().State.Stance == EOpenStanceStance::LeftLead && !Run.Chung0().Motion.bSwitching,
+		FString::Printf(TEXT("the spin side kick left the fighter in %s"), Run.Chung0().State.Stance == EOpenStanceStance::LeftLead ? TEXT("Left Lead") : TEXT("Right Lead")));
 
 	// 5. The same RT roundhouse from the other side: the back leg is now the right one and RS Right throws it.
 	Run.Chung.bRT = true;
@@ -138,7 +134,7 @@ TArray<FOpenStanceGreyboxProof::FStage> FOpenStanceGreyboxProof::Run(FOpenStance
 	Run.Hold(0.1f);
 	Run.Chung.bRB = false;
 	Run.Settle();
-	Scored(TEXT("Spin side kick to the head (RB, RS Down, Up)"), Before, 6, TEXT("Left"), TEXT("Spin Side"));
+	Scored(TEXT("Spin side kick to the head (RB, RS Down, Up)"), Before, 6, TEXT("Right (lead)"), TEXT("Spin Side"));
 
 	const bool bTotals = Run.ChungScore() == 16 && Sim.Fighters[1].State.Score == 0;
 	Run.Stage(TEXT("Final score"), bTotals, FString::Printf(TEXT("Chung %d, Hong %d (expected 16 to 0)"), Run.ChungScore(), Sim.Fighters[1].State.Score));

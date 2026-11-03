@@ -107,7 +107,7 @@ TSharedRef<SWidget> UOpenStanceBracketScreen::BuildContent()
 	const TArray<FBracketMatch> Final = { ToPlay(TEXT("TBD"), TEXT("TBD")) };
 
 	TSharedRef<SOpenStanceOption> NextMatch = SNew(SOpenStanceOption)
-		.Label(TEXT("Next match: Park vs Reyes"))
+		.Label(TEXT("Next Match: Park vs Reyes"))
 		.Look(EOpenStanceOptionLook::Primary)
 		.OnPressed(FSimpleDelegate::CreateWeakLambda(this, [this]()
 		{
@@ -121,7 +121,7 @@ TSharedRef<SWidget> UOpenStanceBracketScreen::BuildContent()
 	return SNew(SVerticalBox)
 		+ SVerticalBox::Slot().AutoHeight()
 		[
-			Head(TEXT("Tournament · 8 fighters · World Taekwondo"), TEXT("Bracket"))
+			Head(TEXT("Tournament · 8 Fighters · World Taekwondo"), TEXT("Bracket"))
 		]
 		+ SVerticalBox::Slot().FillHeight(1.0f).Padding(0.0f, U(1.6f), 0.0f, 0.0f)
 		[

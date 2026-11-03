@@ -219,7 +219,7 @@ TArray<FOpenStanceHint> UOpenStanceScreen::SelectHints()
 	{
 		{ TEXT("A"), EOpenStanceGlyphLook::A, TEXT("Select") },
 		{ TEXT("B"), EOpenStanceGlyphLook::B, TEXT("Back") },
-		{ TEXT("↔"), EOpenStanceGlyphLook::Neutral, TEXT("Change value") }
+		{ TEXT("↔"), EOpenStanceGlyphLook::Neutral, TEXT("Change Value") }
 	};
 }
 

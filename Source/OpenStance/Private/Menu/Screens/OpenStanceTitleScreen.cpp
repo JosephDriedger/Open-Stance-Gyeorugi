@@ -61,7 +61,7 @@ TSharedRef<SWidget> UOpenStanceTitleScreen::BuildContent()
 			]
 			+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center).Padding(0.0f, U(4.2f), 0.0f, 0.0f)
 			[
-				MakeText(TEXT("Press any button to start"), { EFont::Display, 1.7f, 0.4f, true }, PromptColor)
+				MakeText(TEXT("Press Any Button to Start"), { EFont::Display, 1.7f, 0.4f, true }, PromptColor)
 			]
 		];
 }

@@ -31,6 +31,9 @@ struct FOpenStanceDialogRequest
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOpenStanceMatchRequested, const FOpenStanceMatchSetup&, Setup);
 
+/** Raised when the menu returns to the main menu, so gameplay can leave an arena for the menu level. */
+DECLARE_MULTICAST_DELEGATE(FOpenStanceMenuLeaveMatch);
+
 /**
  * Runs the menu flow for a local player: which screen is showing, the back stack, dialogs and the pause menu,
  * and what the player has chosen so far. Screens ask it to navigate and never open each other directly.
@@ -88,6 +91,12 @@ public:
 	/** Raised when a match starts; gameplay binds this to load the arena and spawn the fighters. */
 	UPROPERTY(BlueprintAssignable, Category = "Open Stance|Menu")
 	FOpenStanceMatchRequested OnMatchRequested;
+
+	/** Raised by ReturnToMain before it shows the main menu. */
+	FOpenStanceMenuLeaveMatch OnLeaveMatch;
+
+	/** Set by gameplay when it leaves an arena for the menu level, so the menu opens at the main menu, not the title. */
+	bool bReturnToMainOnLoad = false;
 
 	/** The choices made on the setup and fighter select screens, as gameplay needs them. */
 	UFUNCTION(BlueprintCallable, Category = "Open Stance|Menu")

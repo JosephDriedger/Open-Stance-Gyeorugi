@@ -73,6 +73,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Open Stance|Match")
 	void SetPaused(bool bInPaused);
 
+	/** Gameplay ends the match (the simulation's clock or point gap): calls Keu-man and raises OnFinished, once. */
+	UFUNCTION(BlueprintCallable, Category = "Open Stance|Match")
+	void ForceFinish();
+
 	/** Sets the round (1-based) and the seconds left in it. */
 	UFUNCTION(BlueprintCallable, Category = "Open Stance|Match")
 	void SetClock(int32 InRound, float SecondsRemaining);

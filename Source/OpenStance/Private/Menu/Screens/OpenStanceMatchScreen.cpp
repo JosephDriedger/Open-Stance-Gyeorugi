@@ -9,6 +9,7 @@
 #include "Menu/Slate/SOpenStanceFrame.h"
 #include "Widgets/Layout/SBox.h"
 #include "Widgets/Layout/SConstraintCanvas.h"
+#include "Widgets/SNullWidget.h"
 #include "Widgets/SBoxPanel.h"
 
 using namespace OpenStanceMenu;
@@ -36,11 +37,23 @@ UOpenStanceMatchScreen::UOpenStanceMatchScreen(const FObjectInitializer& ObjectI
 
 TArray<FOpenStanceHint> UOpenStanceMatchScreen::GetHints() const
 {
+	if (IsGameplayDriven())
+	{
+		// The buttons belong to the fighter; only Menu is the screen's.
+		return { { TEXT("MENU"), EOpenStanceGlyphLook::Neutral, TEXT("Pause") } };
+	}
 	return
 	{
-		{ TEXT("A"), EOpenStanceGlyphLook::A, TEXT("Score a technique (demo)") },
+		{ TEXT("A"), EOpenStanceGlyphLook::A, TEXT("Score a Technique (Demo)") },
 		{ TEXT("MENU"), EOpenStanceGlyphLook::Neutral, TEXT("Pause") }
 	};
+}
+
+bool UOpenStanceMatchScreen::IsGameplayDriven() const
+{
+	const UOpenStanceMenuSubsystem* Menu = GetMenu();
+	const UOpenStanceMatchModel* Model = Menu ? const_cast<UOpenStanceMenuSubsystem*>(Menu)->GetMatchModel() : nullptr;
+	return Model && !Model->bDemoMode;
 }
 
 FMargin UOpenStanceMatchScreen::GetContentPadding() const
@@ -50,6 +63,11 @@ FMargin UOpenStanceMatchScreen::GetContentPadding() const
 
 TSharedRef<SWidget> UOpenStanceMatchScreen::BuildBackground()
 {
+	// Driven by gameplay, the 3D arena is behind the HUD: no painted backdrop, mat or mock fighters over it.
+	if (IsGameplayDriven())
+	{
+		return SNullWidget::NullWidget;
+	}
 	return SNew(SOpenStanceArenaBackdrop);
 }
 
@@ -83,6 +101,10 @@ TWeakObjectPtr<UOpenStanceMatchModel> UOpenStanceMatchScreen::GetModel() const
 
 TSharedRef<SWidget> UOpenStanceMatchScreen::BuildFighter(EOpenStanceSide Side)
 {
+	if (IsGameplayDriven())
+	{
+		return SNullWidget::NullWidget;
+	}
 	TWeakObjectPtr<UOpenStanceMatchScreen> WeakThis(this);
 	const bool bChung = Side == EOpenStanceSide::Chung;
 	return SNew(SBox)
@@ -178,11 +200,11 @@ TSharedRef<SWidget> UOpenStanceMatchScreen::BuildReviewBox()
 				SNew(SVerticalBox)
 				+ SVerticalBox::Slot().AutoHeight()
 				[
-					MakeText(TEXT("Video review"), { EFont::Display, 1.2f, 0.0f, true }, Palette::Bone)
+					MakeText(TEXT("Video Review"), { EFont::Display, 1.2f, 0.0f, true }, Palette::Bone)
 				]
 				+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, U(0.4f), 0.0f, 0.0f)
 				[
-					MakeText(TEXT("1 left"), { EFont::BodyBold, 1.0f, 0.06f, true }, Palette::Mute)
+					MakeText(TEXT("1 Left"), { EFont::BodyBold, 1.0f, 0.06f, true }, Palette::Mute)
 				]
 				+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Left).Padding(0.0f, U(0.4f), 0.0f, 0.0f)
 				[
@@ -216,8 +238,24 @@ TSharedRef<SWidget> UOpenStanceMatchScreen::BuildNameplate(const TWeakObjectPtr<
 			]
 			+ SVerticalBox::Slot().AutoHeight().HAlign(Align).Padding(0.0f, U(0.5f), 0.0f, 0.0f)
 			[
-				MakeText(TEXT("Stamina"), { EFont::Body, 1.0f }, Palette::Mute)
+				MakeText(TEXT("Stamina"), { EFont::BodyBold, 1.1f }, Palette::Bone)
 			]
+		];
+}
+
+TSharedRef<SWidget> UOpenStanceMatchScreen::BuildGamJeom(const TWeakObjectPtr<UOpenStanceMatchModel>& Model, EOpenStanceSide Side)
+{
+	// Over the 3D arena the counter needs its own dark backing to read on any wall, and turns amber once a penalty is on the board.
+	return SNew(SOpenStanceFrame)
+		.Fill(Hex(0x05070b, 0.85f))
+		.Padding(FMargin(U(1.2f), U(0.5f)))
+		[
+			MakeLiveText([Model, Side]() { return Model.IsValid() ? FString::Printf(TEXT("Gam-jeom %d"), Model->GetGamJeom(Side)) : FString(); },
+				{ EFont::BodyBold, 1.4f, 0.1f, true },
+				TAttribute<FSlateColor>::CreateLambda([Model, Side]()
+				{
+					return FSlateColor(Model.IsValid() && Model->GetGamJeom(Side) > 0 ? Palette::Warn : Palette::Bone);
+				}))
 		];
 }
 
@@ -279,16 +317,8 @@ TSharedRef<SWidget> UOpenStanceMatchScreen::BuildContent()
 		+ PlaceAt(0.5f, 0.0f, U(2.0f), 0.5f)[BuildScoreboard(Model)]
 		+ PlaceAt(0.0f, U(12.5f), U(2.0f), 0.0f)[BuildReviewBox()]
 		+ PlaceAt(1.0f, -U(12.5f), U(2.0f), 1.0f)[BuildReviewBox()]
-		+ PlaceAt(0.0f, U(23.0f), U(11.6f), 0.0f)
-		[
-			MakeLiveText([Model]() { return Model.IsValid() ? FString::Printf(TEXT("Gam-jeom %d"), Model->GetGamJeom(EOpenStanceSide::Chung)) : FString(); },
-				{ EFont::BodyBold, 1.05f, 0.1f, true }, Palette::Mute)
-		]
-		+ PlaceAt(0.0f, U(77.0f), U(11.6f), 1.0f)
-		[
-			MakeLiveText([Model]() { return Model.IsValid() ? FString::Printf(TEXT("Gam-jeom %d"), Model->GetGamJeom(EOpenStanceSide::Hong)) : FString(); },
-				{ EFont::BodyBold, 1.05f, 0.1f, true }, Palette::Mute)
-		]
+		+ PlaceAt(0.0f, U(23.0f), U(11.0f), 0.0f)[BuildGamJeom(Model, EOpenStanceSide::Chung)]
+		+ PlaceAt(0.0f, U(77.0f), U(11.0f), 1.0f)[BuildGamJeom(Model, EOpenStanceSide::Hong)]
 		+ PlaceAt(0.0f, U(4.0f), U(14.0f), 0.0f)[BuildNameplate(Model, EOpenStanceSide::Chung)]
 		+ PlaceAt(1.0f, -U(4.0f), U(14.0f), 1.0f)[BuildNameplate(Model, EOpenStanceSide::Hong)]
 		+ PlaceAt(0.0f, U(26.0f), U(17.75f), 0.0f)[BuildFighter(EOpenStanceSide::Chung)]
@@ -339,6 +369,17 @@ FReply UOpenStanceMatchScreen::NativeOnKeyDown(const FGeometry& InGeometry, cons
 		Menu->ShowPauseMenu();
 		return FReply::Handled();
 	}
+	if (Menu && !Menu->GetMatchModel()->bDemoMode)
+	{
+		// Gameplay is driving the match: every button belongs to the fighter (B dashes, A switches sides, LB and RB are modifiers,
+		// the D-pad picks the guard). Only Menu, or Esc on a keyboard, pauses; the rest falls through to the controller.
+		if (Key == EKeys::Escape)
+		{
+			Menu->ShowPauseMenu();
+			return FReply::Handled();
+		}
+		return FReply::Unhandled();
+	}
 	if (Menu && !Menu->IsDialogOpen() && (Key == EKeys::Enter || Key == EKeys::SpaceBar || Key == EKeys::Gamepad_FaceButton_Bottom))
 	{
 		ScoreRandomTechnique();
@@ -356,7 +397,7 @@ void UOpenStanceMatchScreen::ScoreRandomTechnique()
 		return;
 	}
 
-	static const TCHAR* const Techniques[] = { TEXT("Roundhouse"), TEXT("Back kick"), TEXT("Spinning hook"), TEXT("Axe kick"), TEXT("Side kick"), TEXT("Punch") };
+	static const TCHAR* const Techniques[] = { TEXT("Roundhouse"), TEXT("Back Kick"), TEXT("Spinning Hook"), TEXT("Axe Kick"), TEXT("Side Kick"), TEXT("Punch") };
 	const EOpenStanceSide Side = FMath::FRand() < 0.5f ? EOpenStanceSide::Chung : EOpenStanceSide::Hong;
 	const int32 Points = FMath::RandRange(1, 6);
 	Model->AddPoints(Side, Points, Techniques[FMath::RandRange(0, UE_ARRAY_COUNT(Techniques) - 1)], Points >= 4);

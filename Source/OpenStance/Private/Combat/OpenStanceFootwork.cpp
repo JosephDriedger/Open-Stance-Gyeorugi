@@ -43,8 +43,8 @@ namespace
 	/** The stick in the fighter's frame as a world-plane direction: Y toward the opponent, X to the fighter's right. */
 	FVector2D ToWorld(const FVector2D& Move, const FVector2D& Facing)
 	{
-		// Right of facing (looking from above, X forward, Y to the left of forward): rotate facing by -90 degrees.
-		const FVector2D Right(Facing.Y, -Facing.X);
+		// Right of facing: Unreal is left-handed, so with X forward Y is to the fighter's right.
+		const FVector2D Right(-Facing.Y, Facing.X);
 		return Facing * Move.Y + Right * Move.X;
 	}
 
@@ -55,7 +55,7 @@ namespace
 		const float StartDistance = static_cast<float>(ToOpponent.Size());
 		const FVector2D Moved = Position + Delta;
 		const float Forward = static_cast<float>(FVector2D::DotProduct(Delta, Facing));
-		const float Sideways = static_cast<float>(FMath::Abs(FVector2D::DotProduct(Delta, FVector2D(Facing.Y, -Facing.X))));
+		const float Sideways = static_cast<float>(FMath::Abs(FVector2D::DotProduct(Delta, FVector2D(-Facing.Y, Facing.X))));
 		if (Sideways <= UE_SMALL_NUMBER || StartDistance <= UE_SMALL_NUMBER)
 		{
 			Position = Moved;
