@@ -174,6 +174,11 @@ bool FOpenStanceCombatMachine::RequestAttack(const FOpenStanceAttackRequest& Req
 	}
 
 	const bool bFree = State.CombatState == S::IdleMovement;
+	if (bFree && CooldownLeft > 0.0f)
+	{
+		Reject(FString::Printf(TEXT("cooldown: the last technique's animation has %.2f s left"), CooldownLeft), OutEvents);
+		return false;
+	}
 	if (!bFree && !IsCancelWindowOpen(State))
 	{
 		Reject(FString::Printf(TEXT("busy: %s"), *UEnum::GetValueAsString(State.CombatState)), OutEvents);
@@ -189,6 +194,8 @@ bool FOpenStanceCombatMachine::RequestAttack(const FOpenStanceAttackRequest& Req
 	State.Stamina = FMath::Max(0.0f, State.Stamina - Request.Row.StaminaCost);
 	Attack = Request;
 	bHasAttack = true;
+	AttackElapsed = 0.0f;
+	CooldownLeft = 0.0f;
 	++AttackSerial;
 
 	FOpenStanceCombatEvent& Event = OutEvents.AddDefaulted_GetRef();
@@ -300,6 +307,11 @@ void FOpenStanceCombatMachine::Tick(float DeltaSeconds, FOpenStanceFighterState&
 		Enter(S::IdleMovement, State, OutEvents, true);
 	}
 
+	CooldownLeft = FMath::Max(0.0f, CooldownLeft - DeltaSeconds);
+	if (bHasAttack)
+	{
+		AttackElapsed += DeltaSeconds;
+	}
 	Elapsed += DeltaSeconds;
 	for (int32 Guard = 0; Guard < 8; ++Guard)
 	{
@@ -336,6 +348,12 @@ void FOpenStanceCombatMachine::Tick(float DeltaSeconds, FOpenStanceFighterState&
 			}
 			else
 			{
+				// The animation may outlast the phases: the fighter is free but cannot start another technique until it ends.
+				// A fake only plays its startup, so it leaves no cooldown behind.
+				if (bHasAttack && !Attack.bFake)
+				{
+					CooldownLeft = FMath::Max(0.0f, Attack.Row.AnimationSeconds - (AttackElapsed - Carry));
+				}
 				EndAttack();
 				Enter(S::IdleMovement, State, OutEvents);
 			}

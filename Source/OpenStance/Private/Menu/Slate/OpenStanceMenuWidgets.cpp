@@ -545,7 +545,7 @@ namespace OpenStanceMenuWidgets
 			{
 				continue;
 			}
-			const FName Part = Token.Value == TEXT("Menu button") ? FName(TEXT("MENU")) : Token.Value == TEXT("D-pad") ? FName(TEXT("DPAD")) : FName(*Token.Value);
+			const FName Part = Token.Value == TEXT("Menu Button") ? FName(TEXT("MENU")) : Token.Value == TEXT("D-pad") ? FName(TEXT("DPAD")) : FName(*Token.Value);
 			Parts.AddUnique(Part);
 		}
 		return Parts;

@@ -26,9 +26,17 @@ a kick (lead or back, by stance) is chosen at runtime and only selects the monta
 montage for that leg, then the placeholder if allowed, then nothing. Combat code asks for timing, cost, points and
 reach from the row and never names an animation, so swapping a placeholder for mocap is a table edit.
 
-The Milestone 1 seed holds side/cut, roundhouse and spin side, each to the trunk and the head (six rows), on
+The Milestone 1 seed holds side/cut, roundhouse, spin side, spin hook and tornado, each to the trunk and the head (ten rows), on
 placeholder montages. The starting numbers are provisional and tuned in playtests. Techniques without an approved input
 (GDD 9.4) have no row.
+
+## Animation time and the cooldown
+
+`AnimationSeconds` is how long the technique's animation plays from the input. A new technique cannot start before that has
+passed, so an animation is never cut off: if the startup, active and recovery phases end sooner, the fighter is free to move
+but cannot throw until the animation ends (`GetCooldownLeft`, and a rejected attack says `cooldown`). Cancel windows still
+chain early on purpose, and a fake leaves no cooldown. Placeholder rows use the phases plus 0.15 s (jump rows 0.05 s more);
+set it to the montage length when the mocap lands. 0 means the three phases are the whole animation.
 
 ## Runtime state
 

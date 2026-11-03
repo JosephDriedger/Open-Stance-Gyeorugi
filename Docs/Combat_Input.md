@@ -79,8 +79,60 @@ Kicks without RT use the lead leg. The left stick moves the fighter, the Menu bu
 in v1.0. The spin hook requires RT, because the back leg throws it; its gesture is a half circle down, from either
 side, mirrored like any back-leg kick (GDD 7.2).
 
-The spin hook is not registered yet. It needs a gesture flag that makes RT mandatory for a match, and a `SpinHook` row
-in `DT_MoveData.csv`, so it goes in with the Milestone 2 technique pass.
+## Axe kick (GDD 7.2)
+
+RS Left/Right, a forward quarter circle (3 o'clock to 12 o'clock), then Down: registered as `Toward, Up, Down` or `Away, Up,
+Down`, always to the head, from either side and with either leg (RT for the back leg). Tap Y first for the jump axe.
+
+## Landing and switching sides (not yet in the GDD)
+
+Every back-leg kick (RT), and the spin side and spin hook kicks, land with the other leg in front: the sides switch as the
+recovery begins, with the same animated switch as the A button, never an instant mirror. The GDD does not say this yet; it
+needs a line in 7.4 or 8.7 if it stays.
+
+## Real thumbs
+
+- A direction only switches to a perpendicular one when the new axis is 1.35 times further along than the old one
+  (`DirectionHysteresis`), so a circle near a diagonal does not flicker into extra steps and get rejected.
+- The stick resting at neutral for 0.06 s ends a gesture (`NeutralGraceSeconds`); crossing the centre for a frame does not.
+- The Y tap primes the next gesture for 0.5 s (`JumpPrimeSeconds`), because the same thumb has to move from the button to the stick.
+
+## Clinch (GDD 6.4, 8.4, 11.3)
+
+Chest-to-chest contact, centres within 76 cm, starts a clinch when play is live and neither fighter is throwing a technique,
+whether both press in or one lands a Dash (B) on the other. Code: `FOpenStanceMatchSim::StepClinch`, tuning in
+`FOpenStanceClinchTuning`; tests `OpenStance.Greybox.Clinch`. Starting values, tuned in playtests.
+
+| Step | Behaviour |
+| --- | --- |
+| Held | Both fighters are locked: no stepping, dashing, switching sides or techniques (a punch or kick says `clinch: wait for the referee`). Guards still work. |
+| Hold foul | Past 1.0 s, each fighter still pressing the left stick forward gets a gam-jeom and the opponent a point, once per clinch (GDD 8.4). |
+| Kal-yeo | At 0.8 s the referee stops play (match state Stopped, the clock holds). Under the 2 s a Referee Mode player has before the call is late. |
+| Separating | Over the first 0.5 s of the 0.8 s stoppage the fighters are drawn apart to 120 cm. |
+| Kye-sok | Play resumes with the fighters apart. |
+
+With the 0.8 s referee call the 1.0 s hold foul only happens if the call is slowed (`RefereeCallSeconds`) or a later
+referee is late. Close-range kicks and clinch actions have no inputs yet (GDD 9.4), so nothing is thrown inside a clinch.
+
+## Input window
+
+All gestures share the Options window, 0.20 to 0.40 s with a default of 0.25 s (GDD 7.8). It is the time allowed between one
+stick step and the next: every new step restarts it, so a three-step axe or a five-step tornado circle only has to keep moving,
+and a pause longer than the window expires the gesture. The GDD does not say whether the window runs from the first step or
+between steps; this is the reading that makes the longer gestures playable at the default setting. The greybox reads the setting.
+
+## Spin hook and tornado kick (GDD 9.1, 9.2)
+
+| Technique | Input | Registered as |
+| --- | --- | --- |
+| Spin hook | Hold RT, then a half circle down from either side | `Toward, Down, Away` or `Away, Down, Toward`, with `bRequiresBackLeg` |
+| Tornado kick | Tap Y, then a half circle down and a half circle back up: one full circle that starts downward, from either side | `Toward, Down, Away, Up, Toward` or the mirror, with `bRequiresJump` |
+
+A gesture that requires RT or the Y tap is ignored while that modifier is not latched, so it never delays the plain kick it
+starts like: without RT, Right then Down is still a roundhouse and nothing else. With RT (or the Y tap) the roundhouse and hook
+wait for the stick to return to neutral or for the window to close, as any prefix of a longer gesture does. The tornado is
+always thrown airborne, so its move rows are the jump rows (`bJump` true); the five steps have to land inside the window, which
+is why it is the hardest input in the game. The spin hook's jump version is allowed by the recognizer but has no move row yet.
 
 # Footwork and stance
 

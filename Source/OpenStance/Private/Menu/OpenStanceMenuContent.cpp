@@ -61,7 +61,7 @@ namespace OpenStanceMenuContent
 
 		TArray<FString> RulesetValues()
 		{
-			return { TEXT("World Taekwondo"), TEXT("Casual (no Gam-jeom)"), TEXT("Golden Point"), TEXT("Custom rules [Future]"), TEXT("Historical WT rules [Future]"), TEXT("Para taekwondo [Future]") };
+			return { TEXT("World Taekwondo"), TEXT("Casual (No Gam-jeom)"), TEXT("Golden Point"), TEXT("Custom Rules [Future]"), TEXT("Historical WT Rules [Future]"), TEXT("Para Taekwondo [Future]") };
 		}
 
 		TArray<FString> DifficultyValues()
@@ -74,7 +74,7 @@ namespace OpenStanceMenuContent
 			return
 			{
 				{ Title, { Summary, Detail } },
-				{ TEXT("Ruleset note"),
+				{ TEXT("Ruleset Note"),
 					{
 						TEXT("Rounds are 3 × 2:00 with 1:00 breaks. A 12-point gap ends the match. Head kicks score more than body kicks; turning kicks score more than straight ones."),
 						TEXT("Values tagged [Future] come after v1.0.")
@@ -211,32 +211,32 @@ namespace OpenStanceMenuContent
 			FSetupDefinition Sparring;
 			Sparring.Screen = EOpenStanceMenuScreen::Sparring;
 			Sparring.Kicker = TEXT("Play");
-			Sparring.Title = TEXT("Sparring setup");
+			Sparring.Title = TEXT("Sparring Setup");
 			Sparring.Rows =
 			{
 				MakeRow(TEXT("Players"), TEXT("Players"), { TEXT("1P vs AI"), TEXT("1P vs 2P"), TEXT("Online [Future]") }),
 				MakeRow(TEXT("Ruleset"), TEXT("Ruleset"), RulesetValues()),
-				MakeRow(TEXT("Difficulty"), TEXT("AI difficulty"), DifficultyValues(), 1),
-				MakeRow(TEXT("Arena"), TEXT("Arena"), { TEXT("Training dojang"), TEXT("Club dojang"), TEXT("National arena"), TEXT("Olympic arena"), TEXT("World games stadium [Future]") })
+				MakeRow(TEXT("Difficulty"), TEXT("AI Difficulty"), DifficultyValues(), 1),
+				MakeRow(TEXT("Arena"), TEXT("Arena"), { TEXT("Training Dojang"), TEXT("Club Dojang"), TEXT("National Arena"), TEXT("Olympic Arena"), TEXT("World Games Stadium [Future]") })
 			};
-			Sparring.ContinueLabel = TEXT("Continue to fighter select");
-			Sparring.Next = EOpenStanceMenuScreen::FighterSelect;
+			Sparring.ContinueLabel = TEXT("Continue to Side Select");
+			Sparring.Next = EOpenStanceMenuScreen::SideSelect;
 			Sparring.Cards = RulesCards(TEXT("Sparring"), TEXT("Players, ruleset, difficulty and arena."),
-				TEXT("Sides are assigned by the game: Chung on the left in blue, Hong on the right in red."));
+				TEXT("You pick your side next: Chung is on the left in blue and Hong is on the right in red."));
 			Result.Add(Sparring);
 
 			FSetupDefinition Tournament;
 			Tournament.Screen = EOpenStanceMenuScreen::Tournament;
 			Tournament.Kicker = TEXT("Play");
-			Tournament.Title = TEXT("Tournament setup");
+			Tournament.Title = TEXT("Tournament Setup");
 			Tournament.Rows =
 			{
-				MakeRow(TEXT("BracketSize"), TEXT("Bracket size"), { TEXT("8"), TEXT("16"), TEXT("32") }),
+				MakeRow(TEXT("BracketSize"), TEXT("Bracket Size"), { TEXT("8"), TEXT("16"), TEXT("32") }),
 				MakeRow(TEXT("Ruleset"), TEXT("Ruleset"), RulesetValues()),
-				MakeRow(TEXT("Difficulty"), TEXT("AI difficulty"), DifficultyValues(), 1),
-				MakeRow(TEXT("Arena"), TEXT("Arena"), { TEXT("Club dojang"), TEXT("National arena"), TEXT("Olympic arena"), TEXT("World games stadium [Future]") })
+				MakeRow(TEXT("Difficulty"), TEXT("AI Difficulty"), DifficultyValues(), 1),
+				MakeRow(TEXT("Arena"), TEXT("Arena"), { TEXT("Club Dojang"), TEXT("National Arena"), TEXT("Olympic Arena"), TEXT("World Games Stadium [Future]") })
 			};
-			Tournament.ContinueLabel = TEXT("Continue to fighter select");
+			Tournament.ContinueLabel = TEXT("Continue to Fighter Select");
 			Tournament.Next = EOpenStanceMenuScreen::FighterSelect;
 			Tournament.Cards = RulesCards(TEXT("Tournament"), TEXT("Bracket, ruleset, difficulty and arena."),
 				TEXT("Between matches a bracket view shows results and the next pairing."));
@@ -245,21 +245,21 @@ namespace OpenStanceMenuContent
 			FSetupDefinition Referee;
 			Referee.Screen = EOpenStanceMenuScreen::RefereeSetup;
 			Referee.Kicker = TEXT("Play");
-			Referee.Title = TEXT("Referee Mode setup");
+			Referee.Title = TEXT("Referee Mode Setup");
 			Referee.bFuture = true;
 			Referee.Rows =
 			{
-				MakeRow(TEXT("Match"), TEXT("Match"), { TEXT("Two AI fighters"), TEXT("Two local players"), TEXT("Online [Future]") }),
-				MakeRow(TEXT("Camera"), TEXT("Camera"), { TEXT("Over-the-shoulder"), TEXT("Side-on") }),
-				MakeRow(TEXT("Ruleset"), TEXT("Ruleset"), { TEXT("World Taekwondo"), TEXT("Casual (no Gam-jeom)") }),
-				MakeRow(TEXT("Arena"), TEXT("Arena"), { TEXT("Club dojang"), TEXT("National arena"), TEXT("Olympic arena") })
+				MakeRow(TEXT("Match"), TEXT("Match"), { TEXT("Two AI Fighters"), TEXT("Two Local Players"), TEXT("Online [Future]") }),
+				MakeRow(TEXT("Camera"), TEXT("Camera"), { TEXT("Over-the-Shoulder"), TEXT("Side-On") }),
+				MakeRow(TEXT("Ruleset"), TEXT("Ruleset"), { TEXT("World Taekwondo"), TEXT("Casual (No Gam-jeom)") }),
+				MakeRow(TEXT("Arena"), TEXT("Arena"), { TEXT("Club Dojang"), TEXT("National Arena"), TEXT("Olympic Arena") })
 			};
-			Referee.ContinueLabel = TEXT("Start as referee");
+			Referee.ContinueLabel = TEXT("Start as Referee");
 			Referee.Next = EOpenStanceMenuScreen::RefereeMatch;
 			Referee.Cards =
 			{
-				{ TEXT("Calls decide the match"), { TEXT("Only the penalties you declare are applied. Automatic detection runs only as the answer key for your grade.") } },
-				{ TEXT("Players"), { TEXT("Up to three controllers: Chung, Hong and the referee. The referee has its own layout (Controls, Referee mode).") } }
+				{ TEXT("Calls Decide the Match"), { TEXT("Only the penalties you declare are applied. Automatic detection runs only as the answer key for your grade.") } },
+				{ TEXT("Players"), { TEXT("Up to three controllers: Chung, Hong and the referee. The referee has its own layout (Controls, Referee Mode).") } }
 			};
 			Result.Add(Referee);
 			return Result;
@@ -279,10 +279,10 @@ namespace OpenStanceMenuContent
 			Team.Title = TEXT("Team Championship");
 			Team.Items =
 			{
-				{ TEXT("Team type"), TEXT("Club or national") },
+				{ TEXT("Team Type"), TEXT("Club or national") },
 				{ TEXT("Format"), TEXT("Tag team: fighters rotate in and out") },
-				{ TEXT("Team size"), TEXT("Up to three local players per team") },
-				{ TEXT("Match result"), TEXT("One shared team score decides it") }
+				{ TEXT("Team Size"), TEXT("Up to three local players per team") },
+				{ TEXT("Match Result"), TEXT("One shared team score decides it") }
 			};
 			Team.Cards =
 			{
@@ -296,10 +296,10 @@ namespace OpenStanceMenuContent
 			Challenges.Title = TEXT("Challenges");
 			Challenges.Items =
 			{
-				{ TEXT("Win the round from 5 points down"), TEXT("30 seconds left") },
-				{ TEXT("Score a spin hook kick"), TEXT("Right after switching sides") },
-				{ TEXT("Counter three kicks in one round"), TEXT("Sample") },
-				{ TEXT("Finish a round with no penalties"), TEXT("Sample") }
+				{ TEXT("Win the Round from 5 Points Down"), TEXT("30 seconds left") },
+				{ TEXT("Score a Spin Hook Kick"), TEXT("Right after switching sides") },
+				{ TEXT("Counter Three Kicks in One Round"), TEXT("Sample") },
+				{ TEXT("Finish a Round with No Penalties"), TEXT("Sample") }
 			};
 			Challenges.Cards =
 			{
@@ -313,16 +313,16 @@ namespace OpenStanceMenuContent
 			Online.Title = TEXT("Online");
 			Online.Items =
 			{
-				{ TEXT("Casual match"), TEXT("Quick match") },
-				{ TEXT("Private room"), TEXT("Invite code, rematch") },
+				{ TEXT("Casual Match"), TEXT("Quick match") },
+				{ TEXT("Private Room"), TEXT("Invite code, rematch") },
 				{ TEXT("Ranked"), TEXT("Seasons with a skill rating, Equal Terms on") },
-				{ TEXT("Community tournaments"), TEXT("Brackets and check-in") },
+				{ TEXT("Community Tournaments"), TEXT("Brackets and check-in") },
 				{ TEXT("Clubs"), TEXT("Online dojangs, ladders, club vs club") }
 			};
 			Online.Cards =
 			{
-				{ TEXT("Season rank"), { TEXT("Silver II · rating 1,540 (sample). Shown on a nameplate, never as a belt.") } },
-				{ TEXT("Fair play"), { TEXT("Disconnect penalties, report tools, name and emblem moderation. PC and consoles share one player pool.") } }
+				{ TEXT("Season Rank"), { TEXT("Silver II · rating 1,540 (sample). Shown on a nameplate, never as a belt.") } },
+				{ TEXT("Fair Play"), { TEXT("Disconnect penalties, report tools, name and emblem moderation. PC and consoles share one player pool.") } }
 			};
 			Result.Add(EOpenStanceMenuScreen::Online, Online);
 
@@ -331,14 +331,14 @@ namespace OpenStanceMenuContent
 			Replays.Title = TEXT("Replays");
 			Replays.Items =
 			{
-				{ TEXT("Chung 14–7 Hong"), TEXT("Club dojang · today") },
-				{ TEXT("Chung 9–11 Hong"), TEXT("National arena · yesterday") },
-				{ TEXT("Chung 12–2 Hong"), TEXT("Training dojang · 2 days ago") }
+				{ TEXT("Chung 14–7 Hong"), TEXT("Club Dojang · Today") },
+				{ TEXT("Chung 9–11 Hong"), TEXT("National Arena · Yesterday") },
+				{ TEXT("Chung 12–2 Hong"), TEXT("Training Dojang · 2 Days Ago") }
 			};
 			Replays.Cards =
 			{
 				{ TEXT("Viewer"), { TEXT("Saved matches replay from inputs and scoring events, with a free camera, slow motion and clips of scoring exchanges.") } },
-				{ TEXT("Photo mode and sharing"), { TEXT("Take a photo at any moment of a replay, then share it.") }, true }
+				{ TEXT("Photo Mode and Sharing"), { TEXT("Take a photo at any moment of a replay, then share it.") }, true }
 			};
 			Result.Add(EOpenStanceMenuScreen::Replays, Replays);
 
@@ -347,29 +347,29 @@ namespace OpenStanceMenuContent
 			Broadcast.Title = TEXT("Broadcast");
 			Broadcast.Items =
 			{
-				{ TEXT("Director camera"), FString() },
-				{ TEXT("Live scoreboard overlays"), FString() },
-				{ TEXT("Instant replay"), FString() },
-				{ TEXT("Bracket display"), FString() }
+				{ TEXT("Director Camera"), FString() },
+				{ TEXT("Live Scoreboard Overlays"), FString() },
+				{ TEXT("Instant Replay"), FString() },
+				{ TEXT("Bracket Display"), FString() }
 			};
 			Broadcast.Cards = { { TEXT("About"), { TEXT("Spectator and commentator tools for community tournaments.") } } };
 			Result.Add(EOpenStanceMenuScreen::Broadcast, Broadcast);
 
 			FListDefinition LongTerm;
 			LongTerm.Kicker = TEXT("Career");
-			LongTerm.Title = TEXT("Long-term career");
+			LongTerm.Title = TEXT("Long-Term Career");
 			LongTerm.Items =
 			{
-				{ TEXT("Age divisions"), TEXT("Cadet 12–14, junior 15–17, senior") },
-				{ TEXT("Ageing"), TEXT("Peak years, gradual decline, retirement") },
-				{ TEXT("Fatigue and minor injuries"), TEXT("Rest and physio choices, never graphic") },
-				{ TEXT("Hall of fame"), TEXT("Records, medals, signature techniques") },
-				{ TEXT("World games"), TEXT("Career tier 7, every four years") }
+				{ TEXT("Age Divisions"), TEXT("Cadet 12–14, junior 15–17, senior") },
+				{ TEXT("Aging"), TEXT("Peak years, gradual decline, retirement") },
+				{ TEXT("Fatigue and Minor Injuries"), TEXT("Rest and physio choices, never graphic") },
+				{ TEXT("Hall of Fame"), TEXT("Records, medals, signature techniques") },
+				{ TEXT("World Games"), TEXT("Career tier 7, every four years") }
 			};
 			LongTerm.Cards =
 			{
-				{ TEXT("Hall of fame"), { TEXT("Retired fighters’ records, medals and signature techniques are kept here.") } },
-				{ TEXT("Ageing"), { TEXT("Attributes peak, then decline gradually over a long Career.") } }
+				{ TEXT("Hall of Fame"), { TEXT("Retired fighters’ records, medals and signature techniques are kept here.") } },
+				{ TEXT("Aging"), { TEXT("Attributes peak, then decline gradually over a long Career.") } }
 			};
 			Result.Add(EOpenStanceMenuScreen::LongTerm, LongTerm);
 			return Result;
@@ -382,77 +382,77 @@ namespace OpenStanceMenuContent
 	{
 		static const TArray<FControlTab> Tabs =
 		{
-			MakeTab(TEXT("Movement and guards"), TEXT("Action"), TEXT("Input"), TEXT("Notes"),
+			MakeTab(TEXT("Movement and Guards"), TEXT("Action"), TEXT("Input"), TEXT("Notes"),
 			{
 				MakeControl(TEXT("Movement"), TEXT("LS"), TEXT("Move around the mat")),
-				MakeControl(TEXT("Switch sides"), TEXT("A"), TEXT("Swap lead and back leg")),
-				MakeControl(TEXT("Dash / clinch"), TEXT("B"), TEXT("Dash 1 m; dashing into contact starts a clinch")),
-				MakeControl(TEXT("High guard"), TEXT("D-pad ↑"), TEXT("")),
-				MakeControl(TEXT("Cross guard"), TEXT("D-pad ←"), TEXT("")),
-				MakeControl(TEXT("Mixed guard"), TEXT("D-pad →"), TEXT("")),
-				MakeControl(TEXT("Low guard"), TEXT("D-pad ↓"), TEXT("A normal guard, never a foul"))
+				MakeControl(TEXT("Switch Sides"), TEXT("A"), TEXT("Swap lead and back leg")),
+				MakeControl(TEXT("Dash / Clinch"), TEXT("B"), TEXT("Dash 1 m; dashing into contact starts a clinch")),
+				MakeControl(TEXT("High Guard"), TEXT("D-pad ↑"), TEXT("")),
+				MakeControl(TEXT("Cross Guard"), TEXT("D-pad ←"), TEXT("")),
+				MakeControl(TEXT("Mixed Guard"), TEXT("D-pad →"), TEXT("")),
+				MakeControl(TEXT("Low Guard"), TEXT("D-pad ↓"), TEXT("A normal guard, never a foul"))
 			}),
 			MakeTab(TEXT("Modifiers"), TEXT("Modifier"), TEXT("Input"), TEXT("Effect"),
 			{
-				MakeControl(TEXT("Back leg"), TEXT("Hold RT"), TEXT("Throw with the back leg")),
+				MakeControl(TEXT("Back Leg"), TEXT("Hold RT"), TEXT("Throw with the back leg")),
 				MakeControl(TEXT("Head"), TEXT("Hold RB"), TEXT("Aim at the head, not the trunk")),
 				MakeControl(TEXT("Fake"), TEXT("Hold LB"), TEXT("Feint; see the Fakes tab for each kick")),
 				MakeControl(TEXT("Jump"), TEXT("Tap Y before the kick"), TEXT("Throw the kick airborne")),
-				MakeControl(TEXT("Active defense"), TEXT("Hold LT"), TEXT("RS defends instead of attacks")),
-				MakeControl(TEXT("Stand or slide"), TEXT("LS neutral or held"), TEXT("Neutral roots you; held slides you"))
+				MakeControl(TEXT("Active Defense"), TEXT("Hold LT"), TEXT("RS defends instead of attacks")),
+				MakeControl(TEXT("Stand or Slide"), TEXT("LS neutral or held"), TEXT("Neutral roots you; held slides you"))
 			}),
-			MakeTab(TEXT("Standing kicks"), TEXT("Technique"), TEXT("Input"), TEXT("Points"),
+			MakeTab(TEXT("Standing Kicks"), TEXT("Technique"), TEXT("Input"), TEXT("Points"),
 			{
-				MakeControl(TEXT("Side kick"), TEXT("RS ↑"), TEXT("Body 2 · Head 3")),
-				MakeControl(TEXT("Side kick, back leg"), TEXT("Hold RT + RS ↑"), TEXT("Body 2 · Head 3")),
+				MakeControl(TEXT("Side Kick"), TEXT("RS ↑"), TEXT("Body 2 · Head 3")),
+				MakeControl(TEXT("Side Kick, Back Leg"), TEXT("Hold RT + RS ↑"), TEXT("Body 2 · Head 3")),
 				MakeControl(TEXT("Roundhouse"), TEXT("RS ←/→ toward the lead leg"), TEXT("Body 2")),
-				MakeControl(TEXT("Roundhouse, back leg"), TEXT("Hold RT + RS ←/→ toward the back leg"), TEXT("Body 2 · Head 3")),
-				MakeControl(TEXT("Roundhouse, head"), TEXT("Hold RB + RS ←/→ toward the lead leg"), TEXT("Head 3")),
-				MakeControl(TEXT("Hook kick"), TEXT("RS ←/→ away from the lead leg"), TEXT("Body 2 · Head 3")),
-				MakeControl(TEXT("Axe kick"), TEXT("RS ←/→ {qf}, ↓"), TEXT("Head 3"))
+				MakeControl(TEXT("Roundhouse, Back Leg"), TEXT("Hold RT + RS ←/→ toward the back leg"), TEXT("Body 2 · Head 3")),
+				MakeControl(TEXT("Roundhouse, Head"), TEXT("Hold RB + RS ←/→ toward the lead leg"), TEXT("Head 3")),
+				MakeControl(TEXT("Hook Kick"), TEXT("RS ←/→ away from the lead leg"), TEXT("Body 2 · Head 3")),
+				MakeControl(TEXT("Axe Kick"), TEXT("RS ←/→ {qf}, ↓"), TEXT("Head 3"))
 			}),
-			MakeTab(TEXT("Spinning and jump kicks"), TEXT("Technique"), TEXT("Input"), TEXT("Points"),
+			MakeTab(TEXT("Spinning and Jump Kicks"), TEXT("Technique"), TEXT("Input"), TEXT("Points"),
 			{
-				MakeControl(TEXT("Spin side kick"), TEXT("RS ↓, ↑"), TEXT("Body 4 · Head 6")),
-				MakeControl(TEXT("Spin hook kick"), TEXT("Hold RT + RS ←/→ {h}"), TEXT("Body 4 · Head 6")),
-				MakeControl(TEXT("Tornado kick"), TEXT("Y, RS ←/→ {h}, {hu}"), TEXT("Body 4 · Head 6")),
-				MakeControl(TEXT("Jump side kick"), TEXT("Y, RS ↑"), TEXT("Body 2 · Head 3")),
-				MakeControl(TEXT("Jump roundhouse"), TEXT("Y, RS ←/→ toward the lead leg"), TEXT("Body 2 · Head 3")),
-				MakeControl(TEXT("Jump hook kick"), TEXT("Y, RS ←/→ away from the lead leg"), TEXT("Body 2 · Head 3")),
-				MakeControl(TEXT("Jump axe kick"), TEXT("Y, RS ←/→ {qf}, ↓"), TEXT("Head 3")),
-				MakeControl(TEXT("Jump spin hook"), TEXT("Y, Hold RT + RS ←/→ {h}"), TEXT("Body 4 · Head 6"))
+				MakeControl(TEXT("Spin Side Kick"), TEXT("RS ↓, ↑"), TEXT("Body 4 · Head 6")),
+				MakeControl(TEXT("Spin Hook Kick"), TEXT("Hold RT + RS ←/→ {h}"), TEXT("Body 4 · Head 6")),
+				MakeControl(TEXT("Tornado Kick"), TEXT("Y, RS ←/→ {h}, {hu}"), TEXT("Body 4 · Head 6")),
+				MakeControl(TEXT("Jump Side Kick"), TEXT("Y, RS ↑"), TEXT("Body 2 · Head 3")),
+				MakeControl(TEXT("Jump Roundhouse"), TEXT("Y, RS ←/→ toward the lead leg"), TEXT("Body 2 · Head 3")),
+				MakeControl(TEXT("Jump Hook Kick"), TEXT("Y, RS ←/→ away from the lead leg"), TEXT("Body 2 · Head 3")),
+				MakeControl(TEXT("Jump Axe Kick"), TEXT("Y, RS ←/→ {qf}, ↓"), TEXT("Head 3")),
+				MakeControl(TEXT("Jump Spin Hook"), TEXT("Y, Hold RT + RS ←/→ {h}"), TEXT("Body 4 · Head 6"))
 			}),
 			MakeTab(TEXT("Fakes"), TEXT("Fake"), TEXT("Input"), TEXT("Result"),
 			{
-				MakeControl(TEXT("Fake, no kick"), TEXT("Hold LB"), TEXT("Feint without choosing a kick")),
-				MakeControl(TEXT("Fake side kick"), TEXT("Hold LB + RS ↑"), TEXT("Startup plays, no score")),
-				MakeControl(TEXT("Fake roundhouse"), TEXT("Hold LB + RS ←/→ toward the lead leg"), TEXT("Startup plays, no score")),
-				MakeControl(TEXT("Fake hook kick"), TEXT("Hold LB + RS ←/→ away from the lead leg"), TEXT("Startup plays, no score")),
-				MakeControl(TEXT("Fake axe kick"), TEXT("Hold LB + RS ←/→ {qf}, ↓"), TEXT("Startup plays, no score")),
-				MakeControl(TEXT("Fake spin side kick"), TEXT("Hold LB + RS ↓, ↑"), TEXT("Startup plays, no score")),
-				MakeControl(TEXT("Fake spin hook kick"), TEXT("Hold LB + RT + RS ←/→ {h}"), TEXT("Startup plays, no score")),
-				MakeControl(TEXT("Fake tornado kick"), TEXT("Y, Hold LB + RS ←/→ {h}, {hu}"), TEXT("Startup plays, no score")),
-				MakeControl(TEXT("Fake a jump kick"), TEXT("Y, Hold LB + the kick’s RS input"), TEXT("Startup plays, no score"))
+				MakeControl(TEXT("Fake, No Kick"), TEXT("Hold LB"), TEXT("Feint without choosing a kick")),
+				MakeControl(TEXT("Fake Side Kick"), TEXT("Hold LB + RS ↑"), TEXT("Startup plays, no score")),
+				MakeControl(TEXT("Fake Roundhouse"), TEXT("Hold LB + RS ←/→ toward the lead leg"), TEXT("Startup plays, no score")),
+				MakeControl(TEXT("Fake Hook Kick"), TEXT("Hold LB + RS ←/→ away from the lead leg"), TEXT("Startup plays, no score")),
+				MakeControl(TEXT("Fake Axe Kick"), TEXT("Hold LB + RS ←/→ {qf}, ↓"), TEXT("Startup plays, no score")),
+				MakeControl(TEXT("Fake Spin Side Kick"), TEXT("Hold LB + RS ↓, ↑"), TEXT("Startup plays, no score")),
+				MakeControl(TEXT("Fake Spin Hook Kick"), TEXT("Hold LB + RT + RS ←/→ {h}"), TEXT("Startup plays, no score")),
+				MakeControl(TEXT("Fake Tornado Kick"), TEXT("Y, Hold LB + RS ←/→ {h}, {hu}"), TEXT("Startup plays, no score")),
+				MakeControl(TEXT("Fake a Jump Kick"), TEXT("Y, Hold LB + the kick’s RS input"), TEXT("Startup plays, no score"))
 			}),
-			MakeTab(TEXT("Punches and defense"), TEXT("Action"), TEXT("Input"), TEXT("Effect"),
+			MakeTab(TEXT("Punches and Defense"), TEXT("Action"), TEXT("Input"), TEXT("Effect"),
 			{
 				MakeControl(TEXT("Punch"), TEXT("X"), TEXT("Trunk 1 point")),
-				MakeControl(TEXT("High block"), TEXT("Hold LT, RS ↑"), TEXT("Stops head-height attacks")),
-				MakeControl(TEXT("Body block"), TEXT("Hold LT"), TEXT("Blocks punches and body kicks")),
-				MakeControl(TEXT("Leg check"), TEXT("Hold LT, RS ↓"), TEXT("Stops a body kick; held too long is a penalty")),
-				MakeControl(TEXT("Sway or step"), TEXT("Hold LT, RS ←/→"), TEXT("Move out of range, no block"))
+				MakeControl(TEXT("High Block"), TEXT("Hold LT, RS ↑"), TEXT("Stops head-height attacks")),
+				MakeControl(TEXT("Body Block"), TEXT("Hold LT"), TEXT("Blocks punches and body kicks")),
+				MakeControl(TEXT("Leg Check"), TEXT("Hold LT, RS ↓"), TEXT("Stops a body kick; held too long is a penalty")),
+				MakeControl(TEXT("Sway or Step"), TEXT("Hold LT, RS ←/→"), TEXT("Move out of range, no block"))
 			}),
-			MakeTab(TEXT("Referee mode"), TEXT("Action"), TEXT("Input"), TEXT("Command"),
+			MakeTab(TEXT("Referee Mode"), TEXT("Action"), TEXT("Input"), TEXT("Command"),
 			{
-				MakeControl(TEXT("Move, look"), TEXT("LS, RS"), TEXT("Step around the fighters")),
-				MakeControl(TEXT("Select a fighter"), TEXT("LB for Chung, RB for Hong"), TEXT("")),
-				MakeControl(TEXT("Start or continue"), TEXT("A"), TEXT("SHI-JAK, KYE-SOK")),
+				MakeControl(TEXT("Move, Look"), TEXT("LS, RS"), TEXT("Step around the fighters")),
+				MakeControl(TEXT("Select a Fighter"), TEXT("LB for Chung, RB for Hong"), TEXT("")),
+				MakeControl(TEXT("Start or Continue"), TEXT("A"), TEXT("SHI-JAK, KYE-SOK")),
 				MakeControl(TEXT("Break"), TEXT("B"), TEXT("KAL-YEO")),
 				MakeControl(TEXT("Penalty"), TEXT("Hold X, RS, release"), TEXT("GAM-JEOM, reason on the wheel")),
 				MakeControl(TEXT("Stop"), TEXT("Y"), TEXT("KEU-MAN")),
-				MakeControl(TEXT("Knockdown count"), TEXT("Hold LT"), TEXT("")),
-				MakeControl(TEXT("Raise the winner’s hand"), TEXT("RT"), TEXT("After the final KEU-MAN")),
-				MakeControl(TEXT("Attention, bow, ready"), TEXT("D-pad ↑, D-pad ↓"), TEXT("CHARYEOT, KYEONGRYE, JOON-BI"))
+				MakeControl(TEXT("Knockdown Count"), TEXT("Hold LT"), TEXT("")),
+				MakeControl(TEXT("Raise the Winner’s Hand"), TEXT("RT"), TEXT("After the final KEU-MAN")),
+				MakeControl(TEXT("Attention, Bow, Ready"), TEXT("D-pad ↑, D-pad ↓"), TEXT("CHARYEOT, KYEONGRYE, JOON-BI"))
 			}, true)
 		};
 		return Tabs;

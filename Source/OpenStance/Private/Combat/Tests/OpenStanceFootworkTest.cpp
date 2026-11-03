@@ -71,14 +71,14 @@ bool FOpenStanceFootworkMovementTest::RunTest(const FString& Parameters)
 		const FVector2D FromOpponent = Rig.Motion.Position - Rig.Opponent;
 		const float Swung = static_cast<float>(FMath::Atan2(FMath::Abs(FromOpponent.Y), -FromOpponent.X)) * 200.0f;
 		TestEqual(TEXT("the arc covers a 35 cm step"), Swung, 35.0f, 1.5f);
-		TestTrue(TEXT("a right step goes toward the fighter's right (negative Y here)"), Rig.Motion.Position.Y < 0.0);
+		TestTrue(TEXT("a right step goes toward the fighter's right (positive Y here: Unreal is left-handed)"), Rig.Motion.Position.Y > 0.0);
 	}
 	{
 		FFootworkRig Rig;
 		Rig.Input.Move = FVector2D(-1.0, 0.0);
 		Rig.Run(2.0f);
 		TestEqual(TEXT("holding sideways keeps circling at the same distance"), Rig.DistanceToOpponent(), 200.0f, 0.5f);
-		TestTrue(TEXT("a left step goes the other way"), Rig.Motion.Position.Y > 0.0);
+		TestTrue(TEXT("a left step goes the other way"), Rig.Motion.Position.Y < 0.0);
 	}
 	// A stick inside the dead zone does nothing.
 	{

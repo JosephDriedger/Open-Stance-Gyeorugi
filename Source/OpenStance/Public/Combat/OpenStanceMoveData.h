@@ -72,6 +72,14 @@ struct OPENSTANCE_API FOpenStanceMoveRow : public FTableRowBase
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Open Stance|Timing")
 	float RecoverySeconds = 0.4f;
 
+	/**
+	 * Seconds the technique's animation plays, from the input. No new technique can start before that long has passed, so
+	 * the animation is never cut off; if the phases are shorter, the fighter waits out the difference as a cooldown. Set it
+	 * to the montage's length. 0 means the three phases are the whole animation.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Open Stance|Timing")
+	float AnimationSeconds = 0.0f;
+
 	/** Seconds into the recovery from which the technique may be cancelled; negative means it cannot be cancelled. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Open Stance|Timing")
 	float CancelWindowSeconds = -1.0f;

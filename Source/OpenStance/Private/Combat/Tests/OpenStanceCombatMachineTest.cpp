@@ -153,7 +153,65 @@ bool FOpenStanceCombatPhasesTest::RunTest(const FString& Parameters)
 	return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FOpenStanceCombatFakeTest, "OpenStance.Combat.Fake", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FOpenStanceCombatCooldownTest, "OpenStance.Combat.Cooldown", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FOpenStanceCombatCooldownTest::RunTest(const FString& Parameters)
+{
+	// The animation outlasts the phases: the fighter is free, but cannot start another technique until it has finished.
+	{
+		FCombatRig Rig;
+		FOpenStanceAttackRequest Kick = Rig.Request(TEXT("SideKick_Trunk"));
+		Kick.Row.StartupSeconds = 0.2f;
+		Kick.Row.ActiveSeconds = 0.1f;
+		Kick.Row.RecoverySeconds = 0.3f;
+		Kick.Row.AnimationSeconds = 0.9f;
+		TestTrue(TEXT("the first kick starts"), Rig.Attack(Kick));
+		Rig.Run(0.65f);
+		TestEqual(TEXT("the phases are over"), Rig.State.CombatState, S::IdleMovement);
+		TestTrue(TEXT("with about a quarter second of animation left"), FMath::IsNearlyEqual(Rig.Machine.GetCooldownLeft(), 0.25f, 0.03f));
+
+		Rig.Events.Reset();
+		TestFalse(TEXT("a second kick is refused during the cooldown"), Rig.Attack(Kick));
+		TestTrue(TEXT("and the reason says cooldown"), Rig.Events.ContainsByPredicate([](const FOpenStanceCombatEvent& E) { return E.Type == EOpenStanceCombatEventType::AttackRejected && E.Reason.StartsWith(TEXT("cooldown")); }));
+
+		Rig.Run(0.3f);
+		TestEqual(TEXT("the cooldown has run out"), Rig.Machine.GetCooldownLeft(), 0.0f);
+		TestTrue(TEXT("and the next kick starts"), Rig.Attack(Kick));
+	}
+
+	// No animation length, or one the phases already cover: no cooldown at all.
+	{
+		FCombatRig Rig;
+		FOpenStanceAttackRequest Kick = Rig.Request(TEXT("SideKick_Trunk"));
+		Kick.Row.StartupSeconds = 0.2f;
+		Kick.Row.ActiveSeconds = 0.1f;
+		Kick.Row.RecoverySeconds = 0.3f;
+		Kick.Row.AnimationSeconds = 0.0f;
+		Rig.Attack(Kick);
+		Rig.Run(0.65f);
+		TestEqual(TEXT("no animation length, no cooldown"), Rig.Machine.GetCooldownLeft(), 0.0f);
+		TestTrue(TEXT("the next kick starts at once"), Rig.Attack(Kick));
+	}
+
+	// A fake only plays its startup, so it leaves no cooldown.
+	{
+		FCombatRig Rig;
+		FOpenStanceAttackRequest Fake = Rig.Request(TEXT("SideKick_Trunk"), true);
+		Rig.Attack(Fake);
+		Rig.Run(1.2f);
+		TestEqual(TEXT("back to idle"), Rig.State.CombatState, S::IdleMovement);
+		TestEqual(TEXT("a fake leaves no cooldown"), Rig.Machine.GetCooldownLeft(), 0.0f);
+	}
+
+	// Every seed move carries an animation length at least as long as its phases.
+	for (const TPair<FName, FOpenStanceMoveRow>& Pair : FOpenStanceMoveData::BuildSeedRows())
+	{
+		const FOpenStanceMoveRow& Row = Pair.Value;
+		TestTrue(*FString::Printf(TEXT("%s: the animation covers its phases"), *Pair.Key.ToString()), Row.AnimationSeconds >= Row.StartupSeconds + Row.ActiveSeconds + Row.RecoverySeconds);
+	}
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FOpenStanceCombatFakeTest,"OpenStance.Combat.Fake", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
 bool FOpenStanceCombatFakeTest::RunTest(const FString& Parameters)
 {
 	FCombatRig Rig;

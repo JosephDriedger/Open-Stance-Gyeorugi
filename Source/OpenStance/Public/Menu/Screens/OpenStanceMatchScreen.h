@@ -33,6 +33,7 @@ protected:
 	// The pieces are shared with the referee view, which reads the same model
 	TSharedRef<SWidget> BuildScoreboard(const TWeakObjectPtr<UOpenStanceMatchModel>& Model);
 	TSharedRef<SWidget> BuildNameplate(const TWeakObjectPtr<UOpenStanceMatchModel>& Model, EOpenStanceSide Side);
+	TSharedRef<SWidget> BuildGamJeom(const TWeakObjectPtr<UOpenStanceMatchModel>& Model, EOpenStanceSide Side);
 	TSharedRef<SWidget> BuildReviewBox();
 	TSharedRef<SWidget> BuildScorePop(const TWeakObjectPtr<UOpenStanceMatchModel>& Model, EOpenStanceSide Side);
 	TSharedRef<SWidget> BuildCallBanner(const TWeakObjectPtr<UOpenStanceMatchModel>& Model);
@@ -49,6 +50,9 @@ private:
 	void ScoreRandomTechnique();
 
 	EOpenStanceSex GetFighterSex(EOpenStanceSide Side) const;
+
+	/** True once gameplay feeds the model: the arena is the picture, so the screen draws only the HUD over it. */
+	bool IsGameplayDriven() const;
 
 	bool bCheckedPause = false;
 	bool bLeaving = false;

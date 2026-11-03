@@ -1,12 +1,18 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Combat/OpenStanceMatchModelSync.h"
 #include "Combat/OpenStanceMatchSim.h"
+#include "Menu/OpenStanceMenuTypes.h"
 #include "Subsystems/WorldSubsystem.h"
 #include "OpenStanceCombatDebugSubsystem.generated.h"
 
 class UCanvas;
 class UDataTable;
+class UMaterialInstanceDynamic;
+class UOpenStanceMatchModel;
+class UOpenStanceMenuSubsystem;
+class UStaticMeshComponent;
 
 /** How the second fighter behaves while the AI does not exist yet (os.AIMode). */
 UENUM()
@@ -36,6 +42,7 @@ public:
 	virtual bool ShouldCreateSubsystem(UObject* Outer) const override;
 	virtual void Initialize(FSubsystemCollectionBase& Collection) override;
 	virtual void Deinitialize() override;
+	virtual void OnWorldBeginPlay(UWorld& InWorld) override;
 	virtual void Tick(float DeltaTime) override;
 	virtual TStatId GetStatId() const override;
 
@@ -60,6 +67,7 @@ public:
 	// Development switches, driven by the os.* commands (compiled out of shipping builds).
 	void SetCombatDebug(bool bOn) { bCombatDebug = bOn; }
 	void SetShowHitboxes(bool bOn) { bShowHitboxes = bOn; }
+	void SetShowInput(bool bOn);
 	void SetInfiniteStamina(bool bOn);
 	void SetScoreCheat(int32 Chung, int32 Hong);
 	void SetClockCheat(float Seconds);
@@ -71,6 +79,33 @@ public:
 private:
 	void DrawOverlay(UCanvas* Canvas, APlayerController* Controller);
 	void DrawWorld() const;
+	void DrawInputPanel(UCanvas* Canvas, APlayerController* Controller) const;
+	void UpdateInputLog();
+	void PrintNewInputs();
+	void HandleInvertToggle();
+	void ShowLiveSticks(const FOpenStanceFighterControls& Controls) const;
+	void GetFollowCameraPose(FVector& OutPosition, FRotator& OutRotation) const;
+	void UpdateCamera(float DeltaTime);
+	/** The menu system for the local player, whose match model is the HUD's; null in a world with no local player. */
+	UOpenStanceMenuSubsystem* GetMenu() const;
+
+	/** Hands the HUD's model over to this match (names, demo off) and shows the match HUD. */
+	void LinkMatchModel();
+
+	/** The menu raised a match: restart this one, or travel to the chosen arena from the menu level. */
+	UFUNCTION()
+	void HandleMatchRequested(const FOpenStanceMatchSetup& Setup);
+
+	/** The menu is returning to the main menu: leave the arena for the menu level. */
+	void HandleLeaveMatch();
+
+	bool IsMenuMap() const;
+
+	FVector FindArenaOrigin() const;
+	void SetDefaultPawnHidden(bool bHidden);
+	void BuildBodies();
+	void DestroyBodies();
+	void UpdateBodies();
 	FOpenStanceFighterControls PollController() const;
 	FVector ToWorld(const FVector2D& Position, float Z = 0.0f) const;
 	const UDataTable* GetMoveTable();
@@ -83,11 +118,43 @@ private:
 	UPROPERTY(Transient)
 	TObjectPtr<AActor> Camera;
 
+	/** The solid greybox fighters: one actor each, built from the engine's basic shapes (see BuildBodies for the part order). */
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<AActor>> BodyActors;
+
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<UStaticMeshComponent>> BodyParts;
+
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<UMaterialInstanceDynamic>> BodyMaterials;
+
+	/** Mirrors the simulation into the match HUD while the menu's Match screen is showing. */
+	FOpenStanceMatchModelSync ModelSync;
+	bool bModelLinked = false;
+
+	/** The fighter the controller drives: 0 is Chung, 1 is Hong (chosen on Side Select). */
+	int32 PlayerIndex = 0;
+	FDelegateHandle LeaveMatchHandle;
+
+	int32 SeenContacts = 0;
+	double FlashUntil[2] = { 0.0, 0.0 };
+	bool bFlashing[2] = { false, false };
+
 	FDelegateHandle DebugDrawHandle;
 	FVector Origin = FVector::ZeroVector;
 	EOpenStanceAIMode AIMode = EOpenStanceAIMode::Idle;
 	float Accumulator = 0.0f;
 
+	/** Button presses and releases seen by os.ShowInput, oldest first, and the buttons held on the last tick. */
+	TArray<FString> InputLog;
+	TSet<FName> HeldButtons;
+
+	/** How many of Chung's input events have already been printed on screen. */
+	int32 PrintedInputEvents = 0;
+
+	bool bPrevInvertToggle = false;
+	bool bAutoStartPending = false;
+	bool bShowInput = false;
 	bool bGreybox = false;
 	bool bCombatDebug = false;
 	bool bShowHitboxes = false;

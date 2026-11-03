@@ -22,6 +22,7 @@
 #include "Menu/Screens/OpenStanceRefereeScreens.h"
 #include "Menu/Screens/OpenStanceResultsScreen.h"
 #include "Menu/Screens/OpenStanceSetupScreen.h"
+#include "Menu/Screens/OpenStanceSideSelectScreen.h"
 #include "Menu/Screens/OpenStanceTitleScreen.h"
 #include "Menu/Screens/OpenStanceTrainingScreen.h"
 
@@ -39,6 +40,8 @@ TSubclassOf<UOpenStanceScreen> UOpenStanceMenuSubsystem::GetScreenClass(EOpenSta
 	case EOpenStanceMenuScreen::Tournament:
 	case EOpenStanceMenuScreen::RefereeSetup:
 		return UOpenStanceSetupScreen::StaticClass();
+	case EOpenStanceMenuScreen::SideSelect:
+		return UOpenStanceSideSelectScreen::StaticClass();
 	case EOpenStanceMenuScreen::FighterSelect:
 		return UOpenStanceFighterSelectScreen::StaticClass();
 	case EOpenStanceMenuScreen::Match:
@@ -82,6 +85,13 @@ APlayerController* UOpenStanceMenuSubsystem::GetOwningController() const
 void UOpenStanceMenuSubsystem::StartMenuFlow()
 {
 	BackStack.Reset();
+	if (bReturnToMainOnLoad)
+	{
+		// Gameplay brought the player back from an arena: straight to the main menu.
+		bReturnToMainOnLoad = false;
+		Present(EOpenStanceMenuScreen::Main);
+		return;
+	}
 	Present(EOpenStanceMenuScreen::Title);
 }
 
@@ -101,6 +111,7 @@ void UOpenStanceMenuSubsystem::ReplaceScreen(EOpenStanceMenuScreen Screen)
 
 void UOpenStanceMenuSubsystem::ReturnToMain()
 {
+	OnLeaveMatch.Broadcast();
 	BackStack.Reset();
 	Present(EOpenStanceMenuScreen::Main);
 }
@@ -277,9 +288,9 @@ FOpenStanceDialogRequest UOpenStanceMenuSubsystem::MakePauseRequest()
 	Request.Buttons =
 	{
 		{ TEXT("Resume"), nullptr, false },
-		{ TEXT("Move list"), [this]()
+		{ TEXT("Move List"), [this]()
 			{
-				Session.ControlsTabIndex = FMath::Max(0, OpenStanceMenuContent::FindControlTab(TEXT("Standing kicks")));
+				Session.ControlsTabIndex = FMath::Max(0, OpenStanceMenuContent::FindControlTab(TEXT("Standing Kicks")));
 				ShowScreenFromMatch(EOpenStanceMenuScreen::Controls);
 			}, false },
 		{ TEXT("Controls"), [this]()
@@ -289,7 +300,7 @@ FOpenStanceDialogRequest UOpenStanceMenuSubsystem::MakePauseRequest()
 			}, false },
 		{ TEXT("Options"), [this]() { ShowScreenFromMatch(EOpenStanceMenuScreen::Options); }, false },
 		{ TEXT("Restart"), [this]() { StartMatch(false); }, false },
-		{ TEXT("Quit match"), [this]() { ShowQuitMatchDialog(); }, true }
+		{ TEXT("Quit Match"), [this]() { ShowQuitMatchDialog(); }, true }
 	};
 	return Request;
 }
@@ -297,11 +308,11 @@ FOpenStanceDialogRequest UOpenStanceMenuSubsystem::MakePauseRequest()
 FOpenStanceDialogRequest UOpenStanceMenuSubsystem::MakeQuitGameRequest()
 {
 	FOpenStanceDialogRequest Request;
-	Request.Title = TEXT("Quit game?");
+	Request.Title = TEXT("Quit Game?");
 	Request.Message = TEXT("Settings and created fighters are already saved.");
 	Request.Buttons =
 	{
-		{ TEXT("Quit to title"), [this]() { StartMenuFlow(); }, true },
+		{ TEXT("Quit to Title"), [this]() { StartMenuFlow(); }, true },
 		{ TEXT("Cancel"), nullptr, false }
 	};
 	return Request;
@@ -310,11 +321,11 @@ FOpenStanceDialogRequest UOpenStanceMenuSubsystem::MakeQuitGameRequest()
 FOpenStanceDialogRequest UOpenStanceMenuSubsystem::MakeQuitMatchRequest()
 {
 	FOpenStanceDialogRequest Request;
-	Request.Title = TEXT("Quit match?");
+	Request.Title = TEXT("Quit Match?");
 	Request.Message = TEXT("The match will not be saved.");
 	Request.Buttons =
 	{
-		{ TEXT("Quit to main menu"), [this]() { ReturnToMain(); }, true },
+		{ TEXT("Quit to Main Menu"), [this]() { ReturnToMain(); }, true },
 		{ TEXT("Cancel"), [this]() { ShowPauseMenu(); }, false }
 	};
 	return Request;
@@ -347,6 +358,7 @@ FOpenStanceMatchSetup UOpenStanceMenuSubsystem::BuildMatchSetup() const
 
 	FOpenStanceMatchSetup Setup;
 	Setup.Mode = Session.Mode;
+	Setup.PlayerSide = Session.PlayerSide;
 	if (Roster.IsValidIndex(Session.ChungFighter))
 	{
 		Setup.Chung = Roster[Session.ChungFighter];

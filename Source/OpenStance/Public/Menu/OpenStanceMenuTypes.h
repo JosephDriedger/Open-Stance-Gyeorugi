@@ -15,6 +15,7 @@ enum class EOpenStanceMenuScreen : uint8
 	Main,
 	Sparring,
 	Tournament,
+	SideSelect,
 	FighterSelect,
 	Match,
 	Results,
@@ -45,7 +46,7 @@ enum class EOpenStanceMatchMode : uint8
 	Referee
 };
 
-/** Chung is blue and starts on the left, Hong is red and starts on the right (GDD 4.1). The game assigns sides. */
+/** Chung is blue and starts on the left, Hong is red and starts on the right (GDD 4.1). The player picks a side on Side Select. */
 UENUM(BlueprintType)
 enum class EOpenStanceSide : uint8
 {
@@ -151,6 +152,10 @@ struct OPENSTANCE_API FOpenStanceMatchSetup
 	UPROPERTY(BlueprintReadOnly, Category = "Open Stance|Menu")
 	FOpenStanceFighterProfile Hong;
 
+	/** The side player 1's controller drives, chosen on the Side Select screen; player 2, or the AI, takes the other. */
+	UPROPERTY(BlueprintReadOnly, Category = "Open Stance|Menu")
+	EOpenStanceSide PlayerSide = EOpenStanceSide::Chung;
+
 	/** Setup row values as shown on screen: Players, Ruleset, AI difficulty, Arena, Bracket size. */
 	UPROPERTY(BlueprintReadOnly, Category = "Open Stance|Menu")
 	TMap<FName, FString> Choices;
@@ -167,6 +172,9 @@ struct FOpenStanceMenuSession
 	/** Indices into the premade roster. */
 	int32 ChungFighter = 0;
 	int32 HongFighter = 1;
+
+	/** The side player 1's controller drives. Chung (blue, left) until the player moves the controller on Side Select. */
+	EOpenStanceSide PlayerSide = EOpenStanceSide::Chung;
 
 	/** Selected value index per setup or options row, keyed by row id. */
 	TMap<FName, int32> Choices;

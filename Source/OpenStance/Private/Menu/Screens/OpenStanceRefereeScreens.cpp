@@ -30,10 +30,10 @@ namespace
 		const TArray<FOpenStanceFighterProfile>& Roster = OpenStanceMenuContent::GetRoster();
 		Model.Reset(Roster[0].Name, Roster[1].Name);
 		Model.SetClock(2, 72.0f);
-		Model.AddPoints(EOpenStanceSide::Chung, 3, TEXT("Axe kick"), true);
-		Model.AddPoints(EOpenStanceSide::Chung, 4, TEXT("Spinning hook"), false);
-		Model.AddPoints(EOpenStanceSide::Hong, 4, TEXT("Back kick"), false);
-		Model.SetCall(TEXT("You called"), TEXT("KAL-YEO · +2 correct call"), TEXT(" "));
+		Model.AddPoints(EOpenStanceSide::Chung, 3, TEXT("Axe Kick"), true);
+		Model.AddPoints(EOpenStanceSide::Chung, 4, TEXT("Spinning Hook"), false);
+		Model.AddPoints(EOpenStanceSide::Hong, 4, TEXT("Back Kick"), false);
+		Model.SetCall(TEXT("You called"), TEXT("KAL-YEO · +2 Correct Call"), TEXT(" "));
 	}
 
 	/** One row of the rating table: a label, a count and a point change. */
@@ -74,7 +74,7 @@ TArray<FOpenStanceHint> UOpenStanceRefereeMatchScreen::GetHints() const
 {
 	return
 	{
-		{ TEXT("A"), EOpenStanceGlyphLook::A, TEXT("End match (demo)") },
+		{ TEXT("A"), EOpenStanceGlyphLook::A, TEXT("End Match (Demo)") },
 		{ TEXT("MENU"), EOpenStanceGlyphLook::Neutral, TEXT("Pause") }
 	};
 }
@@ -113,8 +113,8 @@ TSharedRef<SWidget> UOpenStanceRefereeMatchScreen::BuildContent()
 		{ TEXT("B"), TEXT("KAL-YEO") },
 		{ TEXT("Hold X, RS"), TEXT("GAM-JEOM") },
 		{ TEXT("Y"), TEXT("KEU-MAN") },
-		{ TEXT("Hold LT"), TEXT("Knockdown count") },
-		{ TEXT("RT"), TEXT("Raise hand") },
+		{ TEXT("Hold LT"), TEXT("Knockdown Count") },
+		{ TEXT("RT"), TEXT("Raise Hand") },
 		{ TEXT("D-pad ↑"), TEXT("CHARYEOT") },
 		{ TEXT("D-pad ↓"), TEXT("JOON-BI") }
 	};
@@ -150,7 +150,7 @@ TSharedRef<SWidget> UOpenStanceRefereeMatchScreen::BuildContent()
 				SNew(SHorizontalBox)
 				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
 				[
-					MakeText(TEXT("Referee rating"), { EFont::Display, 1.2f, 0.1f, true }, Palette::Bone)
+					MakeText(TEXT("Referee Rating"), { EFont::Display, 1.2f, 0.1f, true }, Palette::Bone)
 				]
 				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(U(0.6f), 0.0f, 0.0f, 0.0f)
 				[
@@ -195,11 +195,11 @@ TSharedRef<SWidget> UOpenStanceRefereeGradeScreen::BuildContent()
 	};
 	const TArray<FRatingEvent> Events =
 	{
-		{ TEXT("Correct call"), TEXT("3"), TEXT("+6") },
-		{ TEXT("Late call"), TEXT("2"), TEXT("−6") },
-		{ TEXT("Missed penalty"), TEXT("1"), TEXT("−6") },
-		{ TEXT("Wrong penalty"), TEXT("1"), TEXT("−10") },
-		{ TEXT("Blocked the camera"), TEXT("2"), TEXT("−4") }
+		{ TEXT("Correct Call"), TEXT("3"), TEXT("+6") },
+		{ TEXT("Late Call"), TEXT("2"), TEXT("−6") },
+		{ TEXT("Missed Penalty"), TEXT("1"), TEXT("−6") },
+		{ TEXT("Wrong Penalty"), TEXT("1"), TEXT("−10") },
+		{ TEXT("Blocked the Camera"), TEXT("2"), TEXT("−4") }
 	};
 
 	TSharedRef<SVerticalBox> Changes = SNew(SVerticalBox);
@@ -242,11 +242,11 @@ TSharedRef<SWidget> UOpenStanceRefereeGradeScreen::BuildContent()
 		]
 		+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, U(0.7f), 0.0f, 0.0f)
 		[
-			StatRow(TEXT("Call accuracy"), SNullWidget::NullWidget, TEXT("B"))
+			StatRow(TEXT("Call Accuracy"), SNullWidget::NullWidget, TEXT("B"))
 		]
 		+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, U(0.7f), 0.0f, 0.0f)
 		[
-			StatRow(TEXT("Call timing"), SNullWidget::NullWidget, TEXT("C"))
+			StatRow(TEXT("Call Timing"), SNullWidget::NullWidget, TEXT("C"))
 		]
 		+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, U(0.7f), 0.0f, 0.0f)
 		[
@@ -254,7 +254,7 @@ TSharedRef<SWidget> UOpenStanceRefereeGradeScreen::BuildContent()
 		];
 
 	TSharedRef<SOpenStanceOption> PlayAgain = SNew(SOpenStanceOption)
-		.Label(TEXT("Play again"))
+		.Label(TEXT("Play Again"))
 		.OnPressed(FSimpleDelegate::CreateWeakLambda(this, [this]()
 		{
 			if (UOpenStanceMenuSubsystem* Menu = GetMenu())
@@ -267,7 +267,7 @@ TSharedRef<SWidget> UOpenStanceRefereeGradeScreen::BuildContent()
 	return SNew(SVerticalBox)
 		+ SVerticalBox::Slot().AutoHeight()
 		[
-			Head(TEXT("Referee Mode"), TEXT("Referee grade"), true)
+			Head(TEXT("Referee Mode"), TEXT("Referee Grade"), true)
 		]
 		+ SVerticalBox::Slot().FillHeight(1.0f).Padding(0.0f, U(1.6f), 0.0f, 0.0f)
 		[
@@ -292,7 +292,7 @@ TSharedRef<SWidget> UOpenStanceRefereeGradeScreen::BuildContent()
 				SNew(SVerticalBox)
 				+ SVerticalBox::Slot().AutoHeight()
 				[
-					Card(TEXT("Rating changes"), Changes)
+					Card(TEXT("Rating Changes"), Changes)
 				]
 				+ SVerticalBox::Slot().FillHeight(1.0f)
 				[
@@ -306,7 +306,7 @@ TSharedRef<SWidget> UOpenStanceRefereeGradeScreen::BuildContent()
 						+ SHorizontalBox::Slot().FillWidth(1.0f).Padding(U(0.8f), 0.0f, 0.0f, 0.0f)
 						[
 							SNew(SOpenStanceOption)
-							.Label(TEXT("Main menu"))
+							.Label(TEXT("Main Menu"))
 							.OnPressed(FSimpleDelegate::CreateWeakLambda(this, [this]()
 							{
 								if (UOpenStanceMenuSubsystem* Menu = GetMenu())

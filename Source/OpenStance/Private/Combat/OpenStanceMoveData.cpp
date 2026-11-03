@@ -2,6 +2,8 @@
 
 #include "Animation/AnimMontage.h"
 #include "Engine/DataTable.h"
+#include "DataTableUtils.h"
+#include "UObject/UnrealType.h"
 
 namespace
 {
@@ -10,6 +12,9 @@ namespace
 	{
 		return FSoftObjectPath(FString::Printf(TEXT("/Game/Animation/Moves/Placeholder/AM_Placeholder_%s.AM_Placeholder_%s"), Name, Name));
 	}
+
+	/** How long a placeholder animation keeps playing after the recovery ends: the cooldown before the next technique. */
+	constexpr float PlaceholderAnimationTailSeconds = 0.15f;
 
 	void AddIssue(TArray<FOpenStanceMoveIssue>& Issues, FName RowName, const FString& Message, bool bError = true)
 	{
@@ -35,6 +40,8 @@ namespace
 		Row.StartupSeconds = Startup;
 		Row.ActiveSeconds = Active;
 		Row.RecoverySeconds = Recovery;
+		// Placeholder animations play a little past the phases; the real montage length replaces this with the mocap.
+		Row.AnimationSeconds = Startup + Active + Recovery + PlaceholderAnimationTailSeconds;
 		Row.StaminaCost = Cost;
 		Row.Points = FOpenStanceMoveData::PointsFor(Technique, Target, Row.bSpinning);
 		Row.ReachCm = Reach;
@@ -129,6 +136,11 @@ TArray<FOpenStanceMoveIssue> FOpenStanceMoveData::Validate(const TMap<FName, FOp
 			AddIssue(Issues, Name, TEXT("CancelWindowSeconds is later than the end of recovery."));
 		}
 
+		if (!FMath::IsFinite(Row.AnimationSeconds) || Row.AnimationSeconds < 0.0f)
+		{
+			AddIssue(Issues, Name, TEXT("AnimationSeconds cannot be negative."));
+		}
+
 		if (Row.StaminaCost < 0.0f)
 		{
 			AddIssue(Issues, Name, TEXT("StaminaCost cannot be negative."));
@@ -216,6 +228,48 @@ TMap<FName, FOpenStanceMoveRow> FOpenStanceMoveData::BuildSeedRows()
 	Rows.Add(TEXT("Roundhouse_Head"), MakeRow(TEXT("Roundhouse Kick (Head)"), T::Roundhouse, TEXT("RB + RS toward the lead leg"), G::Head, 0.23f, 0.10f, 0.43f, 8.0f, 110.0f, 55.0f, R::Heavy, 0.0f, TEXT("Roundhouse")));
 	Rows.Add(TEXT("SpinSide_Trunk"), MakeRow(TEXT("Spin Side Kick"), T::SpinSide, TEXT("RS Down, Up"), G::Trunk, 0.40f, 0.12f, 0.60f, 20.0f, 120.0f, 80.0f, R::Heavy, 0.05f, TEXT("SpinSide")));
 	Rows.Add(TEXT("SpinSide_Head"), MakeRow(TEXT("Spin Side Kick (Head)"), T::SpinSide, TEXT("RB + RS Down, Up"), G::Head, 0.43f, 0.12f, 0.63f, 20.0f, 120.0f, 80.0f, R::Knockdown, 0.05f, TEXT("SpinSide")));
+	Rows.Add(TEXT("Hook_Trunk"), MakeRow(TEXT("Hook Kick"), T::Hook, TEXT("RS toward the other side"), G::Trunk, 0.22f, 0.10f, 0.42f, 8.0f, 110.0f, 55.0f, R::Normal, 0.0f, TEXT("Hook")));
+	Rows.Add(TEXT("Hook_Head"), MakeRow(TEXT("Hook Kick (Head)"), T::Hook, TEXT("RB + RS toward the other side"), G::Head, 0.25f, 0.10f, 0.45f, 8.0f, 110.0f, 55.0f, R::Heavy, 0.0f, TEXT("Hook")));
+	Rows.Add(TEXT("Axe_Head"), MakeRow(TEXT("Axe Kick"), T::Axe, TEXT("RS Left/Right quarter circle forward, Down"), G::Head, 0.32f, 0.12f, 0.50f, 12.0f, 115.0f, 70.0f, R::Heavy, 0.02f, TEXT("Axe")));
+
+	// X throws a punch with the glove: trunk only (a punch to the head is a foul), one point, light and quick (GDD 8.3, 9.3).
+	Rows.Add(TEXT("Punch_Trunk"), MakeRow(TEXT("Punch"), T::Punch, TEXT("X"), G::Trunk, 0.10f, 0.06f, 0.20f, 3.0f, 70.0f, 40.0f, R::Normal, 0.0f, TEXT("Punch")));
+
+	Rows.Add(TEXT("SpinHook_Trunk"), MakeRow(TEXT("Spin Hook Kick"), T::SpinHook, TEXT("RT + RS Left/Right half circle down"), G::Trunk, 0.42f, 0.12f, 0.62f, 20.0f, 115.0f, 75.0f, R::Heavy, 0.05f, TEXT("SpinHook")));
+	Rows.Add(TEXT("SpinHook_Head"), MakeRow(TEXT("Spin Hook Kick (Head)"), T::SpinHook, TEXT("RB + RT + RS Left/Right half circle down"), G::Head, 0.45f, 0.12f, 0.65f, 20.0f, 115.0f, 75.0f, R::Knockdown, 0.05f, TEXT("SpinHook")));
+
+	// The tornado kick is always airborne, so its rows are the jump rows the recognizer's Find asks for. Highest cost and
+	// fall chance of the set: GDD 9.2 makes it the hardest input and 8.9 gives non-grounded kicks a failure chance.
+	FOpenStanceMoveRow TornadoTrunk = MakeRow(TEXT("Tornado Kick"), T::Tornado, TEXT("Y, RS Left/Right half circle down, half circle up"), G::Trunk, 0.50f, 0.14f, 0.75f, 30.0f, 125.0f, 90.0f, R::Heavy, 0.12f, TEXT("Tornado"));
+	TornadoTrunk.bJump = true;
+	Rows.Add(TEXT("Tornado_Trunk"), TornadoTrunk);
+	FOpenStanceMoveRow TornadoHead = MakeRow(TEXT("Tornado Kick (Head)"), T::Tornado, TEXT("Y, RB + RS Left/Right half circle down, half circle up"), G::Head, 0.53f, 0.14f, 0.78f, 30.0f, 125.0f, 90.0f, R::Knockdown, 0.12f, TEXT("Tornado"));
+	TornadoHead.bJump = true;
+	Rows.Add(TEXT("Tornado_Head"), TornadoHead);
+
+	// Jump kicks (GDD 9.2): the grounded kick thrown after a tap of Y, same target and points, at the Jump cost tier. They start a
+	// little slower and can fail their own landing. The tornado is already airborne; there is no jump punch.
+	const auto Jump = [&Rows](const TCHAR* BaseName, const TCHAR* Display, const TCHAR* Notation)
+	{
+		FOpenStanceMoveRow Row = Rows[BaseName];
+		Row.DisplayName = Display;
+		Row.GestureNotation = Notation;
+		Row.bJump = true;
+		Row.StartupSeconds += 0.05f;
+		Row.AnimationSeconds += 0.05f;
+		Row.StaminaCost += 6.0f;
+		Row.SelfFallChance = FMath::Max(Row.SelfFallChance, 0.03f);
+		return Row;
+	};
+	Rows.Add(TEXT("SideKick_Trunk_Jump"), Jump(TEXT("SideKick_Trunk"), TEXT("Jump Side Kick"), TEXT("Y, RS Up")));
+	Rows.Add(TEXT("SideKick_Head_Jump"), Jump(TEXT("SideKick_Head"), TEXT("Jump Side Kick (Head)"), TEXT("Y, RB + RS Up")));
+	Rows.Add(TEXT("Roundhouse_Trunk_Jump"), Jump(TEXT("Roundhouse_Trunk"), TEXT("Jump Roundhouse"), TEXT("Y, RS toward the lead leg")));
+	Rows.Add(TEXT("Roundhouse_Head_Jump"), Jump(TEXT("Roundhouse_Head"), TEXT("Jump Roundhouse (Head)"), TEXT("Y, RB + RS toward the lead leg")));
+	Rows.Add(TEXT("Hook_Trunk_Jump"), Jump(TEXT("Hook_Trunk"), TEXT("Jump Hook Kick"), TEXT("Y, RS toward the other side")));
+	Rows.Add(TEXT("Hook_Head_Jump"), Jump(TEXT("Hook_Head"), TEXT("Jump Hook Kick (Head)"), TEXT("Y, RB + RS toward the other side")));
+	Rows.Add(TEXT("Axe_Head_Jump"), Jump(TEXT("Axe_Head"), TEXT("Jump Axe Kick"), TEXT("Y, RS Left/Right quarter circle forward, Down")));
+	Rows.Add(TEXT("SpinHook_Trunk_Jump"), Jump(TEXT("SpinHook_Trunk"), TEXT("Jump Spin Hook Kick"), TEXT("Y, RT + RS Left/Right half circle down")));
+	Rows.Add(TEXT("SpinHook_Head_Jump"), Jump(TEXT("SpinHook_Head"), TEXT("Jump Spin Hook Kick (Head)"), TEXT("Y, RB + RT + RS Left/Right half circle down")));
 	return Rows;
 }
 
@@ -232,7 +286,39 @@ UDataTable* FOpenStanceMoveData::CreateSeedTable(UObject* Outer)
 
 FString FOpenStanceMoveData::ExportCsv(const UDataTable& Table)
 {
-	return Table.GetTableAsCSV();
+	// UDataTable::GetTableAsCSV is editor-only. Keep the Blueprint export path
+	// available in game builds using the runtime property serializers.
+	if (!Table.RowStruct)
+	{
+		return FString();
+	}
+	const auto CsvField = [](const FString& Value)
+	{
+		return TEXT("\"") + Value.Replace(TEXT("\""), TEXT("\"\"")) + TEXT("\"");
+	};
+	TArray<const FProperty*> Columns;
+	FString Csv = CsvField(Table.ImportKeyField.IsEmpty() ? TEXT("---") : Table.ImportKeyField);
+	for (TFieldIterator<FProperty> Property(Table.RowStruct); Property; ++Property)
+	{
+		const FString Name = DataTableUtils::GetPropertyExportName(*Property);
+		if (!Table.ImportKeyField.IsEmpty() && Name == Table.ImportKeyField)
+		{
+			continue;
+		}
+		Columns.Add(*Property);
+		Csv += TEXT(",") + CsvField(Name);
+	}
+	Csv += TEXT("\n");
+	for (const auto& Row : Table.GetRowMap())
+	{
+		Csv += CsvField(Row.Key.ToString());
+		for (const FProperty* Property : Columns)
+		{
+			Csv += TEXT(",") + CsvField(DataTableUtils::GetPropertyValueAsString(Property, Row.Value, EDataTableExportFlags::None));
+		}
+		Csv += TEXT("\n");
+	}
+	return Csv;
 }
 
 TArray<FString> FOpenStanceMoveData::ImportCsv(UDataTable& Table, const FString& Csv)

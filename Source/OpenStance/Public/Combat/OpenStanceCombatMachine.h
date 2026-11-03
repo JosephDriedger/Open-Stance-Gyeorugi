@@ -53,6 +53,9 @@ struct OPENSTANCE_API FOpenStanceAttackRequest
 	FName MoveName;
 	FOpenStanceMoveRow Row;
 	EOpenStanceLegSide Leg = EOpenStanceLegSide::Right;
+
+	/** Whether the lead or the back leg throws it; a back-leg kick lands with the sides switched. */
+	EOpenStanceLegRole LegRole = EOpenStanceLegRole::Lead;
 	bool bFake = false;
 	bool bJump = false;
 };
@@ -146,6 +149,9 @@ public:
 	/** Counts up with every technique started, so hit registration can tell one attack's traces from the next's. */
 	int32 GetAttackSerial() const { return AttackSerial; }
 
+	/** Seconds left before a new technique may start: the rest of the last technique's animation after its recovery ended. */
+	float GetCooldownLeft() const { return CooldownLeft; }
+
 	/** Seconds spent in the current state. */
 	float GetStateElapsed() const { return Elapsed; }
 
@@ -162,5 +168,9 @@ private:
 	bool bHasAttack = false;
 	int32 AttackSerial = 0;
 	float Elapsed = 0.0f;
+
+	/** Seconds since the current technique started, to measure how much of its animation has played. */
+	float AttackElapsed = 0.0f;
+	float CooldownLeft = 0.0f;
 	EOpenStanceKnockdownCause Cause = EOpenStanceKnockdownCause::None;
 };

@@ -59,7 +59,13 @@ TSharedRef<SWidget> UOpenStanceFighterSelectScreen::BuildSidePanel(EOpenStanceSi
 				]
 				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(U(0.8f), 0.0f, 0.0f, 0.0f)
 				[
-					Tag(TEXT("Assigned"))
+					LiveTag([WeakThis, Side]()
+					{
+						// The side you chose on Side Select is yours; the other is the AI's or player 2's.
+						const UOpenStanceFighterSelectScreen* Screen = WeakThis.Get();
+						const UOpenStanceMenuSubsystem* MenuSubsystem = Screen ? Screen->GetMenu() : nullptr;
+						return MenuSubsystem && MenuSubsystem->GetSession().PlayerSide == Side ? FString(TEXT("You")) : FString(TEXT("Opponent"));
+					})
 				]
 			]
 			// The portrait takes what is left, up to the prototype's 30u, so the name and tags always fit above the hint bar
@@ -125,7 +131,8 @@ TSharedRef<SWidget> UOpenStanceFighterSelectScreen::BuildRosterList(EOpenStanceS
 			{
 				const UOpenStanceFighterSelectScreen* Screen = WeakThis.Get();
 				const UOpenStanceMenuSubsystem* Menu = Screen ? Screen->GetMenu() : nullptr;
-				return Menu && Menu->GetSession().ChungFighter == RosterIndex;
+				// The fighter highlighted is the one on your side.
+				return Menu && (Menu->GetSession().PlayerSide == EOpenStanceSide::Chung ? Menu->GetSession().ChungFighter : Menu->GetSession().HongFighter) == RosterIndex;
 			})
 			.OnPressed(FSimpleDelegate::CreateWeakLambda(this, [this, RosterIndex]() { PickFighter(RosterIndex); }));
 
@@ -194,8 +201,8 @@ TSharedRef<SWidget> UOpenStanceFighterSelectScreen::BuildContent()
 		[
 			MakeLiveText([GetCategory]()
 			{
-				return GetCategory() == EOpenStanceSex::Female ? FString(TEXT("Premade women’s fighters · choose one"))
-					: FString(TEXT("Premade men’s fighters · choose one"));
+				return GetCategory() == EOpenStanceSex::Female ? FString(TEXT("Premade Women’s Fighters · Choose One"))
+					: FString(TEXT("Premade Men’s Fighters · Choose One"));
 			}, { EFont::BodyBold, 1.05f, 0.2f, true }, Palette::Mute)
 		]
 		+ SVerticalBox::Slot().AutoHeight()
@@ -205,7 +212,7 @@ TSharedRef<SWidget> UOpenStanceFighterSelectScreen::BuildContent()
 		+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, U(1.4f), 0.0f, 0.0f)
 		[
 			SNew(SOpenStanceOption)
-			.Label(TEXT("Start match"))
+			.Label(TEXT("Start Match"))
 			.Look(EOpenStanceOptionLook::Primary)
 			.OnPressed(FSimpleDelegate::CreateWeakLambda(this, [this]()
 			{
@@ -219,7 +226,7 @@ TSharedRef<SWidget> UOpenStanceFighterSelectScreen::BuildContent()
 	return SNew(SVerticalBox)
 		+ SVerticalBox::Slot().AutoHeight()
 		[
-			Head(ModeName, TEXT("Fighter select"))
+			Head(ModeName, TEXT("Fighter Select"))
 		]
 		+ SVerticalBox::Slot().FillHeight(1.0f).Padding(0.0f, U(1.6f), 0.0f, 0.0f)
 		[
@@ -274,9 +281,12 @@ void UOpenStanceFighterSelectScreen::PickFighter(int32 RosterIndex)
 		return;
 	}
 
+	// The pick is the fighter on the side you chose; the other side keeps its fighter unless that is the same one.
 	FOpenStanceMenuSession& Session = Menu->GetSession();
-	Session.ChungFighter = RosterIndex;
-	if (Session.HongFighter == RosterIndex)
+	int32& Yours = Session.PlayerSide == EOpenStanceSide::Chung ? Session.ChungFighter : Session.HongFighter;
+	int32& Theirs = Session.PlayerSide == EOpenStanceSide::Chung ? Session.HongFighter : Session.ChungFighter;
+	Yours = RosterIndex;
+	if (Theirs == RosterIndex)
 	{
 		// The opponent may not be the same fighter: take the first other one in this roster
 		const TArray<int32> Indices = OpenStanceMenuContent::GetRosterIndices(Session.Category);
@@ -284,7 +294,7 @@ void UOpenStanceFighterSelectScreen::PickFighter(int32 RosterIndex)
 		{
 			if (Candidate != RosterIndex)
 			{
-				Session.HongFighter = Candidate;
+				Theirs = Candidate;
 				break;
 			}
 		}

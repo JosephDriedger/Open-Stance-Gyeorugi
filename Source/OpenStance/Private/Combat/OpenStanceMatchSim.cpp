@@ -17,6 +17,12 @@ namespace
 		}
 	}
 
+	/** The kicks that spin the fighter half a turn, so they land with the sides switched. */
+	bool LandsFacingFront(EOpenStanceTechnique Technique)
+	{
+		return Technique == EOpenStanceTechnique::SpinSide || Technique == EOpenStanceTechnique::SpinHook;
+	}
+
 	FString LegText(const FOpenStanceInputEvent& Event)
 	{
 		return FString::Printf(TEXT("%s (%s)"), Event.Leg == EOpenStanceLegSide::Left ? TEXT("Left") : TEXT("Right"), Event.LegRole == EOpenStanceLegRole::Back ? TEXT("back") : TEXT("lead"));
@@ -37,6 +43,12 @@ void FOpenStanceMatchSim::StartMatch(float DistanceCm)
 	Time = 0.0;
 	Log.Reset();
 	Contacts.Reset();
+	LogEventCount = 0;
+	StartDistanceCm = DistanceCm;
+	RoundBreakElapsed = 0.0f;
+	ClinchPhase = EOpenStanceClinchPhase::None;
+	ClinchElapsed = 0.0f;
+	bClinchFouled = false;
 	for (int32 Index = 0; Index < 2; ++Index)
 	{
 		FOpenStanceFighterSim& F = Fighters[Index];
@@ -51,6 +63,9 @@ void FOpenStanceMatchSim::StartMatch(float DistanceCm)
 		F.Machine = FOpenStanceCombatMachine();
 		F.Machine.Random.Initialize(Index + 1);
 		F.RecentInput.Reset();
+		F.InputEventCount = 0;
+		F.bPrevPunch = false;
+		F.PenaltyReasons.Reset();
 		F.LastMove = F.LastTarget = F.LastLeg = F.LastResult = TEXT("-");
 		F.PreviousStamina = F.State.Stamina;
 		F.SinceSpend = 0.0f;
@@ -59,11 +74,22 @@ void FOpenStanceMatchSim::StartMatch(float DistanceCm)
 	}
 	Match = FOpenStanceMatchStatus();
 	Match.State = EOpenStanceMatchState::Running;
-	Match.ClockSeconds = 120.0f;
+	Match.ClockSeconds = RoundRules.RoundSeconds;
+}
+
+void FOpenStanceMatchSim::AddGamJeom(int32 Index, const FString& Reason)
+{
+	FOpenStanceFighterSim& F = Fighters[Index];
+	F.State.GamJeom++;
+	Fighters[1 - Index].State.Score++;
+	F.LastResult = TEXT("FOUL");
+	F.PenaltyReasons.Add(Reason);
+	AddLog(F.Side, FString::Printf(TEXT("gam-jeom: %s"), *Reason.ToLower()));
 }
 
 void FOpenStanceMatchSim::AddLog(EOpenStanceSide Side, const FString& Text)
 {
+	++LogEventCount;
 	FOpenStanceMatchLogEntry& Entry = Log.AddDefaulted_GetRef();
 	Entry.Time = Time;
 	Entry.Side = Side;
@@ -88,6 +114,12 @@ void FOpenStanceMatchSim::SetClock(float Seconds)
 void FOpenStanceMatchSim::Start(int32 Index, const FOpenStanceInputEvent& Event)
 {
 	FOpenStanceFighterSim& F = Fighters[Index];
+	if (IsInClinch())
+	{
+		// Chest to chest nobody can throw: the referee separates them first (GDD 11.3).
+		F.LastResult = TEXT("clinch: wait for the referee");
+		return;
+	}
 	EOpenStanceTechnique Technique = Event.Technique;
 	EOpenStanceTarget Target = Event.Target;
 	bool bFake = Event.bFake;
@@ -113,6 +145,7 @@ void FOpenStanceMatchSim::Start(int32 Index, const FOpenStanceInputEvent& Event)
 	Request.MoveName = RowName;
 	Request.Row = *Row;
 	Request.Leg = Event.Leg;
+	Request.LegRole = Event.LegRole;
 	Request.bFake = bFake;
 	Request.bJump = Event.bJump;
 
@@ -165,10 +198,7 @@ void FOpenStanceMatchSim::ApplyContact(const FOpenStanceContact& Contact)
 	case EOpenStanceContactType::PunchToHead:
 	case EOpenStanceContactType::KickBelowBelt:
 		// A gam-jeom gives the opponent a point (GDD 8.3, 8.4).
-		A.State.GamJeom++;
-		D.State.Score++;
-		A.LastResult = TEXT("FOUL");
-		AddLog(A.Side, Contact.Type == EOpenStanceContactType::PunchToHead ? TEXT("gam-jeom: punch to the head") : TEXT("gam-jeom: kick below the belt"));
+		AddGamJeom(Attacker, Contact.Type == EOpenStanceContactType::PunchToHead ? TEXT("Punch to the head") : TEXT("Kick below the belt"));
 		break;
 	}
 }
@@ -234,6 +264,7 @@ void FOpenStanceMatchSim::StepFighter(int32 Index, float DeltaSeconds, const FOp
 	for (const FOpenStanceInputEvent& Event : Input)
 	{
 		F.RecentInput.Add(Event);
+		++F.InputEventCount;
 		if (F.RecentInput.Num() > MaxRecentInput)
 		{
 			F.RecentInput.RemoveAt(0);
@@ -244,11 +275,46 @@ void FOpenStanceMatchSim::StepFighter(int32 Index, float DeltaSeconds, const FOp
 		}
 	}
 
+	// X throws a punch (GDD 9.3). The Skill Stick recognizer only reads the stick, so the press becomes the same Attack event
+	// here: trunk only, one punch per press, none while LT reads the stick as defence, and LB makes it a fake.
+	const bool bPunchPressed = Controls.bX && !F.bPrevPunch && !Controls.bLT;
+	F.bPrevPunch = Controls.bX;
+	if (bPunchPressed)
+	{
+		FOpenStanceInputEvent Punch;
+		Punch.Type = EOpenStanceInputEventType::Attack;
+		Punch.Technique = EOpenStanceTechnique::Punch;
+		Punch.Target = EOpenStanceTarget::Trunk;
+		Punch.Leg = F.State.GetLeadLeg();
+		Punch.LegRole = EOpenStanceLegRole::Lead;
+		Punch.bFake = Controls.bLB;
+		Punch.Path = TEXT("X");
+		F.RecentInput.Add(Punch);
+		++F.InputEventCount;
+		if (F.RecentInput.Num() > MaxRecentInput)
+		{
+			F.RecentInput.RemoveAt(0);
+		}
+		Start(Index, Punch);
+	}
+
 	TArray<FOpenStanceCombatEvent> Events;
 	F.Machine.SetDefense(Controls.bLT, F.State, Match, Events);
 	F.Machine.Tick(DeltaSeconds, F.State, Match, Events);
 	for (const FOpenStanceCombatEvent& Event : Events)
 	{
+		// A back-leg kick, and a spin side or spin hook kick, land with the other leg in front: the sides switch as the
+		// recovery begins, the same animated switch as the A button. Not specified in the GDD yet; see Combat_Input.md.
+		if (Event.Type == EOpenStanceCombatEventType::ActiveEnded && Event.To == EOpenStanceCombatState::AttackRecovery && !F.Motion.bSwitching)
+		{
+			const FOpenStanceAttackRequest* Landing = F.Machine.GetCurrentAttack();
+			if (Landing && !Landing->bFake && (Landing->LegRole == EOpenStanceLegRole::Back || LandsFacingFront(Landing->Row.Technique)))
+			{
+				F.Motion.bSwitching = true;
+				F.Motion.SwitchElapsed = 0.0f;
+				F.Motion.SwitchBlend = 0.0f;
+			}
+		}
 		if (Event.Type == EOpenStanceCombatEventType::ActiveEnded && Event.To == EOpenStanceCombatState::AttackRecovery && !F.bContactThisAttack)
 		{
 			F.LastResult = TEXT("MISS");
@@ -256,16 +322,15 @@ void FOpenStanceMatchSim::StepFighter(int32 Index, float DeltaSeconds, const FOp
 		}
 		else if (Event.Type == EOpenStanceCombatEventType::KnockedDown && Event.bFoulFall)
 		{
-			F.State.GamJeom++;
-			Other.State.Score++;
-			AddLog(F.Side, TEXT("gam-jeom: fell without being hit"));
+			AddGamJeom(Index, TEXT("Falling"));
 		}
 	}
 
 	FOpenStanceMotionInput Motion;
-	Motion.Move = Controls.LeftStick;
-	Motion.bDash = Controls.bB;
-	Motion.bSwitch = Controls.bA;
+	// In a clinch the fighters are locked chest to chest: no stepping, dashing or switching until the referee has separated them.
+	Motion.Move = IsInClinch() ? FVector2D::ZeroVector : Controls.LeftStick;
+	Motion.bDash = Controls.bB && !IsInClinch();
+	Motion.bSwitch = Controls.bA && !IsInClinch();
 	Motion.DPad = Controls.DPad;
 	FOpenStanceFootwork::Tick(DeltaSeconds, Motion, Other.Motion.Position, F.State, F.Motion, Movement);
 
@@ -289,22 +354,132 @@ void FOpenStanceMatchSim::StepFighter(int32 Index, float DeltaSeconds, const FOp
 	F.PreviousStamina = F.State.Stamina;
 }
 
+void FOpenStanceMatchSim::StepClinch(float DeltaSeconds, const FOpenStanceFighterControls& Chung, const FOpenStanceFighterControls& Hong)
+{
+	FVector2D& PositionA = Fighters[0].Motion.Position;
+	FVector2D& PositionB = Fighters[1].Motion.Position;
+	const float Distance = static_cast<float>((PositionA - PositionB).Size());
+
+	switch (ClinchPhase)
+	{
+	case EOpenStanceClinchPhase::None:
+	{
+		// Chest-to-chest contact starts a clinch, whether both fighters press in or one dashes onto the other (GDD 6.4). It
+		// needs live play and two fighters who are not throwing a technique.
+		const auto IsFree = [](const FOpenStanceFighterSim& F)
+		{
+			return F.State.CombatState == EOpenStanceCombatState::IdleMovement || F.State.CombatState == EOpenStanceCombatState::ActiveDefense;
+		};
+		if (Match.State == EOpenStanceMatchState::Running && Distance <= ClinchRules.ContactRangeCm && IsFree(Fighters[0]) && IsFree(Fighters[1]))
+		{
+			ClinchPhase = EOpenStanceClinchPhase::Held;
+			ClinchElapsed = 0.0f;
+			bClinchFouled = false;
+			ClinchStartDistance = Distance;
+			AddLog(EOpenStanceSide::Chung, TEXT("clinch"));
+		}
+		break;
+	}
+	case EOpenStanceClinchPhase::Held:
+	{
+		ClinchElapsed += DeltaSeconds;
+
+		// Holding on or pushing for over a second is a gam-jeom for each fighter still pressing into the other (GDD 8.4).
+		if (!bClinchFouled && ClinchElapsed > ClinchRules.HoldFoulSeconds)
+		{
+			bClinchFouled = true;
+			const FOpenStanceFighterControls* Controls[2] = { &Chung, &Hong };
+			for (int32 Index = 0; Index < 2; ++Index)
+			{
+				if (Controls[Index]->LeftStick.Y > 0.3)
+				{
+					AddGamJeom(Index, TEXT("Holding or pushing"));
+				}
+			}
+		}
+
+		// The referee calls kal-yeo and steps between them: play stops and the clock holds.
+		if (ClinchElapsed >= ClinchRules.RefereeCallSeconds)
+		{
+			ClinchPhase = EOpenStanceClinchPhase::Separating;
+			ClinchElapsed = 0.0f;
+			Match.State = EOpenStanceMatchState::Stopped;
+			AddLog(EOpenStanceSide::Chung, TEXT("kal-yeo"));
+		}
+		break;
+	}
+	case EOpenStanceClinchPhase::Separating:
+	{
+		ClinchElapsed += DeltaSeconds;
+
+		// The fighters are drawn apart along the line between them over the first part of the stoppage, then kye-sok.
+		const float Alpha = FMath::Clamp(ClinchElapsed / FMath::Max(ClinchRules.StoppageSeconds * 0.6f, 0.001f), 0.0f, 1.0f);
+		const float Smooth = Alpha * Alpha * (3.0f - 2.0f * Alpha);
+		const float Wanted = FMath::Lerp(ClinchStartDistance, ClinchRules.SeparationCm, Smooth);
+		const FVector2D Mid = (PositionA + PositionB) * 0.5;
+		const FVector2D Axis = Distance > UE_SMALL_NUMBER ? (PositionB - PositionA) / Distance : FVector2D(1.0, 0.0);
+		PositionA = Mid - Axis * (Wanted * 0.5f);
+		PositionB = Mid + Axis * (Wanted * 0.5f);
+
+		if (ClinchElapsed >= ClinchRules.StoppageSeconds)
+		{
+			ClinchPhase = EOpenStanceClinchPhase::None;
+			ClinchElapsed = 0.0f;
+			Match.State = EOpenStanceMatchState::Running;
+			AddLog(EOpenStanceSide::Chung, TEXT("kye-sok"));
+		}
+		break;
+	}
+	}
+}
+
 void FOpenStanceMatchSim::Step(float DeltaSeconds, const FOpenStanceFighterControls& Chung, const FOpenStanceFighterControls& Hong)
 {
 	Time += DeltaSeconds;
 	StepFighter(0, DeltaSeconds, Chung);
 	StepFighter(1, DeltaSeconds, Hong);
 	FOpenStanceFootwork::SeparateFighters(Fighters[0].Motion.Position, Fighters[1].Motion.Position, Movement.CapsuleRadiusCm);
+	StepClinch(DeltaSeconds, Chung, Hong);
 	RunTraces(0);
 	RunTraces(1);
 
 	if (Match.State == EOpenStanceMatchState::Running)
 	{
 		Match.ClockSeconds = FMath::Max(0.0f, Match.ClockSeconds - DeltaSeconds);
-		if (Match.ClockSeconds <= 0.0f)
+		if (FMath::Abs(Fighters[0].State.Score - Fighters[1].State.Score) >= RoundRules.GapToEnd)
 		{
+			// The 12-point gap ends the match on the spot (WT rules, GDD 4.4).
 			Match.State = EOpenStanceMatchState::Finished;
-			AddLog(EOpenStanceSide::Chung, TEXT("time"));
+			AddLog(Fighters[0].State.Score > Fighters[1].State.Score ? EOpenStanceSide::Chung : EOpenStanceSide::Hong, TEXT("point gap"));
+		}
+		else if (Match.ClockSeconds <= 0.0f)
+		{
+			if (Match.Round < RoundRules.RoundCount)
+			{
+				// Keu-man: the round is over and the fighters rest before the next.
+				Match.State = EOpenStanceMatchState::RoundBreak;
+				RoundBreakElapsed = 0.0f;
+				AddLog(EOpenStanceSide::Chung, TEXT("keu-man"));
+			}
+			else
+			{
+				Match.State = EOpenStanceMatchState::Finished;
+				AddLog(EOpenStanceSide::Chung, TEXT("time"));
+			}
+		}
+	}
+	else if (Match.State == EOpenStanceMatchState::RoundBreak)
+	{
+		RoundBreakElapsed += DeltaSeconds;
+		if (RoundBreakElapsed >= RoundRules.BreakSeconds)
+		{
+			// The next round: the clock is full again and the fighters are back on their marks, scores and penalties kept.
+			++Match.Round;
+			Match.ClockSeconds = RoundRules.RoundSeconds;
+			Match.State = EOpenStanceMatchState::Running;
+			Fighters[0].Motion.Position = FVector2D(-StartDistanceCm * 0.5, 0.0);
+			Fighters[1].Motion.Position = FVector2D(StartDistanceCm * 0.5, 0.0);
+			AddLog(EOpenStanceSide::Chung, TEXT("shi-jak"));
 		}
 	}
 }

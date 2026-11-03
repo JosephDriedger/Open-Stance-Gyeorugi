@@ -131,6 +131,7 @@ bool FOpenStanceMatchSimTest::RunTest(const FString& Parameters)
 	// A match that runs out of clock finishes and freezes combat.
 	{
 		FSimRig Rig;
+		Rig.Sim.Match.Round = Rig.Sim.RoundRules.RoundCount; // the last round
 		Rig.Sim.SetClock(0.2f);
 		Rig.Run(0.5f);
 		TestEqual(TEXT("the clock ended the match"), Rig.Sim.Match.State, EOpenStanceMatchState::Finished);
@@ -182,6 +183,246 @@ bool FOpenStanceOverlayTest::RunTest(const FString& Parameters)
 	Partial.Chung.RightStick = FVector2D(0.0, -1.0);
 	Partial.Run(0.5f);
 	TestTrue(TEXT("an expired gesture is shown"), Contains(FOpenStanceCombatOverlay::BuildLines(Partial.Sim, 0, false), TEXT("Expired: Down")));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FOpenStanceGreyboxPunchTest, "OpenStance.Greybox.Punch", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FOpenStanceGreyboxPunchTest::RunTest(const FString& Parameters)
+{
+	// X throws one punch per press, to the trunk; holding it does not repeat.
+	FSimRig Rig(80.0f);
+	Rig.Chung.bX = true;
+	Rig.Run(0.05f);
+	TestEqual(TEXT("X starts a punch"), Rig.Sim.Fighters[0].LastMove, FString(TEXT("Punch")));
+	TestEqual(TEXT("to the trunk"), Rig.Sim.Fighters[0].LastTarget, FString(TEXT("Trunk")));
+	const int32 AfterPress = Rig.Sim.Fighters[0].InputEventCount;
+	Rig.Run(1.0f);
+	TestEqual(TEXT("a held X throws no second punch"), Rig.Sim.Fighters[0].InputEventCount, AfterPress);
+
+	// LT reads the buttons as defence, so X does nothing under it.
+	FSimRig Blocking(80.0f);
+	Blocking.Chung.bLT = true;
+	Blocking.Chung.bX = true;
+	Blocking.Run(0.2f);
+	TestEqual(TEXT("no punch while LT is held"), Blocking.Sim.Fighters[0].InputEventCount, 0);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FOpenStanceGreyboxSpinSwitchTest, "OpenStance.Greybox.SpinKicksSwitchSides", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FOpenStanceGreyboxSpinSwitchTest::RunTest(const FString& Parameters)
+{
+	// A spin side kick lands facing the front: the sides switch, with the animated switch rather than an instant flip.
+	{
+		FSimRig Rig(100.0f);
+		TestEqual(TEXT("starts Right Lead"), Rig.Sim.Fighters[0].State.Stance, EOpenStanceStance::RightLead);
+		Rig.Chung.RightStick = FVector2D(0.0, -1.0);
+		Rig.Run(0.05f);
+		Rig.Chung.RightStick = FVector2D(0.0, 1.0);
+		Rig.Run(0.05f);
+		Rig.Chung.RightStick = FVector2D::ZeroVector;
+		bool bSawSwitch = false;
+		for (int32 Index = 0; Index < 180 && !bSawSwitch; ++Index)
+		{
+			Rig.Run(1.0f / 60.0f);
+			bSawSwitch = Rig.Sim.Fighters[0].Motion.bSwitching;
+		}
+		TestTrue(TEXT("the switch animates"), bSawSwitch);
+		Rig.Run(2.0f);
+		TestEqual(TEXT("the spin side kick left Chung Left Lead"), Rig.Sim.Fighters[0].State.Stance, EOpenStanceStance::LeftLead);
+		TestFalse(TEXT("and the switch has finished"), Rig.Sim.Fighters[0].Motion.bSwitching);
+	}
+
+	// The spin hook (RT and a half circle down) does the same.
+	{
+		FSimRig Rig(100.0f);
+		Rig.Chung.bRT = true;
+		const FVector2D Path[] = { FVector2D(-1.0, 0.0), FVector2D(0.0, -1.0), FVector2D(1.0, 0.0) };
+		for (const FVector2D& Step : Path)
+		{
+			Rig.Chung.RightStick = Step;
+			Rig.Run(0.04f);
+		}
+		Rig.Chung.RightStick = FVector2D::ZeroVector;
+		Rig.Run(3.0f);
+		TestEqual(TEXT("the spin hook was thrown"), Rig.Sim.Fighters[0].LastMove.Left(9), FString(TEXT("Spin Hook")));
+		TestEqual(TEXT("and left Chung Left Lead"), Rig.Sim.Fighters[0].State.Stance, EOpenStanceStance::LeftLead);
+	}
+
+	// Every back-leg kick lands with the sides switched, whatever the kick is.
+	{
+		FSimRig Rig(100.0f);
+		Rig.Chung.bRT = true;
+		Rig.Chung.RightStick = FVector2D(-1.0, 0.0); // Right Lead + RT: the left back leg's roundhouse
+		Rig.Run(0.05f);
+		Rig.Chung.RightStick = FVector2D::ZeroVector;
+		Rig.Run(3.0f);
+		TestEqual(TEXT("a back-leg roundhouse was thrown"), Rig.Sim.Fighters[0].LastLeg, FString(TEXT("Left (back)")));
+		TestEqual(TEXT("and it left Chung Left Lead"), Rig.Sim.Fighters[0].State.Stance, EOpenStanceStance::LeftLead);
+	}
+
+	// An ordinary kick does not switch sides.
+	{
+		FSimRig Rig(100.0f);
+		Rig.Chung.RightStick = FVector2D(0.0, 1.0);
+		Rig.Run(0.05f);
+		Rig.Chung.RightStick = FVector2D::ZeroVector;
+		Rig.Run(2.0f);
+		TestEqual(TEXT("a side kick keeps Right Lead"), Rig.Sim.Fighters[0].State.Stance, EOpenStanceStance::RightLead);
+	}
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FOpenStanceGreyboxClinchTest, "OpenStance.Greybox.Clinch", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FOpenStanceGreyboxClinchTest::RunTest(const FString& Parameters)
+{
+	const auto Distance = [](const FSimRig& Rig) { return static_cast<float>((Rig.Sim.Fighters[0].Motion.Position - Rig.Sim.Fighters[1].Motion.Position).Size()); };
+	const auto LogHas = [](const FSimRig& Rig, const TCHAR* Text)
+	{
+		return Rig.Sim.Log.ContainsByPredicate([Text](const FOpenStanceMatchLogEntry& Entry) { return Entry.Text.Contains(Text); });
+	};
+
+	// A dash that closes to contact range starts a clinch (GDD 6.4).
+	{
+		FSimRig Rig(150.0f);
+		Rig.Chung.bB = true;
+		Rig.Chung.LeftStick = FVector2D(0.0, 1.0);
+		Rig.Run(0.45f);
+		Rig.Chung.bB = false;
+		Rig.Chung.LeftStick = FVector2D::ZeroVector;
+		TestTrue(TEXT("the dash ended chest to chest"), Distance(Rig) <= Rig.Sim.ClinchRules.ContactRangeCm + 1.0f);
+		TestTrue(TEXT("and a clinch started"), Rig.Sim.IsInClinch());
+		TestTrue(TEXT("the log says so"), LogHas(Rig, TEXT("clinch")));
+
+		// Nobody can throw, dash or switch inside it.
+		Rig.Chung.bX = true;
+		Rig.Run(0.1f);
+		Rig.Chung.bX = false;
+		TestTrue(TEXT("a punch in a clinch is refused"), Rig.Sim.Fighters[0].LastResult.StartsWith(TEXT("clinch")));
+		TestEqual(TEXT("and no technique started"), Rig.Sim.Fighters[0].State.CombatState, EOpenStanceCombatState::IdleMovement);
+
+		// The referee calls kal-yeo: play stops, the clock holds and the fighters are drawn apart.
+		Rig.Run(0.75f);
+		TestEqual(TEXT("kal-yeo stops play"), Rig.Sim.Match.State, EOpenStanceMatchState::Stopped);
+		TestTrue(TEXT("kal-yeo is logged"), LogHas(Rig, TEXT("kal-yeo")));
+		const float ClockAtStop = Rig.Sim.Match.ClockSeconds;
+		Rig.Run(0.2f);
+		TestEqual(TEXT("the clock holds while play is stopped"), Rig.Sim.Match.ClockSeconds, ClockAtStop);
+
+		// Kye-sok: play resumes with the fighters apart and free to act.
+		Rig.Run(1.0f);
+		TestEqual(TEXT("kye-sok restarts play"), Rig.Sim.Match.State, EOpenStanceMatchState::Running);
+		TestTrue(TEXT("kye-sok is logged"), LogHas(Rig, TEXT("kye-sok")));
+		TestFalse(TEXT("the clinch is over"), Rig.Sim.IsInClinch());
+		TestTrue(TEXT("and the fighters are the referee's separation apart"), Distance(Rig) >= Rig.Sim.ClinchRules.SeparationCm - 2.0f);
+		TestEqual(TEXT("an ordinary clinch is not a foul"), Rig.Sim.Fighters[0].State.GamJeom + Rig.Sim.Fighters[1].State.GamJeom, 0);
+
+		Rig.Chung.bX = true;
+		Rig.Run(0.05f);
+		TestEqual(TEXT("a punch works again"), Rig.Sim.Fighters[0].LastMove, FString(TEXT("Punch")));
+	}
+
+	// Holding or pushing for over a second is a gam-jeom for whoever is still pressing in (GDD 8.4).
+	{
+		FSimRig Rig(150.0f);
+		Rig.Sim.ClinchRules.RefereeCallSeconds = 3.0f; // a slow referee, so the hold can pass a second
+		Rig.Chung.bB = true;
+		Rig.Chung.LeftStick = FVector2D(0.0, 1.0);
+		Rig.Run(0.45f);
+		Rig.Chung.bB = false;
+		Rig.Run(1.2f); // Chung keeps pushing, Hong stands still
+		TestEqual(TEXT("the pusher is penalized"), Rig.Sim.Fighters[0].State.GamJeom, 1);
+		TestEqual(TEXT("the other fighter scores the point"), Rig.Sim.Fighters[1].State.Score, 1);
+		TestEqual(TEXT("the fighter who did not push is not"), Rig.Sim.Fighters[1].State.GamJeom, 0);
+		Rig.Run(1.0f);
+		TestEqual(TEXT("one penalty per clinch"), Rig.Sim.Fighters[0].State.GamJeom, 1);
+	}
+
+	// Fighters two metres apart do not clinch.
+	{
+		FSimRig Rig(200.0f);
+		Rig.Run(0.5f);
+		TestFalse(TEXT("no clinch from two metres"), Rig.Sim.IsInClinch());
+	}
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FOpenStanceGreyboxRoundsTest, "OpenStance.Greybox.Rounds", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FOpenStanceGreyboxRoundsTest::RunTest(const FString& Parameters)
+{
+	// Three rounds: the clock running out ends a round, not the match, until the last one (WT rules, GDD 4.4).
+	{
+		FSimRig Rig;
+		Rig.Sim.SetScore(3, 1);
+		Rig.Sim.SetClock(0.2f);
+		Rig.Run(0.5f);
+		TestEqual(TEXT("round 1 ends in a break"), Rig.Sim.Match.State, EOpenStanceMatchState::RoundBreak);
+		Rig.Run(2.2f);
+		TestEqual(TEXT("round 2 starts"), Rig.Sim.Match.Round, 2);
+		TestEqual(TEXT("with play running"), Rig.Sim.Match.State, EOpenStanceMatchState::Running);
+		TestEqual(TEXT("and a full clock"), Rig.Sim.Match.ClockSeconds, Rig.Sim.RoundRules.RoundSeconds, 3.0f);
+		TestEqual(TEXT("the scores carry over"), Rig.Sim.Fighters[0].State.Score, 3);
+		TestEqual(TEXT("and the fighters are back on their marks"), static_cast<float>((Rig.Sim.Fighters[1].Motion.Position - Rig.Sim.Fighters[0].Motion.Position).Size()), 100.0f, 1.0f);
+
+		Rig.Sim.SetClock(0.1f);
+		Rig.Run(2.8f);
+		TestEqual(TEXT("round 3 starts"), Rig.Sim.Match.Round, 3);
+		Rig.Sim.SetClock(0.1f);
+		Rig.Run(0.5f);
+		TestEqual(TEXT("the third round's clock ends the match"), Rig.Sim.Match.State, EOpenStanceMatchState::Finished);
+	}
+
+	// A 12-point gap ends the match at once.
+	{
+		FSimRig Rig;
+		Rig.Sim.SetScore(12, 0);
+		Rig.Run(0.1f);
+		TestEqual(TEXT("a 12-point gap finishes the match"), Rig.Sim.Match.State, EOpenStanceMatchState::Finished);
+	}
+
+	// A penalty's reason is kept for the HUD and the results page.
+	{
+		FSimRig Rig;
+		Rig.Sim.AddGamJeom(1, TEXT("Grabbing"));
+		TestEqual(TEXT("the penalized fighter has a gam-jeom"), Rig.Sim.Fighters[1].State.GamJeom, 1);
+		TestEqual(TEXT("the other fighter gets the point"), Rig.Sim.Fighters[0].State.Score, 1);
+		TestEqual(TEXT("and the reason is recorded"), Rig.Sim.Fighters[1].PenaltyReasons.Num() == 1 ? Rig.Sim.Fighters[1].PenaltyReasons[0] : FString(), FString(TEXT("Grabbing")));
+	}
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FOpenStanceGreyboxEveryMoveTest,"OpenStance.Greybox.EveryMoveHasARow", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FOpenStanceGreyboxEveryMoveTest::RunTest(const FString& Parameters)
+{
+	// Every gesture the recognizer registers must find a move row for each target and jump state it can produce, or the
+	// input would throw "unmapped" in the greybox.
+	const UDataTable* Table = FOpenStanceMoveData::CreateSeedTable(GetTransientPackage());
+	for (const FOpenStanceGestureDef& Def : FOpenStanceSkillStickRecognizer::MakeDefaultGestures())
+	{
+		const bool bJumps[] = { false, true };
+		const EOpenStanceTarget Targets[] = { EOpenStanceTarget::Trunk, EOpenStanceTarget::Head };
+		for (const bool bJump : bJumps)
+		{
+			if (bJump && !Def.bCanJump)
+			{
+				continue;
+			}
+			if (!bJump && Def.bRequiresJump)
+			{
+				continue;
+			}
+			for (const EOpenStanceTarget Target : Targets)
+			{
+				if (Def.bHeadOnly && Target != EOpenStanceTarget::Head)
+				{
+					continue;
+				}
+				TestNotNull(*FString::Printf(TEXT("%s, %s%s has a move row"), *UEnum::GetValueAsString(Def.Technique),
+					Target == EOpenStanceTarget::Head ? TEXT("head") : TEXT("trunk"), bJump ? TEXT(", jump") : TEXT("")),
+					FOpenStanceMoveData::Find(*Table, Def.Technique, Target, bJump));
+			}
+		}
+	}
+	TestNotNull(TEXT("the punch has a row"), FOpenStanceMoveData::Find(*Table, EOpenStanceTechnique::Punch, EOpenStanceTarget::Trunk, false));
 	return true;
 }
 

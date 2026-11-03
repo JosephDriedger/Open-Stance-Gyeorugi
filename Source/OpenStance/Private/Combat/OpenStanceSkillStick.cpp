@@ -35,6 +35,21 @@ namespace
 		else if (Travel >= Config.GetEngage())
 		{
 			Next = FOpenStanceSkillStickRecognizer::ToDirection(Stick, Config.GetEngage());
+
+			// Stay on the current direction near a diagonal until the new axis clearly wins.
+			const bool bCurrentVertical = Current == EOpenStanceStickDir::Up || Current == EOpenStanceStickDir::Down;
+			const bool bCurrentHorizontal = Current == EOpenStanceStickDir::Left || Current == EOpenStanceStickDir::Right;
+			const bool bNextVertical = Next == EOpenStanceStickDir::Up || Next == EOpenStanceStickDir::Down;
+			const bool bNextHorizontal = Next == EOpenStanceStickDir::Left || Next == EOpenStanceStickDir::Right;
+			if ((bCurrentVertical && bNextHorizontal) || (bCurrentHorizontal && bNextVertical))
+			{
+				const float Along = static_cast<float>(FMath::Abs(bCurrentVertical ? Stick.Y : Stick.X));
+				const float Across = static_cast<float>(FMath::Abs(bCurrentVertical ? Stick.X : Stick.Y));
+				if (Across < Along * Config.DirectionHysteresis)
+				{
+					Next = Current;
+				}
+			}
 		}
 		const bool bChanged = Next != Current;
 		Current = Next;
@@ -52,7 +67,7 @@ FOpenStanceSkillStickConfig FOpenStanceSkillStickConfig::FromSettings(float Dead
 	FOpenStanceSkillStickConfig Result;
 	Result.DeadZone = FMath::Clamp(DeadZonePercent / 100.0f, 0.0f, 0.4f);
 	Result.WindowSeconds = FMath::Clamp(InWindowSeconds, MinWindowSeconds, MaxWindowSeconds);
-	Result.JumpPrimeSeconds = Result.WindowSeconds;
+	Result.JumpPrimeSeconds = FMath::Max(Result.WindowSeconds, Result.JumpPrimeSeconds);
 	return Result;
 }
 
@@ -66,12 +81,15 @@ TArray<FOpenStanceGestureDef> FOpenStanceSkillStickRecognizer::MakeDefaultGestur
 	using Gs = EOpenStanceGestureStep;
 	using T = EOpenStanceTechnique;
 
-	auto Make = [](T Technique, std::initializer_list<Gs> Steps, bool bCanJump)
+	auto Make = [](T Technique, std::initializer_list<Gs> Steps, bool bCanJump, bool bRequiresBackLeg = false, bool bRequiresJump = false, bool bHeadOnly = false)
 	{
 		FOpenStanceGestureDef Def;
 		Def.Technique = Technique;
 		Def.Steps = TArray<Gs>(Steps);
 		Def.bCanJump = bCanJump;
+		Def.bRequiresBackLeg = bRequiresBackLeg;
+		Def.bRequiresJump = bRequiresJump;
+		Def.bHeadOnly = bHeadOnly;
 		return Def;
 	};
 
@@ -82,6 +100,18 @@ TArray<FOpenStanceGestureDef> FOpenStanceSkillStickRecognizer::MakeDefaultGestur
 		Make(T::Roundhouse, { Gs::Toward }, true),
 		Make(T::Hook, { Gs::Away }, true),
 		Make(T::SpinSide, { Gs::Down, Gs::Up }, false),
+
+		// Axe kick (GDD 9.1): a quarter circle forward from the side up to the top, then Down, always to the head, from
+		// either side (the GDD's 3 o'clock to 12 o'clock, mirrored on the left).
+		Make(T::Axe, { Gs::Toward, Gs::Up, Gs::Down }, true, false, false, true),
+		Make(T::Axe, { Gs::Away, Gs::Up, Gs::Down }, true, false, false, true),
+
+		// Spin hook (GDD 9.1): RT and a half circle down, from either side. Tornado (GDD 9.2): a tap of Y, then that
+		// half circle and a half circle back up, one full circle that starts downward from either side.
+		Make(T::SpinHook, { Gs::Toward, Gs::Down, Gs::Away }, true, true),
+		Make(T::SpinHook, { Gs::Away, Gs::Down, Gs::Toward }, true, true),
+		Make(T::Tornado, { Gs::Toward, Gs::Down, Gs::Away, Gs::Up, Gs::Toward }, true, false, true),
+		Make(T::Tornado, { Gs::Away, Gs::Down, Gs::Toward, Gs::Up, Gs::Away }, true, false, true),
 	};
 }
 
@@ -147,6 +177,11 @@ FOpenStanceSkillStickRecognizer::FMatch FOpenStanceSkillStickRecognizer::MatchPa
 	for (const FOpenStanceGestureDef& Def : Gestures)
 	{
 		if (!IsFinalTechnique(Def.Technique) || Def.Steps.Num() < Path.Num())
+		{
+			continue;
+		}
+		// A gesture that needs RT or the jump tap does not exist without it, so it never delays the plain kick it starts like.
+		if ((Def.bRequiresBackLeg && !bLatchedRT) || (Def.bRequiresJump && !bLatchedJump))
 		{
 			continue;
 		}
@@ -223,7 +258,7 @@ void FOpenStanceSkillStickRecognizer::Commit(const FMatch& Match, FOpenStanceFig
 	Emit(OutEvents, EOpenStanceInputEventType::Attack, State);
 	FOpenStanceInputEvent& Event = OutEvents.Last();
 	Event.Technique = Match.Def->Technique;
-	Event.Target = bLatchedRB ? EOpenStanceTarget::Head : EOpenStanceTarget::Trunk;
+	Event.Target = bLatchedRB || Match.Def->bHeadOnly ? EOpenStanceTarget::Head : EOpenStanceTarget::Trunk;
 	Event.bFake = bLatchedLB;
 	Event.bJump = bLatchedJump && Match.Def->bCanJump;
 	State.bJumpPrimed = false;
@@ -358,11 +393,13 @@ void FOpenStanceSkillStickRecognizer::Update(float DeltaSeconds, const FOpenStan
 		if (bChanged)
 		{
 			bSpent = false;
-			if (bInGesture)
-			{
-				Finish(State, OutEvents);
-				bSpent = false;
-			}
+			NeutralStart = Clock;
+		}
+		// A gesture ends once the stick has rested at neutral; passing through the centre on the way to the next step is not rest.
+		if (bInGesture && Clock - NeutralStart >= Config.NeutralGraceSeconds)
+		{
+			Finish(State, OutEvents);
+			bSpent = false;
 		}
 	}
 	else if (bChanged && !bSpent)
@@ -373,6 +410,9 @@ void FOpenStanceSkillStickRecognizer::Update(float DeltaSeconds, const FOpenStan
 		}
 		Path.Add(CurrentDir);
 		History.Add({ CurrentDir, Clock });
+		// The window is the time allowed between steps: each new step starts it again, so a three-step quarter circle or a
+		// five-step full circle is as easy to finish as a flick, as long as the thumb keeps moving.
+		GestureStart = Clock;
 
 		const FMatch Match = MatchPath(State);
 		if (Match.Kind == EMatch::Exact)

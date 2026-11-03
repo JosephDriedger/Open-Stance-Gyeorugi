@@ -25,6 +25,46 @@ struct OPENSTANCE_API FOpenStanceFighterControls
 	EOpenStanceDPad DPad = EOpenStanceDPad::None;
 };
 
+/** Clinch rules (GDD 6.4, 8.4, 11.3). Starting values, tuned in playtests. */
+struct OPENSTANCE_API FOpenStanceClinchTuning
+{
+	/** Centres this close mean chest-to-chest contact: two 35 cm capsules touching, plus a little. */
+	float ContactRangeCm = 76.0f;
+
+	/** The referee calls kal-yeo this long into a clinch. Under the 2 s a Referee Mode player has before the call is late. */
+	float RefereeCallSeconds = 0.8f;
+
+	/** Grabbing, holding or pushing for longer than this is a gam-jeom for the fighter pressing in (GDD 8.4). */
+	float HoldFoulSeconds = 1.0f;
+
+	/** The referee steps between the fighters: their centres end this far apart. */
+	float SeparationCm = 120.0f;
+
+	/** Seconds from kal-yeo to kye-sok; play is stopped and the clock holds. */
+	float StoppageSeconds = 0.8f;
+};
+
+/** Round and match length rules (WT rules, GDD 4.4). The same numbers the match HUD's model uses. */
+struct OPENSTANCE_API FOpenStanceRoundTuning
+{
+	int32 RoundCount = 3;
+	float RoundSeconds = 120.0f;
+
+	/** The point gap that ends a match. */
+	int32 GapToEnd = 12;
+
+	/** The break between rounds, with the fighters back on their marks when it ends. */
+	float BreakSeconds = 2.0f;
+};
+
+/** Where a clinch is: none, held while the referee is on the way, or the referee separating the fighters. */
+enum class EOpenStanceClinchPhase : uint8
+{
+	None,
+	Held,
+	Separating
+};
+
 /** One line of what happened in a match, for the overlay's feed and the greybox proof's record. */
 struct OPENSTANCE_API FOpenStanceMatchLogEntry
 {
@@ -45,6 +85,15 @@ struct OPENSTANCE_API FOpenStanceFighterSim
 
 	/** Stick path of the last gestures and what became of them, newest last, for the overlay. */
 	TArray<FOpenStanceInputEvent> RecentInput;
+
+	/** Every input event so far, so a reader can tell how many are new when RecentInput has dropped old ones. */
+	int32 InputEventCount = 0;
+
+	/** X was down on the last step, so a held button throws one punch. */
+	bool bPrevPunch = false;
+
+	/** Why each of this fighter's gam-jeom was given, oldest first, for the HUD and the results page. */
+	TArray<FString> PenaltyReasons;
 
 	/** What the last attack resolved to and how it ended. */
 	FString LastMove = TEXT("-");
@@ -77,6 +126,18 @@ public:
 	FOpenStanceMatchStatus Match;
 	FOpenStanceMovementTuning Movement;
 	FOpenStanceHitTuning Hits;
+	FOpenStanceClinchTuning ClinchRules;
+	FOpenStanceRoundTuning RoundRules;
+
+	/** Counts up with every log entry, so a reader can tell what is new when the log has dropped old ones. */
+	int32 LogEventCount = 0;
+
+	EOpenStanceClinchPhase ClinchPhase = EOpenStanceClinchPhase::None;
+
+	/** Seconds into the current clinch. */
+	float ClinchElapsed = 0.0f;
+
+	bool IsInClinch() const { return ClinchPhase != EOpenStanceClinchPhase::None; }
 
 	/** Every score, penalty and miss since the match began. */
 	TArray<FOpenStanceMatchLogEntry> Log;
@@ -103,11 +164,22 @@ public:
 
 	void AddLog(EOpenStanceSide Side, const FString& Text);
 
+	/** A gam-jeom for one fighter: the opponent gets the point (GDD 8.3, 8.4) and the reason is kept for the HUD. */
+	void AddGamJeom(int32 Index, const FString& Reason);
+
 private:
 	void StepFighter(int32 Index, float DeltaSeconds, const FOpenStanceFighterControls& Controls);
 	void RunTraces(int32 Index);
 	void Start(int32 Index, const FOpenStanceInputEvent& Event);
 	void ApplyContact(const FOpenStanceContact& Contact);
+	void StepClinch(float DeltaSeconds, const FOpenStanceFighterControls& Chung, const FOpenStanceFighterControls& Hong);
 
 	const UDataTable* MoveTable = nullptr;
+
+	bool bClinchFouled = false;
+	float ClinchStartDistance = 0.0f;
+
+	/** Where the fighters start each round, and how long the break between rounds has run. */
+	float StartDistanceCm = 200.0f;
+	float RoundBreakElapsed = 0.0f;
 };

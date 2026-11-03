@@ -74,7 +74,7 @@ TArray<FOpenStanceHint> UOpenStanceCareerScreen::GetHints() const
 	{
 		{ TEXT("A"), EOpenStanceGlyphLook::A, TEXT("Select") },
 		{ TEXT("B"), EOpenStanceGlyphLook::B, TEXT("Back") },
-		{ TEXT("Y"), EOpenStanceGlyphLook::Y, TEXT("Advance week") }
+		{ TEXT("Y"), EOpenStanceGlyphLook::Y, TEXT("Advance Week") }
 	};
 }
 
@@ -107,23 +107,23 @@ TSharedRef<SWidget> UOpenStanceCareerScreen::BuildContent()
 			Item
 		];
 	};
-	AddAction(SNew(SOpenStanceOption).Label(TEXT("Training slots")));
-	AddAction(SNew(SOpenStanceOption).Label(TEXT("Enter event")).Small(TEXT("City Open")));
+	AddAction(SNew(SOpenStanceOption).Label(TEXT("Training Slots")));
+	AddAction(SNew(SOpenStanceOption).Label(TEXT("Enter Event")).Small(TEXT("City Open")));
 	AddAction(SNew(SOpenStanceOption).Label(TEXT("Grading")));
-	AddAction(SNew(SOpenStanceOption).Label(TEXT("Post-match review")));
-	AddAction(SNew(SOpenStanceOption).Label(TEXT("Fighter creator")).Small(TEXT("Look and gear")).OnPressed(Open(EOpenStanceMenuScreen::Customize)));
-	AddAction(SNew(SOpenStanceOption).Label(TEXT("Long-term career")).TagWidget(FutureTag()).OnPressed(Open(EOpenStanceMenuScreen::LongTerm)));
+	AddAction(SNew(SOpenStanceOption).Label(TEXT("Post-Match Review")));
+	AddAction(SNew(SOpenStanceOption).Label(TEXT("Fighter Creator")).Small(TEXT("Look and Gear")).OnPressed(Open(EOpenStanceMenuScreen::Customize)));
+	AddAction(SNew(SOpenStanceOption).Label(TEXT("Long-Term Career")).TagWidget(FutureTag()).OnPressed(Open(EOpenStanceMenuScreen::LongTerm)));
 	SetDefaultFocus(FirstItem);
 
 	const TArray<FWeek> Weeks =
 	{
-		{ TEXT("Wk 1"), EWeekKind::Training, TEXT("Footwork block") },
-		{ TEXT("Wk 2"), EWeekKind::Training, TEXT("Sparring block") },
+		{ TEXT("Wk 1"), EWeekKind::Training, TEXT("Footwork Block") },
+		{ TEXT("Wk 2"), EWeekKind::Training, TEXT("Sparring Block") },
 		{ TEXT("Wk 3"), EWeekKind::Event, TEXT("City Open") },
 		{ TEXT("Wk 4"), EWeekKind::Training, TEXT("Rest") },
-		{ TEXT("Wk 5"), EWeekKind::Training, TEXT("Kick power") },
-		{ TEXT("Wk 6"), EWeekKind::Grading, TEXT("Grading: blue belt") },
-		{ TEXT("Wk 7"), EWeekKind::Training, TEXT("Counter drills") },
+		{ TEXT("Wk 5"), EWeekKind::Training, TEXT("Kick Power") },
+		{ TEXT("Wk 6"), EWeekKind::Grading, TEXT("Grading: Blue Belt") },
+		{ TEXT("Wk 7"), EWeekKind::Training, TEXT("Counter Drills") },
 		{ TEXT("Wk 8"), EWeekKind::Event, TEXT("Regional Cup") }
 	};
 	const int32 CurrentWeek = 2;
@@ -166,8 +166,8 @@ TSharedRef<SWidget> UOpenStanceCareerScreen::BuildContent()
 							+ SVerticalBox::Slot().AutoHeight()
 							[
 								SNew(SHorizontalBox)
-								+ SHorizontalBox::Slot().AutoWidth().Padding(0.0f, 0.0f, U(0.8f), 0.0f)[Tag(TEXT("Your fighter"))]
-								+ SHorizontalBox::Slot().AutoWidth().Padding(0.0f, 0.0f, U(0.8f), 0.0f)[Tag(TEXT("Green belt"))]
+								+ SHorizontalBox::Slot().AutoWidth().Padding(0.0f, 0.0f, U(0.8f), 0.0f)[Tag(TEXT("Your Fighter"))]
+								+ SHorizontalBox::Slot().AutoWidth().Padding(0.0f, 0.0f, U(0.8f), 0.0f)[Tag(TEXT("Green Belt"))]
 								+ SHorizontalBox::Slot().AutoWidth()[Tag(TEXT("OVR 74"))]
 							]
 							+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, U(0.7f), 0.0f, 0.0f)
@@ -186,7 +186,7 @@ TSharedRef<SWidget> UOpenStanceCareerScreen::BuildContent()
 				SNew(SVerticalBox)
 				+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, U(0.8f))
 				[
-					Kicker(TEXT("Season calendar · sample"))
+					Kicker(TEXT("Season Calendar · Sample"))
 				]
 				+ SVerticalBox::Slot().FillHeight(1.0f)
 				[
@@ -202,6 +202,6 @@ TSharedRef<SWidget> UOpenStanceCareerScreen::BuildContent()
 		]
 		+ SOverlay::Slot().HAlign(HAlign_Right).VAlign(VAlign_Top)
 		[
-			PlayerBar(Name, TEXT("Your fighter · Green belt · OVR 74"), TEXT("JC"))
+			PlayerBar(Name, TEXT("Your Fighter · Green Belt · OVR 74"), TEXT("JC"))
 		];
 }

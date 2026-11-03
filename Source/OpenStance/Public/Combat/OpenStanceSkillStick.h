@@ -34,6 +34,15 @@ struct OPENSTANCE_API FOpenStanceGestureDef
 
 	/** A leading tap of Y throws the technique airborne (GDD 7.4); false for techniques with no jump version. */
 	bool bCanJump = false;
+
+	/** The gesture only counts while RT is latched: the back leg throws it (the spin hook, GDD 9.1). */
+	bool bRequiresBackLeg = false;
+
+	/** The gesture only counts after a tap of Y, and is always thrown airborne (the tornado kick, GDD 9.2). */
+	bool bRequiresJump = false;
+
+	/** The technique only aims at the head, with or without RB (the axe kick, GDD 9.1). */
+	bool bHeadOnly = false;
 };
 
 /** What Active Defense does with the Skill Stick while LT is held (GDD 8.8). */
@@ -50,7 +59,7 @@ struct OPENSTANCE_API FOpenStanceSkillStickConfig
 	static constexpr float MinWindowSeconds = 0.20f;
 	static constexpr float MaxWindowSeconds = 0.40f;
 
-	/** Seconds from the first stick step within which the rest of the gesture must follow. 0.20 to 0.40. */
+	/** Seconds allowed between one stick step and the next in a gesture (the clock restarts on every step). 0.20 to 0.40. */
 	float WindowSeconds = 0.25f;
 
 	/** Radial dead zone as a fraction of stick travel; movement inside it never counts. */
@@ -62,8 +71,24 @@ struct OPENSTANCE_API FOpenStanceSkillStickConfig
 	/** Travel below which the stick counts as back at neutral; raised to at least the dead zone. */
 	float ReleaseThreshold = 0.35f;
 
-	/** Seconds after a released tap of Y during which a gesture is thrown airborne. */
-	float JumpPrimeSeconds = 0.25f;
+	/**
+	 * Seconds the stick must stay at neutral before a gesture in progress counts as released. A thumb swinging from Down to
+	 * Up, or sweeping a circle, crosses the centre for a frame or two; that crossing is not a release.
+	 */
+	float NeutralGraceSeconds = 0.06f;
+
+	/**
+	 * Seconds after a released tap of Y during which a gesture is thrown airborne. The same thumb taps Y and then moves
+	 * to the stick, which takes longer than a stick window, so this is longer than the window (GDD 9.2 says only "just before").
+	 */
+	float JumpPrimeSeconds = 0.5f;
+
+	/**
+	 * A stick that is already pointing one way changes to a perpendicular direction only when it is this much further
+	 * along the new axis than the old one; 1 is the plain 45 degree line. Stops a thumb circling near a diagonal from
+	 * flickering between two directions and adding steps that spoil a circle.
+	 */
+	float DirectionHysteresis = 1.35f;
 
 	/** Builds a config from the Options values: dead zone in percent, window in seconds (clamped to 0.20 to 0.40). */
 	static FOpenStanceSkillStickConfig FromSettings(float DeadZonePercent, float WindowSeconds);
@@ -81,7 +106,7 @@ struct OPENSTANCE_API FOpenStanceInputFrame
 	bool bRT = false; // back leg
 	bool bRB = false; // head
 	bool bLB = false; // fake
-	bool bLT = false; // active defence
+	bool bLT = false; // active defense
 	bool bY = false;  // jump tap
 };
 
@@ -217,7 +242,11 @@ private:
 	/** Steps of the gesture in progress, as stick directions. */
 	TArray<EOpenStanceStickDir> Path;
 	TArray<FOpenStanceStickStep> History;
+	/** When the gesture's latest stick step happened (its first step until the next one arrives); the window runs from here. */
 	double GestureStart = 0.0;
+
+	/** When the stick last came back to neutral, for the release grace. */
+	double NeutralStart = 0.0;
 	bool bInGesture = false;
 
 	/** The gesture already fired or was dropped; ignore the stick until it is back at neutral. */
