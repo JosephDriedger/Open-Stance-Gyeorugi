@@ -182,6 +182,9 @@ for r0, r1 in zip(rows, rows[1:]):
     for k in range(ACROSS - 1):
         bm.faces.new((r0[k], r0[k + 1], r1[k + 1], r1[k]))
 bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:])
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from garment_normals import face_outward
+normals_flipped = face_outward(bm, bpy.data.objects["Body"])
 for f in bm.faces:
     f.smooth = True
 mesh = bpy.data.meshes.new('Jacket_Collar')

@@ -68,8 +68,8 @@ namespace
 	const TCHAR* FighterHeadPath = TEXT("/Game/Characters/Fighters/Export/MH_FighterBase_Head.MH_FighterBase_Head");
 	const TCHAR* FighterGearFolder = TEXT("/Game/Characters/Fighters/Gear/Medium");
 	const TCHAR* FighterGearParts[] = { TEXT("Jacket"), TEXT("Pants"), TEXT("Belt"), TEXT("Protector"), TEXT("Helmet"), TEXT("Gloves"), TEXT("FootGuards") };
-	const TCHAR* TeamGearMaterials[2] = { TEXT("/Game/Characters/Fighters/Gear/MI_FighterGear_Chung.MI_FighterGear_Chung"),
-		TEXT("/Game/Characters/Fighters/Gear/MI_FighterGear_Hong.MI_FighterGear_Hong") };
+	const TCHAR* TeamGearMaterials[2] = { TEXT("/Game/Characters/Fighters/Gear/Clean/MI_FighterGear_Chung.MI_FighterGear_Chung"),
+		TEXT("/Game/Characters/Fighters/Gear/Clean/MI_FighterGear_Hong.MI_FighterGear_Hong") };
 	const TCHAR* StanceAnimationPath = TEXT("/Game/Animation/Moves/Placeholder/AS_Placeholder_Stance.AS_Placeholder_Stance");
 
 	/** The animation a montage plays (its first segment), so the greybox can scrub it frame by frame. */

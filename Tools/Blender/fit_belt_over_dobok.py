@@ -12,6 +12,7 @@ Rest-pose positions; the belt pieces are skinned to the pelvis, so the fit holds
 import json
 import math
 import sys
+from collections import defaultdict
 from pathlib import Path
 
 import bpy
@@ -173,6 +174,38 @@ for name in (KNOT,) + TAILS:
     amount = max(amount, push[bin_of(polar(middle)[0])] if amount < 0 else amount)
     offset = radial(middle, amount)
     report[name + '_moved_mm'] = round(move(name, lambda p, o=offset: o) * 1000 * (1 if amount >= 0 else -1), 1)
+
+
+# 4. The tails hang straight down from the knot. Modelled sloping forward (to clear the old flared skirt), they stood
+#    8 cm out from the body, which a turned stance shows as a sideways splay. Each tail keeps its width and twist (every
+#    point's offset from the tail's own centreline at its height) but its centreline drops plumb from the top, and only
+#    where that would touch the jacket is it eased out to rest on it.
+def hang_plumb(name):
+    obj = bpy.data.objects.get(name)
+    if obj is None:
+        return 0.0
+    pts = [obj.matrix_world @ v.co for v in obj.data.vertices]  # raw mesh: the evaluated one carries Solidify
+    by_height = defaultdict(list)
+    for p in pts:
+        by_height[int(p.z * 100)].append(p)
+    line = {k: sum(v, Vector()) / len(v) for k, v in by_height.items()}
+    top = line[max(line)]
+    inverse = obj.matrix_world.inverted()
+    worst = 0.0
+    for v, p in zip(obj.data.vertices, pts):
+        c = line[int(p.z * 100)]
+        q = Vector((top.x + p.x - c.x, top.y + p.y - c.y, p.z))
+        out = needed(q)
+        if out > 0:
+            q = q + radial(q, out)
+        worst = max(worst, (q - p).length)
+        v.co = inverse @ q
+    obj.data.update()
+    return worst
+
+
+for name in TAILS:
+    report[name + '_plumbed_mm'] = round(hang_plumb(name) * 1000, 1)
 rig.data.pose_position = pose_position
 print('BELT DONE', json.dumps(report), flush=True)
 if OUT:

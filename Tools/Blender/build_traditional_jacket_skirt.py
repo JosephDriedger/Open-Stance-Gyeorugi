@@ -33,13 +33,15 @@ jacket = bpy.data.objects['Jacket']
 belt = bpy.data.objects['Belt_Waistband']
 
 LENGTH_BELOW_BELT = .13   # m: hem just below the hip (sparring photos)
-TOP_EASE, HEM_EASE = .012, .02   # m outside the trousers at the top and at the hem: lies close
+TOP_EASE, HEM_EASE = .008, .012  # m outside the trousers at the top and at the hem: lies against them
+HUG_BLEND = .045                 # m below the belt over which the skirt goes from the jacket hem's width onto the trousers
 OVERLAP = math.radians(25)       # inner flap reaches this far past the overlap edge, under the outer flap
 INNER_DROP = .012                # m: inner flap sits this far inside the outer one (closer and the drape pokes it through)
 SNAPSHOT, SUNK_LIMIT = 6, .01          # drape snapshot interval (frames), share of skirt points allowed to touch the trousers
 TORSO_REACH = .30                # m from the centre: anything further out at skirt height is an arm
 MIN_GAP = .010                   # m: every skirt point starts at least this far outside the trousers (drape safety)
 UNDER_BELT = .004                # m: the skirt top stays this far inside the belt band
+SMOOTH_PASSES = 8                # Taubin passes over the draped skirt (evens the ragged hem)
 SLIT = .10                       # m: side slits up from the hem
 COLUMNS = 150
 STEP = .012
@@ -85,6 +87,7 @@ direction = -1 if edge.x > 0 else 1                 # wrap from the edge across 
 # What the skirt hangs over, per height and angle: the trousers, and the jacket's own hem (the skirt carries the jacket
 # body on down, so it starts at least as wide as the hem above it).
 pants_points = [pants.matrix_world @ v.co for v in pants.data.vertices]
+trouser_points = list(pants_points)
 jacket_hem = min(p.z for p in (jacket.matrix_world @ v.co for v in jacket.data.vertices)
                  if math.hypot(p.x, p.y - centre.y) < TORSO_REACH)
 # torso only: on short-armed bodies the bind-pose sleeves hang down to the hem's height (they threw a skirt point 47 cm out)
@@ -95,10 +98,10 @@ pants_points += [p for p in (jacket.matrix_world @ v.co for v in jacket.data.ver
 BINS = 180
 
 
-def outline(z, band=.015):
+def outline(z, band=.015, points=None):
     """Trouser reach from the centre in BINS angle bins at height z (gaps filled from neighbours, smoothed)."""
     reach = [0.0] * BINS
-    for p in pants_points:
+    for p in (pants_points if points is None else points):
         if abs(p.z - z) < band:
             k = int((math.atan2(p.y - centre.y, p.x - centre.x) + math.pi) / (2 * math.pi) * BINS) % BINS
             reach[k] = max(reach[k], math.hypot(p.x - centre.x, p.y - centre.y))
@@ -121,6 +124,8 @@ while z > hem_z + STEP * .5:
     z -= STEP
 rows.append(hem_z)
 samples = {z: outline(z) for z in rows[::3] + [rows[-1]]}
+# the trousers alone (no jacket hem): what the skirt lies against below the belt
+trouser_samples = {z: outline(z, points=trouser_points) for z in rows[::3] + [rows[-1]]}
 sample_z = sorted(samples)
 # Belt band reach per angle: the skirt top tucks just inside it.
 belt_reach = [0.0] * BINS
@@ -134,12 +139,13 @@ for _ in range(BINS):
     belt_reach = [r or max(belt_reach[i - 1], belt_reach[(i + 1) % BINS]) for i, r in enumerate(belt_reach)]
 
 
-def reach_at(z, angle):
+def reach_at(z, angle, table=None):
+    table = samples if table is None else table
     lo = max([q for q in sample_z if q <= z] or [sample_z[0]])
     hi = min([q for q in sample_z if q >= z] or [sample_z[-1]])
     t = 0 if hi == lo else (z - lo) / (hi - lo)
     k = int(((angle + math.pi) % (2 * math.pi)) / (2 * math.pi) * BINS) % BINS
-    return samples[lo][k] * (1 - t) + samples[hi][k] * t
+    return table[lo][k] * (1 - t) + table[hi][k] * t
 
 
 bm = bmesh.new()
@@ -148,9 +154,12 @@ for j, z in enumerate(rows):
     ease = TOP_EASE + (HEM_EASE - TOP_EASE) * ((top_z - z) / (top_z - hem_z)) ** 1.5
     row = []
     for c, a in enumerate(angles):
-        # Hangs straight down from its top (the jacket's box), never inside the trousers. The belt is the next layer
-        # and is fitted over this, so nothing tucks under it here.
-        r = max(reach_at(z, a), reach_at(top_z, a)) + ease
+        # One piece with the jacket: it leaves the belt at the jacket hem's width and within HUG_BLEND lies against the
+        # trousers (a straight drop from the top read as a separate boxy skirt). The belt is fitted over this next.
+        hug = reach_at(z, a, trouser_samples) + ease
+        t = min(1.0, max(0.0, (top_z - z) / HUG_BLEND))
+        t = t * t * (3 - 2 * t)
+        r = (reach_at(top_z, a) + TOP_EASE) * (1 - t) + hug * t
         r -= INNER_DROP if c > inner_from else 0
         row.append(bm.verts.new((centre.x + r * math.cos(a), centre.y + r * math.sin(a), z)))
     grid.append(row)
@@ -184,6 +193,9 @@ for row in grid:
             v.co.x, v.co.y = centre.x + (v.co.x - centre.x) * scale, centre.y + (v.co.y - centre.y) * scale
             pushed += 1
 bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:])
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from garment_normals import face_outward
+normals_flipped = face_outward(bm, body)
 for f in bm.faces:
     f.smooth = True
 skirt_mesh = bpy.data.meshes.new('Jacket_Skirt')
@@ -193,7 +205,7 @@ drape = bpy.data.objects.new('Jacket_Skirt_Drape', skirt_mesh)
 scene.collection.objects.link(drape)
 report = {'pushed_clear_of_trousers': pushed, 'top_z': round(top_z, 3), 'hem_z': round(hem_z, 3), 'edge': [round(c, 3) for c in edge],
           'edge_angle_deg': round(math.degrees(edge_angle), 1), 'vertices': len(skirt_mesh.vertices),
-          'slit_columns': sorted(slit_columns)}
+          'slit_columns': sorted(slit_columns), 'normals_flipped': normals_flipped}
 
 # --- drape on the bind-pose body over the trousers ---------------------------------------------------------------------
 pose_position = rig.data.pose_position
@@ -252,12 +264,23 @@ def trouser_floor(p):
     return max((floor.get(((k + dk) % 360, zc + dz), 0.0) for dk in range(-3, 4) for dz in (-1, 0, 1)), default=0.0)
 
 
+# Sunk is measured against the real trouser surface (rest pose, as the drape runs): a point counts when it is
+# behind it (touching is fine: anything closer than MIN_GAP is pushed back out after the drape). The dilated per-cell floor used to place the skirt overstates the surface beside a bulging
+# seat or thigh, and on Compact and Male_Lean it called a skirt resting correctly on the trousers sunk after 6 frames.
+_pants_world = [pants.matrix_world @ v.co for v in pants.data.vertices]
+sunk_tree = BVHTree.FromPolygons(_pants_world, [tuple(p.vertices) for p in pants.data.polygons])
+
+
 def snapshot():
     depsgraph = bpy.context.evaluated_depsgraph_get()
     mesh = bpy.data.meshes.new_from_object(drape.evaluated_get(depsgraph), depsgraph=depsgraph)
     points = [v.co.copy() for v in mesh.vertices]
     bpy.data.meshes.remove(mesh)
-    sunk = sum(1 for p in points if trouser_floor(p) and math.hypot(p.x - centre.x, p.y - centre.y) < trouser_floor(p) + .002)
+    sunk = 0
+    for p in points:
+        loc, normal, _, dist = sunk_tree.find_nearest(p, .05)
+        if loc is not None and (p - loc).dot(normal) < 0:
+            sunk += 1
     return points, sunk
 
 
@@ -269,19 +292,34 @@ for f in range(1, DRAPE_FRAMES + 1):
     scene.frame_set(f)
     if f % SNAPSHOT == 0 or f == DRAPE_FRAMES:
         points, sunk = snapshot()
+        report.setdefault('drape_sunk', []).append((f, sunk))
         if sunk > SUNK_LIMIT * len(points):
             break
         chosen, chosen_frame = points, f
 moved = max((p - v.co).length for p, v in zip(chosen, skirt_mesh.vertices))
+# The drape leaves a ragged, rippled hem: Taubin smoothing (shrink then inflate, so no volume is lost) evens it; the
+# band under the belt stays put. The push-out below then restores MIN_GAP over the trousers.
+skirt_links = defaultdict(list)
+for e in skirt_mesh.edges:
+    skirt_links[e.vertices[0]].append(e.vertices[1])
+    skirt_links[e.vertices[1]].append(e.vertices[0])
+held = {v.index for v in skirt_mesh.vertices if v.co.z > top_z - .03}
+for _ in range(SMOOTH_PASSES):
+    for factor in (.5, -.53):
+        chosen = [p if i in held or not skirt_links[i] else
+                  p + (sum((chosen[j] for j in skirt_links[i]), Vector()) / len(skirt_links[i]) - p) * factor
+                  for i, p in enumerate(chosen)]
 for v, p in zip(skirt_mesh.vertices, chosen):
     v.co = p
-# Anything still touching the trousers is pushed back out to MIN_GAP.
+# Anything closer than MIN_GAP to the trousers is moved out along the real trouser surface's normal (pushing out to the
+# dilated per-cell floor re-roughened a smoothed hem: it moved nearly every point onto that blocky outline).
+pushed_out = 0
 for v in skirt_mesh.vertices:
-    need = trouser_floor(v.co)
-    r = math.hypot(v.co.x - centre.x, v.co.y - centre.y)
-    if need and r < need + MIN_GAP:
-        s = (need + MIN_GAP) / max(r, 1e-6)
-        v.co.x, v.co.y = centre.x + (v.co.x - centre.x) * s, centre.y + (v.co.y - centre.y) * s
+    loc, normal, _, dist = sunk_tree.find_nearest(v.co, .05)
+    if loc is not None and (v.co - loc).dot(normal) < MIN_GAP:
+        v.co = loc + normal * MIN_GAP
+        pushed_out += 1
+report['pushed_out_after_drape'] = pushed_out
 report['drape_frames_used'] = chosen_frame
 drape.modifiers.remove(cloth)
 for modifier in muted:

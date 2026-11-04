@@ -45,6 +45,7 @@ STEP = .014              # m between rings
 INNER_GAP = .006         # m: leg tubes start this far from the centre line
 DRAPE_FRAMES = 70
 SNAPSHOT, MAX_ROUGHNESS = 10, .0028   # drape snapshot interval (frames), crumple limit (m, see roughness())
+SMOOTH_PASSES, SMOOTH_CLEAR = 12, .006   # Taubin passes after the drape; m kept outside the body
 SEAT_BLEND = .12         # m below the crotch over which the seat outline eases into the straight leg
 
 
@@ -222,6 +223,9 @@ def leg_loops(side):
 
 leg_rings = {s: leg_loops(s) for s in 'lr'}
 bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:])
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from garment_normals import face_outward
+normals_flipped = face_outward(bm, body)
 new = bpy.data.meshes.new('Pants_Traditional')
 bm.to_mesh(new)
 bm.free()
@@ -230,6 +234,7 @@ for poly in new.polygons:
 garment = bpy.data.objects.new('TraditionalTrousers_Drape', new)
 scene.collection.objects.link(garment)
 report['vertices'] = len(new.vertices)
+report['normals_flipped'] = normals_flipped
 
 # --- drape on the bind-pose body ---------------------------------------------------------------------------------------
 pose_position = rig.data.pose_position
@@ -309,6 +314,33 @@ for f in range(1, DRAPE_FRAMES + 1):
         draped_points, used = points, f
 report['drape_frames_used'] = used
 report['roughness_mm'] = round(roughness(draped_points) * 1000, 2)
+# The drape leaves small crumples (lumpy seat and legs). Taubin smoothing (a shrink step then an inflate step) evens the
+# surface without losing volume; the waistband stays where the drape pinned it, and every point is kept SMOOTH_CLEAR
+# outside the body so the smoothing never pulls cloth into the skin.
+depsgraph = bpy.context.evaluated_depsgraph_get()
+contact = bpy.data.meshes.new_from_object(collider.evaluated_get(depsgraph), depsgraph=depsgraph)
+contact_points = [collider.matrix_world @ v.co for v in contact.vertices]
+body_tree = BVHTree.FromPolygons(contact_points, [tuple(p.vertices) for p in contact.polygons])
+bpy.data.meshes.remove(contact)
+pinned = {v.index for v in new.vertices if v.co.z > waist_z - .035}
+points = [p.copy() for p in draped_points]
+for _ in range(SMOOTH_PASSES):
+    for factor in (.5, -.53):
+        moved = []
+        for i, p in enumerate(points):
+            ring = drape_links[i]
+            if i in pinned or not ring:
+                moved.append(p)
+                continue
+            centre_point = sum((points[j] for j in ring), Vector()) / len(ring)
+            moved.append(p + (centre_point - p) * factor)
+        points = moved
+for i, p in enumerate(points):
+    loc, normal, _, dist = body_tree.find_nearest(p, .05)
+    if loc is not None and (p - loc).dot(normal) < SMOOTH_CLEAR:
+        points[i] = loc + normal * SMOOTH_CLEAR
+draped_points = points
+report['smoothed_roughness_mm'] = round(roughness(draped_points) * 1000, 2)
 garment.modifiers.remove(cloth)
 report['drape_max_move_cm'] = round(max((v.co - co).length for v, co in zip(new.vertices, draped_points)) * 100, 1)
 for v, co in zip(new.vertices, draped_points):
