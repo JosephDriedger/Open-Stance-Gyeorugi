@@ -55,6 +55,8 @@ def prepare_assets(log):
         ui = unreal.FbxImportUI()
         ui.set_editor_property("import_mesh", True)
         ui.set_editor_property("import_as_skeletal", True)
+        ui.set_editor_property("mesh_type_to_import", unreal.FBXImportType.FBXIT_SKELETAL_MESH)
+        ui.skeletal_mesh_import_data.set_editor_property("normal_import_method", unreal.FBXNormalImportMethod.FBXNIM_IMPORT_NORMALS)
         ui.set_editor_property("import_animations", False)
         ui.set_editor_property("import_materials", False)
         ui.set_editor_property("import_textures", False)

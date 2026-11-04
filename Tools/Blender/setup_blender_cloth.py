@@ -61,6 +61,8 @@ def setup(scene):
  # of topology density instead of assigning hundreds of kilograms to an LOD.
  from normalize_uniform_cloth_mass import configure as normalize_mass
  normalize_mass(scene)
+ from refine_pants_cloth import configure as refine_pants
+ refine_pants(scene)
  return rows
 if __name__=='__main__':
  try:

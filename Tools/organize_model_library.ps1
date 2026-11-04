@@ -91,6 +91,10 @@ Add-AssetLink '03 Technical and Experiments/Mocap Record' 'Matching Blender clea
 @'
 # Models and rigs
 
+Updated guard targets: open **01 Mocap Test → 3 UPDATED GUARDS - Medium Standard** (or **4** for padded guards). These are the latest separate high-detail test deliveries. [Delivery guide](../Resources/Models/FinalRefinement/GuardBodyDelivery/README.md). Free uniform/belt physics and complete visual acceptance remain unfinished.
+
+Production builds, packaging and validation: [results](../Resources/Models/FinalRefinement/ProductionCheck_20261102/README.md). [Outstanding work](../Resources/Models/FinalRefinement/REMAINING_WORK.md).
+
 For the mocap readiness test, open **01 Mocap Test**, then **1 OPEN IN MOTIONBUILDER - Medium Sparring**.
 It opens the characterized Medium fighter with sparring gear in MotionBuilder when installed.
 Read **2 READ ME - Test checklist.md** for three simple model/rig checks.
@@ -108,8 +112,19 @@ Regenerate shortcuts after relocating the project with `powershell -ExecutionPol
 '@ | Set-Content -LiteralPath (Join-Path $libraryRoot 'START HERE.md') -Encoding UTF8
 
 $bodies = @('Compact','Medium','Stocky','LeanTall','Tall','Male_Athletic','Male_Lean','Female_Athletic','Female_Strong')
+if (Test-Path -LiteralPath (Join-Path $modelRoot 'FinalRefinement/BindNormalsDelivery/installation_complete.txt')) {
+    Add-AssetLink '07 Guides and validation' 'Bind pose and normal repair.md' 'Resources/Models/FinalRefinement/BindNormalsDelivery/README.md' 'Installed FBX bind-pose and zero-normal fixes; validation and remaining cloth limits.'
+    $startPath = Join-Path $libraryRoot 'START HERE.md'
+    $startText = Get-Content -LiteralPath $startPath -Raw
+    $status = 'October 29: uniform UV/body-face repairs and the 375-file bind-pose/zero-normal repair are installed. The 36 Unreal import checks have no bind-pose or zero-normal warnings. Cloth physics still needs refinement. See [repair results](../Resources/Models/FinalRefinement/BindNormalsDelivery/README.md).'
+    $startText.Replace('# Models and rigs', "# Models and rigs`r`n`r`n$status") | Set-Content -LiteralPath $startPath -Encoding UTF8
+}
 if (Test-Path -LiteralPath (Join-Path $modelRoot 'FinalRefinement/UniformGeometryDelivery/published.json')) {
     Add-AssetLink '07 Guides and validation' 'Uniform UV and body-face repair.md' 'Resources/Models/FinalRefinement/UniformGeometryDelivery/README.md' 'Installed UV and collapsed export-face repair; rig preservation, mocap checks and remaining limitations.'
+}
+if (Test-Path -LiteralPath (Join-Path $modelRoot 'FinalRefinement/PantsClothDeliveryV3/installation_complete.txt')) {
+    Add-AssetLink '07 Guides and validation' 'Trouser cloth refinement.md' 'Resources/Models/FinalRefinement/PantsClothDeliveryV3/README.md' 'Live Blender trouser-physics refinement; tested scope and remaining jacket, belt and cuff issues.'
+    Add-Content -LiteralPath (Join-Path $libraryRoot 'START HERE.md') -Value "`r`nOctober 30: the constrained trouser-cloth update is installed in the native Blender library. Jacket-hip folds, belt physics and a Stocky cuff/body intersection remain open. See [trouser cloth notes](../Resources/Models/FinalRefinement/PantsClothDeliveryV3/README.md)." -Encoding UTF8
 }
 if (Test-Path -LiteralPath (Join-Path $modelRoot 'Animation/MotionBuilder_BeltChain/README.md')) {
     Add-AssetLink '09 Experimental - Belt physics' 'READ FIRST - Belt-chain target limitations.md' 'Resources/Models/Animation/MotionBuilder_BeltChain/README.md' 'Experimental targets; original MotionBuilder targets remain suitable for recording. Read root compatibility and physics limits.'
@@ -257,6 +272,18 @@ if (Test-Path -LiteralPath (Join-Path $modelRoot 'FinalRefinement/HairRepeat/pub
     Add-AssetLink '08 Sample animations' 'EXPERIMENTAL - Secondary cloth kick.blend' 'Resources/Models/Animation/Physics/SecondaryCloth_Kick_Study.blend' 'Medium wrap: fitted belt contact and constrained uniform physics. Play from frame 1; other bodies/moves unvalidated.'
     if (Test-Path -LiteralPath (Join-Path $modelRoot 'Animation/Physics/SecondaryCloth_Kick_Study_VNeck.blend')) {
         Add-AssetLink '08 Sample animations' 'EXPERIMENTAL - V-neck secondary cloth kick.blend' 'Resources/Models/Animation/Physics/SecondaryCloth_Kick_Study_VNeck.blend' 'Medium V-neck: fitted belt contact and constrained uniform physics. Play from frame 1; other bodies/moves unvalidated.'
+    }
+}
+$guardDelivery = 'Resources/Models/FinalRefinement/GuardBodyDelivery'
+if (Test-Path -LiteralPath (Join-Path $projectRoot "$guardDelivery/README.md")) {
+    Add-AssetLink '01 Mocap Test' '3 UPDATED GUARDS - Medium Standard' "$guardDelivery/MotionBuilder/Medium/Medium_Standard_Mocap.fbx" 'November 2 verified control-rig target with corrected foot guards; save tests as a new file. Free cloth remains unfinished.' $motionBuilder
+    Add-AssetLink '01 Mocap Test' '4 UPDATED GUARDS - Medium Padded' "$guardDelivery/MotionBuilder/Medium/Medium_Padded_Mocap.fbx" 'Padded foot-guard variant of the updated Medium mocap target.' $motionBuilder
+    Add-AssetLink '02 Asset Library/Updated guard targets' 'All nine bodies - MotionBuilder' "$guardDelivery/MotionBuilder" '18 characterized high-detail sparring targets; recorded mocap and free cloth not accepted.'
+    Add-AssetLink '02 Asset Library/Updated guard targets' 'Editable Blender models' 'Resources/Models/FinalRefinement/GuardBodyVariantsV7' 'Nine editable native models with both corrected foot-guard styles.'
+    Add-AssetLink '02 Asset Library/Updated guard targets' 'Delivery guide' "$guardDelivery/README.md" 'Verified scope and outstanding work.'
+    $dummyTake = "$guardDelivery/MediumControlTestAbsolute/Medium_Standard_Mocap_Rig_Test.fbx"
+    if (Test-Path -LiteralPath (Join-Path $projectRoot $dummyTake)) {
+        Add-AssetLink '08 Sample animations' 'Updated Medium - wrist and ankle rig test' $dummyTake '30-frame dummy control movement and return, saved and reopened. Diagnostic, not a finished martial arts animation.' $motionBuilder
     }
 }
 $manifest = [ordered]@{

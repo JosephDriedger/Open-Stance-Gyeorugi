@@ -123,6 +123,8 @@ def export(rig,meshes,path,animation=False):
  bpy.ops.export_scene.fbx(filepath=str(path),use_selection=True,object_types={'ARMATURE','MESH'},use_mesh_modifiers=False,add_leaf_bones=False,bake_anim=animation,bake_anim_use_all_actions=False,bake_anim_use_nla_strips=False,bake_anim_simplify_factor=0,path_mode='COPY',embed_textures=True,axis_forward='-Z',axis_up='Y')
  for c in copies:
   data=c.data;bpy.data.objects.remove(c,do_unlink=True);bpy.data.meshes.remove(data)
+ from finalize_fbx_bind_normals import finalize
+ finalize(path)
 def run(kind):
  directory=OUT/kind;catalog=json.loads((directory/'catalog.json').read_text())
  for path in sorted(directory.glob('*.blend')):

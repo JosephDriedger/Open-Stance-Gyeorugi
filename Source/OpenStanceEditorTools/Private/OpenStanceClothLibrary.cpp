@@ -3,9 +3,11 @@
 #include "ClothingAsset.h"
 #include "ClothingAssetFactoryInterface.h"
 #include "ClothingSystemEditorInterfaceModule.h"
+#include "Components/SkeletalMeshComponent.h"
 #include "Engine/SkeletalMesh.h"
 #include "Modules/ModuleManager.h"
 #include "PhysicsEngine/PhysicsAsset.h"
+#include "PhysicsEngine/SkeletalBodySetup.h"
 #include "PointWeightMap.h"
 #include "Rendering/SkeletalMeshLODModel.h"
 #include "Rendering/SkeletalMeshModel.h"
@@ -87,9 +89,19 @@ FString UOpenStanceClothLibrary::SetupSectionCloth(USkeletalMesh* Mesh, int32 Se
 	}
 	Mesh->AddClothingAsset(Asset);
 
-	// Max Distance from the height rule, pinned outside the box
-	FClothPhysicalMeshData& PhysMesh = Asset->LodData[0].PhysicalMeshData;
-	FPointWeightMap& MaxDistances = PhysMesh.FindOrAddWeightMap(EWeightMapTargetCommon::MaxDistance);
+	// Max Distance from the height rule, pinned outside the box. It is written as an enabled painted mask: ApplyParameterMasks
+	// clears the physical mesh's weight maps and rebuilds them from the masks, so a value written straight into
+	// PhysicalMeshData is wiped and every particle stays kinematic (the cloth then just follows the skinning).
+	FClothLODDataCommon& Lod = Asset->LodData[0];
+	FClothPhysicalMeshData& PhysMesh = Lod.PhysicalMeshData;
+	Lod.PointWeightMaps.RemoveAll([](const FPointWeightMap& Mask)
+	{
+		return Mask.CurrentTarget == (uint8)EWeightMapTargetCommon::MaxDistance;
+	});
+	FPointWeightMap& MaxDistances = Lod.PointWeightMaps.AddDefaulted_GetRef();
+	MaxDistances.Name = TEXT("MaxDistance");
+	MaxDistances.CurrentTarget = (uint8)EWeightMapTargetCommon::MaxDistance;
+	MaxDistances.bEnabled = true;
 	const int32 NumVerts = PhysMesh.Vertices.Num();
 	MaxDistances.Values.SetNum(NumVerts);
 	const FBox Box(BoxMin, BoxMax);
@@ -116,7 +128,89 @@ FString UOpenStanceClothLibrary::SetupSectionCloth(USkeletalMesh* Mesh, int32 Se
 	}
 	RemoveUnusedClothingAssets(Mesh);
 	Mesh->MarkPackageDirty();
-	return FString::Printf(TEXT("%d sim verts, %d dynamic"), NumVerts, NumDynamic);
+	// Read back what the simulation will use.
+	int32 Applied = 0;
+	if (const FPointWeightMap* Final = Asset->LodData[0].PhysicalMeshData.FindWeightMap(EWeightMapTargetCommon::MaxDistance))
+	{
+		for (const float Value : Final->Values)
+		{
+			Applied += Value > 0.1f ? 1 : 0;
+		}
+	}
+	return FString::Printf(TEXT("%d sim verts, %d dynamic (%d after masks applied)"), NumVerts, NumDynamic, Applied);
+}
+
+FString UOpenStanceClothLibrary::InflateCapsules(UPhysicsAsset* PhysicsAsset, const TArray<FString>& BonePrefixes, float Delta)
+{
+	if (!PhysicsAsset)
+	{
+		return TEXT("ERROR: no physics asset");
+	}
+	PhysicsAsset->Modify();
+	TArray<FString> Grown;
+	for (USkeletalBodySetup* Setup : PhysicsAsset->SkeletalBodySetups)
+	{
+		if (!Setup)
+		{
+			continue;
+		}
+		const FString Bone = Setup->BoneName.ToString();
+		if (!BonePrefixes.ContainsByPredicate([&Bone](const FString& Prefix) { return Bone.StartsWith(Prefix); }))
+		{
+			continue;
+		}
+		Setup->Modify();
+		for (FKSphylElem& Capsule : Setup->AggGeom.SphylElems)
+		{
+			Grown.Add(FString::Printf(TEXT("%s %.1f->%.1f"), *Bone, Capsule.Radius, Capsule.Radius + Delta));
+			Capsule.Radius += Delta;
+		}
+		for (FKSphereElem& Sphere : Setup->AggGeom.SphereElems)
+		{
+			Grown.Add(FString::Printf(TEXT("%s sphere %.1f->%.1f"), *Bone, Sphere.Radius, Sphere.Radius + Delta));
+			Sphere.Radius += Delta;
+		}
+		Setup->InvalidatePhysicsData();
+		Setup->CreatePhysicsMeshes();
+	}
+	PhysicsAsset->MarkPackageDirty();
+	return FString::Join(Grown, TEXT(", "));
+}
+
+FString UOpenStanceClothLibrary::DescribeClothSimulation(USkeletalMeshComponent* Component)
+{
+	if (!Component)
+	{
+		return TEXT("no component");
+	}
+	static TMap<TWeakObjectPtr<USkeletalMeshComponent>, TArray<FVector3f>> Previous;
+	// Stalls until this frame's cloth task finishes, so the data is complete.
+	const TMap<int32, FClothSimulData>& Data = Component->GetCurrentClothingData_AnyThread();
+	TArray<FVector3f> Now;
+	for (const TPair<int32, FClothSimulData>& Pair : Data)
+	{
+		// Simulation positions are in the sim space given by the data's transform; bring them to component space.
+		const FTransform ToComponent = Pair.Value.Transform * Pair.Value.ComponentRelativeTransform;
+		for (const FVector3f& Position : Pair.Value.Positions)
+		{
+			Now.Add(FVector3f(ToComponent.TransformPosition(FVector(Position))));
+		}
+	}
+	float MinZ = Now.Num() ? TNumericLimits<float>::Max() : 0.0f;
+	float MaxMove = 0.0f;
+	const TArray<FVector3f>* Last = Previous.Find(Component);
+	for (int32 Index = 0; Index < Now.Num(); ++Index)
+	{
+		MinZ = FMath::Min(MinZ, Now[Index].Z);
+		if (Last && Last->Num() == Now.Num())
+		{
+			MaxMove = FMath::Max(MaxMove, FVector3f::Distance(Now[Index], (*Last)[Index]));
+		}
+	}
+	Previous.Add(Component, Now);
+	return FString::Printf(TEXT("%d assets, %d particles, min z %.1f, max move %.2f cm, sim suspended %s, cloth disabled %s, blend weight %.2f, render LOD %d"),
+		Data.Num(), Now.Num(), MinZ, MaxMove, Component->IsClothingSimulationSuspended() ? TEXT("yes") : TEXT("no"),
+		Component->bDisableClothSimulation ? TEXT("yes") : TEXT("no"), Component->ClothBlendWeight, Component->GetPredictedLODLevel());
 }
 
 void UOpenStanceClothLibrary::RemoveAllCloth(USkeletalMesh* Mesh)
@@ -149,7 +243,10 @@ FString UOpenStanceClothLibrary::DescribeCloth(USkeletalMesh* Mesh)
 	TArray<FString> Flags;
 	for (const FSkelMeshSection& Section : LodModel.Sections)
 	{
-		Flags.Add(Section.HasClothingData() ? TEXT("cloth") : TEXT("-"));
+		// The renderer can only show the simulation where the section has mesh-to-mesh mapping data.
+		Flags.Add(Section.HasClothingData()
+			? FString::Printf(TEXT("cloth (%d mapped verts)"), Section.ClothMappingDataLODs.Num() ? Section.ClothMappingDataLODs[0].Num() : 0)
+			: TEXT("-"));
 	}
 	return FString::Printf(TEXT("%d sections: [%s], %d clothing assets"), LodModel.Sections.Num(),
 		*FString::Join(Flags, TEXT(", ")), Mesh->GetMeshClothingAssets().Num());

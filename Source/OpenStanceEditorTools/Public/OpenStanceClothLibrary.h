@@ -5,6 +5,7 @@
 #include "OpenStanceClothLibrary.generated.h"
 
 class USkeletalMesh;
+class USkeletalMeshComponent;
 class UPhysicsAsset;
 
 /**
@@ -32,6 +33,22 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Open Stance|Cloth")
 	static FString SetupSectionCloth(USkeletalMesh* Mesh, int32 SectionIndex, UPhysicsAsset* PhysicsAsset,
 		float PinZ, float FreeZ, float MaxDistance, FVector BoxMin, FVector BoxMax);
+
+	/**
+	 * Grow the capsule and sphere radii of every body whose bone name starts with one of BonePrefixes by Delta cm.
+	 * Use it on a copy of the body physics asset for cloth collision: the body capsules sit inside the garments, so
+	 * cloth colliding with them can slip behind the trouser surface. Returns "<bone> <old>-><new>" per shape.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Open Stance|Cloth")
+	static FString InflateCapsules(UPhysicsAsset* PhysicsAsset, const TArray<FString>& BonePrefixes, float Delta);
+
+	/**
+	 * Live cloth state on a component: simulated assets, particle count, lowest particle (component space, cm) and the
+	 * largest particle move since the previous call for the same component, e.g. "1 assets, 2275 particles, min z 74.1,
+	 * max move 2.3 cm". "0 assets" means no simulation data exists. Call from the game thread of a playing world.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Open Stance|Cloth")
+	static FString DescribeClothSimulation(USkeletalMeshComponent* Component);
 
 	/** Remove cloth from every section of LOD 0. */
 	UFUNCTION(BlueprintCallable, Category = "Open Stance|Cloth")
