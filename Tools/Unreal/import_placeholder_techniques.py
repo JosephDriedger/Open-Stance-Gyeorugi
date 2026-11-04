@@ -7,7 +7,7 @@ Reads Resources/Models/Animation/PlaceholderTechniques/Placeholder_<Name>.fbx (T
 and creates, under /Game/Animation/Moves/Placeholder/:
     AS_Placeholder_<Name>     animation sequence on the production fighter skeleton (Stance and every technique)
     AM_Placeholder_<Name>     montage of it (techniques only; DT_MoveData's PlaceholderMontage column points here)
-Existing assets of those names are replaced. Log: Saved/Logs/import_placeholder_techniques.txt.
+Sequences of those names are re-imported in place; existing montages are kept (they play the re-imported clip). Log: Saved/Logs/import_placeholder_techniques.txt.
 """
 import os
 import traceback
@@ -66,7 +66,11 @@ try:
             continue
         montage_path = f"{DEST}/AM_Placeholder_{name}"
         if EAL.does_asset_exist(montage_path):
-            EAL.delete_asset(montage_path)
+            # The sequence is re-imported in place, so an existing montage already plays the new clip (deleting and
+            # re-creating it fails once it has been loaded).
+            montage = EAL.load_asset(montage_path)
+            log("montage kept", montage.get_path_name(), f"{montage.get_play_length():.3f}s")
+            continue
         factory = unreal.AnimMontageFactory()
         factory.set_editor_property("source_animation", sequence)
         montage = tools.create_asset(f"AM_Placeholder_{name}", DEST, unreal.AnimMontage, factory)

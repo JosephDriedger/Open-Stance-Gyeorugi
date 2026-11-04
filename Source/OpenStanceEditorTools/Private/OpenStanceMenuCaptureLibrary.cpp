@@ -4,6 +4,8 @@
 #include "Engine/LocalPlayer.h"
 #include "Engine/TextureRenderTarget2D.h"
 #include "ImageUtils.h"
+#include "ShaderCompiler.h"
+#include "Menu/OpenStanceFighterStudio.h"
 #include "Menu/OpenStanceMatchModel.h"
 #include "Menu/OpenStanceMenuContent.h"
 #include "Menu/OpenStanceMenuSubsystem.h"
@@ -157,6 +159,11 @@ bool UOpenStanceMenuCaptureLibrary::CaptureScreen(EOpenStanceMenuScreen Screen, 
 	for (int32 Frame = 0; Frame < 3; ++Frame)
 	{
 		Renderer.DrawWidget(Target.Get(), SlateWidget, FVector2D(Width, Height), 0.0f);
+		// Materials drawn by Slate (the fighter portraits) compile on first use; wait so the kept frame shows them
+		if (GShaderCompilingManager)
+		{
+			GShaderCompilingManager->FinishAllCompilation();
+		}
 	}
 	FlushRenderingCommands();
 
@@ -168,4 +175,43 @@ bool UOpenStanceMenuCaptureLibrary::CaptureScreen(EOpenStanceMenuScreen Screen, 
 		return false;
 	}
 	return true;
+}
+
+FString UOpenStanceMenuCaptureLibrary::CaptureFighterStudio(EOpenStanceBodyType BodyType, EOpenStanceSex Sex, bool bFaceLeft, float Seconds, const FString& OutputPath)
+{
+	UWorld* World = GEditor ? GEditor->GetEditorWorldContext().World() : nullptr;
+	TStrongObjectPtr<UOpenStanceFighterStudio> Studio(NewObject<UOpenStanceFighterStudio>());
+	if (!Studio->Init(World, bFaceLeft))
+	{
+		return TEXT("studio could not be built");
+	}
+	Studio->SetFighter(BodyType, Sex);
+	Studio->Update(Seconds);
+	FlushRenderingCommands();
+
+	FString Summary;
+	TArray<FLinearColor> Depth;
+	if (FTextureRenderTargetResource* Resource = Studio->GetDepthTarget()->GameThread_GetRenderTargetResource())
+	{
+		Resource->ReadLinearColorPixels(Depth);
+	}
+	float Min = TNumericLimits<float>::Max(), Max = TNumericLimits<float>::Lowest();
+	int32 Near = 0;
+	for (const FLinearColor& Pixel : Depth)
+	{
+		Min = FMath::Min(Min, Pixel.R);
+		Max = FMath::Max(Max, Pixel.R);
+		Near += Pixel.R < 10000.0f ? 1 : 0;
+	}
+	Summary = FString::Printf(TEXT("depth %d px, min %.1f, max %.1f, fighter %.1f%%"), Depth.Num(), Min, Max,
+		Depth.Num() ? 100.0f * Near / Depth.Num() : 0.0f);
+
+	IFileManager::Get().MakeDirectory(*FPaths::GetPath(OutputPath), true);
+	const TUniquePtr<FArchive> Archive(IFileManager::Get().CreateFileWriter(*OutputPath));
+	if (!Archive.IsValid() || !FImageUtils::ExportRenderTarget2DAsPNG(Studio->GetColorTarget(), *Archive))
+	{
+		Summary += TEXT("; colour PNG not written");
+	}
+	Studio->Shutdown();
+	return Summary;
 }

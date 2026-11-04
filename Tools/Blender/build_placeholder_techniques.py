@@ -58,14 +58,17 @@ S = HIP_Z / .915
 
 
 def stance():
+    # Sparring stance (gyeorugi junbi): side-on with the left foot leading, feet a long step apart on the opponent line,
+    # knees soft and weight on the balls of the feet; fists closed, lead fist forward at shoulder height, rear fist by
+    # the chin, elbows down guarding the trunk. Between the user's two reference photos (WT upright, and a lower base).
     return {
-        'pelvis': dict(drop=.07, yaw=-40, pitch=0, roll=0, shift=V(0, 0, 0)),
-        'chest': dict(yaw=12, pitch=6, roll=0),
+        'pelvis': dict(drop=.085, yaw=-52, pitch=0, roll=0, shift=V(0, 0, 0)),
+        'chest': dict(yaw=14, pitch=5, roll=0),
         'look': 0,
-        'foot_l': dict(at=V(.12, -.24, FOOT_Z), pole=V(.4, -1, .2), toe=V(-.3, -1, 0)),
-        'foot_r': dict(at=V(-.10, .22, FOOT_Z), pole=V(-.3, -1, .1), toe=V(-1, -.4, 0)),
-        'hand_l': dict(at=V(.05, -.36, 1.22), pole=V(.6, .2, -1)),
-        'hand_r': dict(at=V(-.06, -.22, 1.30), pole=V(-.6, .3, -1)),
+        'foot_l': dict(at=V(.10, -.33, FOOT_Z), pole=V(.5, -1, .2), toe=V(-.25, -1, 0)),
+        'foot_r': dict(at=V(-.13, .30, FOOT_Z), pole=V(-.4, -1, .1), toe=V(-1, -.35, 0)),
+        'hand_l': dict(at=V(.07, -.40, 1.30), pole=V(.5, .1, -1)),
+        'hand_r': dict(at=V(-.05, -.26, 1.35), pole=V(-.5, .2, -1)),
     }
 
 
@@ -161,6 +164,11 @@ def solve(p):
         posed['foot_' + side] = ft
         f0 = ft.translation.copy()
         toe = foot['toe'].normalized()
+        # A level toe direction keeps the rest pose's ankle-to-ball slope, so a planted foot lands flat instead of
+        # pointing down; a toe direction with its own height (a chambered or extended kick) is used as given.
+        if abs(toe.z) < 1e-6:
+            rest = head('ball_' + side) - head('foot_' + side)
+            toe = (toe * math.hypot(rest.x, rest.y) + V(0, 0, rest.z)).normalized()
         rotate('foot_' + side, aim_rotation(child_head('foot_' + side, 'ball_' + side) - f0, toe))
 
         hand = p['hand_' + side]
@@ -181,7 +189,64 @@ KEYED = ['pelvis', 'spine_01', 'spine_02', 'spine_03', 'spine_04', 'spine_05', '
     [f'{b}_{s}' for s in 'lr' for b in ('thigh', 'calf', 'foot', 'upperarm', 'lowerarm')]
 
 
+# Closed fists on every key: each finger joint curls toward the palm about the axis across the finger (from the rest
+# pose, so it works on any body built on this rig), the thumb wraps across. Left unkeyed, the fingers stay in the rest
+# pose's open hand, which reads as a claw.
+FINGER_CURL = {'01': 82, '02': 98, '03': 72}
+THUMB_CURL = {'01': 22, '02': 38, '03': 42}
+
+
+def _fist_rotations():
+    rotations = {}
+    for side in 'lr':
+        hand = head('hand_' + side)
+        across = head('pinky_01_' + side) - head('index_01_' + side)
+        along = head('middle_01_' + side) - hand
+        palm = along.cross(across).normalized()
+        # the thumb sits on the palm side of the hand plane (tested on the left hand; the right is its mirror, since on
+        # the right the thumb test picked the back of the hand)
+        if side == 'l':
+            if (head('thumb_02_l') - hand).dot(palm) < 0:
+                palm = -palm
+            left_palm = palm
+        else:
+            palm = Vector((-left_palm.x, left_palm.y, left_palm.z))
+        for finger in ('index', 'middle', 'ring', 'pinky', 'thumb'):
+            curls = THUMB_CURL if finger == 'thumb' else FINGER_CURL
+            for joint, degrees in curls.items():
+                name = f'{finger}_{joint}_{side}'
+                if name not in bones:
+                    continue
+                # This rig's finger bones (UE/MetaHuman convention) run along their local X and hinge about their local
+                # Z, the same axis for every joint of a finger; Blender's bone Y (head to tail) does not follow the
+                # finger, so the hinge is taken from the bone frame and only its sign from the hand: the one that turns
+                # the finger toward the palm (the thumb toward the palm and the little finger).
+                frame = REST[name].to_3x3()
+                direction = frame.col[0].normalized()
+                hinge = frame.col[2].normalized()
+                toward = ((across.normalized() + palm) if finger == 'thumb' else palm).normalized()
+                turned = Quaternion(hinge, math.radians(degrees)) @ direction
+                sign = 1.0 if (turned - direction).dot(toward) >= 0 else -1.0
+                # The right side's bone axes mirror the left's (UE convention), so it takes the left joint's rotation as is.
+                left = f'{finger}_{joint}_l'
+                rotations[name] = rotations[left] if side == 'r' and left in rotations else \
+                    Quaternion((0.0, 0.0, 1.0), sign * math.radians(degrees))
+    return rotations
+
+
+FIST = _fist_rotations()
+
+
+def key_fists(frame):
+    for name, rotation in FIST.items():
+        pb = rig.pose.bones[name]
+        pb.rotation_mode = 'QUATERNION'
+        pb.rotation_quaternion = rotation
+        pb.keyframe_insert('rotation_quaternion', frame=frame)
+
+
 def key_pose(p, frame):
+    key_fists(frame)
     posed = solve(p)
     for name in KEYED:
         bone = bones[name]

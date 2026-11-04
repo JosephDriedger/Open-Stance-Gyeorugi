@@ -4,6 +4,7 @@
 #include "Menu/OpenStanceMenuSubsystem.h"
 #include "Menu/OpenStanceMenuTheme.h"
 #include "Menu/Slate/SOpenStanceArt.h"
+#include "Menu/Slate/SOpenStanceFighterRender.h"
 #include "Menu/Slate/SOpenStanceFrame.h"
 #include "Menu/Slate/SOpenStanceItems.h"
 #include "Widgets/Layout/SBox.h"
@@ -77,12 +78,21 @@ TSharedRef<SWidget> UOpenStanceFighterSelectScreen::BuildSidePanel(EOpenStanceSi
 					.Fill(Palette::Panel)
 					.Padding(FMargin(U(1.0f)))
 					[
-						SNew(SOpenStanceFighterFigure)
-						.BodyColor(Colour)
-						.TrimColor(Dark)
-						.GearOn(true)
-						.Kick(bChung)
+						// The fighter's body build in the sparring stance, without gear; the silhouette if it cannot render
+						SNew(SOpenStanceFighterRender)
+						.BodyType_Lambda([Fighter]() { return Fighter().BodyType; })
 						.Sex_Lambda([Fighter]() { return Fighter().Sex; })
+						.FaceLeft(!bChung)
+						.World(GetWorld())
+						.Fallback()
+						[
+							SNew(SOpenStanceFighterFigure)
+							.BodyColor(Colour)
+							.TrimColor(Dark)
+							.GearOn(true)
+							.Kick(bChung)
+							.Sex_Lambda([Fighter]() { return Fighter().Sex; })
+						]
 					]
 				]
 			]
