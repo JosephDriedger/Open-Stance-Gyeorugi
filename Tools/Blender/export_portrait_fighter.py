@@ -21,9 +21,12 @@ out = Path(args[0])
 out.parent.mkdir(parents=True, exist_ok=True)
 # Optional look for one premade fighter (portrait_roster.json): SkinTone=, HairStyle=, HairColor=, EyeColor=, EyebrowStyle=, HeadStyle=
 LOOK = {a.split('=')[0]: int(a.split('=')[1]) for a in args[1:] if '=' in a}
+# --gear: the match fighter (FinalRefinement/Match, build_match_fighters.sh) wears its sparring gear, coloured for the side
+# MatchSide= gives (0 Chung blue, 1 Hong red); without it the menu portrait is in uniform only.
+GEAR = '--gear' in args
 rig = next(o for o in bpy.data.objects if o.type == 'ARMATURE' and o.name.startswith('RIG_Body_'))
 for key in ('Wear_Helmet', 'Wear_Protector', 'Wear_Gloves', 'Wear_FootGuards'):
-    rig[key] = False
+    rig[key] = GEAR
 rig['BlenderCloth'] = False
 for key, value in LOOK.items():
     rig[key] = value

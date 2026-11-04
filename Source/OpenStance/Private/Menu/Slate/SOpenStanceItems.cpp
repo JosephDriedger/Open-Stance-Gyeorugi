@@ -322,7 +322,7 @@ void SOpenStanceFighterTile::Construct(const FArguments& InArgs)
 {
 	InitInteraction(InArgs._Locked, InArgs._OnPressed, InArgs._OnStep, InArgs._OnActivated);
 	Selected = InArgs._Selected;
-	bHong = InArgs._Hong;
+	Hong = InArgs._Hong;
 
 	ChildSlot
 	[
@@ -363,7 +363,7 @@ FLinearColor SOpenStanceFighterTile::GetRule() const
 {
 	if (IsActive() || Selected.Get(false))
 	{
-		return bHong ? Palette::Hong : Palette::Chung;
+		return Hong.Get(false) ? Palette::Hong : Palette::Chung;
 	}
 	return FLinearColor::Transparent;
 }

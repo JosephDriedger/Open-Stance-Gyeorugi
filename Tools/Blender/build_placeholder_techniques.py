@@ -406,6 +406,33 @@ def phase_frame(phase, s, a, rec):
     return 1 + round(seconds * FPS)
 
 
+def mirror(p):
+    """The same pose for the other side: left and right swap, x and the yaw/roll turns change sign (a right-lead stance,
+    a left-leg kick). The clips are authored right-leg from a left lead; the game plays these for the mirror cases
+    instead of scaling the fighter by -1, which turned the gear's faces inside out."""
+    def flip(v):
+        return V(-v.x, v.y, v.z)
+
+    m = {}
+    for key, value in p.items():
+        if key in ('pelvis', 'chest'):
+            value = dict(value)
+            for turn in ('yaw', 'roll'):
+                if turn in value:
+                    value[turn] = -value[turn]
+            if 'shift' in value:
+                value['shift'] = flip(value['shift'])
+            m[key] = value
+        elif key == 'look':
+            m[key] = -value
+        elif key[:5] in ('foot_', 'hand_'):
+            other = key[:5] + ('r' if key.endswith('_l') else 'l')
+            m[other] = {k: flip(v) if isinstance(v, Vector) else v for k, v in value.items()}
+        else:
+            m[key] = value
+    return m
+
+
 def build():
     scene.render.fps = FPS
     rig.animation_data_create()
@@ -417,17 +444,24 @@ def build():
     key_pose(STANCE, 1)
     key_pose(STANCE, 31)
     made['Stance'] = {'action': stance_action.name, 'frames': 31}
+    stance_action = bpy.data.actions.new('Placeholder_Stance_Mirror')
+    stance_action.use_fake_user = True
+    rig.animation_data.action = stance_action
+    key_pose(mirror(STANCE), 1)
+    key_pose(mirror(STANCE), 31)
+    made['Stance_Mirror'] = {'action': stance_action.name, 'frames': 31}
     for name, keys in TECHNIQUES.items():
         s, a, rec = times[name]
-        action = bpy.data.actions.new('Placeholder_' + name)
-        action.use_fake_user = True
-        rig.animation_data.action = action
-        last = 1
-        for phase, p in keys():
-            frame = max(last, phase_frame(phase, s, a, rec))
-            key_pose(p, frame)
-            last = frame + 1
-        made[name] = {'action': action.name, 'frames': last - 1, 'startup_s': s, 'active_s': a, 'recovery_s': rec}
+        for suffix, shape in (('', lambda p: p), ('_Mirror', mirror)):
+            action = bpy.data.actions.new('Placeholder_' + name + suffix)
+            action.use_fake_user = True
+            rig.animation_data.action = action
+            last = 1
+            for phase, p in keys():
+                frame = max(last, phase_frame(phase, s, a, rec))
+                key_pose(shape(p), frame)
+                last = frame + 1
+            made[name + suffix] = {'action': action.name, 'frames': last - 1, 'startup_s': s, 'active_s': a, 'recovery_s': rec}
     return made
 
 

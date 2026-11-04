@@ -72,6 +72,39 @@ namespace
 		TEXT("/Game/Characters/Fighters/Gear/Clean/MI_FighterGear_Hong.MI_FighterGear_Hong") };
 	const TCHAR* StanceAnimationPath = TEXT("/Game/Animation/Moves/Placeholder/AS_Placeholder_Stance.AS_Placeholder_Stance");
 
+	/**
+	 * The match fighter for a roster fighter and side: the suite body in the layered dobok with its sparring gear in the
+	 * side's colour (Tools/Blender/build_match_fighters.sh, Tools/Unreal/import_match_fighters.py), on the rig the
+	 * placeholder clips are authored on, so the techniques play on it without stretching the body out of the gear.
+	 */
+	FString MatchFighterPath(const FString& PortraitKey, int32 Side)
+	{
+		const FString Name = FString::Printf(TEXT("SK_Match_%s_%s"), *PortraitKey, Side == 0 ? TEXT("Chung") : TEXT("Hong"));
+		return FString::Printf(TEXT("/Game/Characters/Fighters/Match/%s/%s.%s"), *Name.RightChop(9), *Name, *Name);
+	}
+
+	/**
+	 * The mirrored copy of a placeholder clip (<clip>_Mirror beside it: left leg and right lead), or null. Playing it
+	 * replaces scaling the fighter by -1, which turned the gear's faces inside out (it read as see-through from behind).
+	 */
+	UAnimSequenceBase* MirrorClip(UAnimSequenceBase* Clip)
+	{
+		static TMap<TWeakObjectPtr<UAnimSequenceBase>, TWeakObjectPtr<UAnimSequenceBase>> Mirrors;
+		if (!Clip)
+		{
+			return nullptr;
+		}
+		if (const TWeakObjectPtr<UAnimSequenceBase>* Found = Mirrors.Find(Clip))
+		{
+			return Found->Get();
+		}
+		const FString Package = Clip->GetOutermost()->GetName() + TEXT("_Mirror");
+		const FString Name = Clip->GetName() + TEXT("_Mirror");
+		UAnimSequenceBase* Mirror = LoadObject<UAnimSequenceBase>(nullptr, *(Package + TEXT(".") + Name), nullptr, LOAD_NoWarn | LOAD_Quiet);
+		Mirrors.Add(Clip, Mirror);
+		return Mirror;
+	}
+
 	/** The animation a montage plays (its first segment), so the greybox can scrub it frame by frame. */
 	UAnimSequenceBase* MontageClip(UAnimMontage* Montage)
 	{
@@ -357,8 +390,15 @@ bool UOpenStanceCombatDebugSubsystem::BuildFighterMeshes()
 		return false;
 	}
 	USkeletalMesh* HeadMesh = LoadObject<USkeletalMesh>(nullptr, FighterHeadPath);
+	// The fighters chosen on Fighter Select, as match fighters in their side's colour, when those are built
+	const UOpenStanceMenuSubsystem* Menu = GetMenu();
+	const TArray<FOpenStanceFighterProfile>& Roster = OpenStanceMenuContent::GetRoster();
 	for (int32 Fighter = 0; Fighter < 2; ++Fighter)
 	{
+		const int32 RosterIndex = Menu ? (Fighter == 0 ? Menu->GetSession().ChungFighter : Menu->GetSession().HongFighter) : Fighter;
+		USkeletalMesh* MatchMesh = Roster.IsValidIndex(RosterIndex)
+			? LoadObject<USkeletalMesh>(nullptr, *MatchFighterPath(OpenStanceMenuContent::GetPortraitKey(Roster[RosterIndex]), Fighter), nullptr, LOAD_NoWarn | LOAD_Quiet)
+			: nullptr;
 		AActor* Actor = BodyActors[Fighter];
 		USceneComponent* Pivot = NewObject<USceneComponent>(Actor, TEXT("FighterPivot"));
 		Pivot->SetMobility(EComponentMobility::Movable);
@@ -366,7 +406,7 @@ bool UOpenStanceCombatDebugSubsystem::BuildFighterMeshes()
 		Pivot->RegisterComponent();
 
 		USkeletalMeshComponent* Body = NewObject<USkeletalMeshComponent>(Actor, TEXT("FighterBody"));
-		Body->SetSkeletalMesh(BodyMesh);
+		Body->SetSkeletalMesh(MatchMesh ? MatchMesh : BodyMesh);
 		Body->SetupAttachment(Pivot);
 		// The fighter faces the mesh's +Y; the pivot's forward is +X.
 		Body->SetRelativeRotation(FRotator(0.0, -90.0, 0.0));
@@ -391,6 +431,14 @@ bool UOpenStanceCombatDebugSubsystem::BuildFighterMeshes()
 			Part->SetLeaderPoseComponent(Body);
 			return Part;
 		};
+		if (MatchMesh)
+		{
+			// One mesh: body, head, hair, dobok and gear (already in the side's colour)
+			FighterPivots.Add(Pivot);
+			FighterBodies.Add(Body);
+			ShownAnimation[Fighter] = StanceAnimation;
+			continue;
+		}
 		Follower(HeadMesh, TEXT("FighterHead"));
 		UMaterialInterface* Team = LoadObject<UMaterialInterface>(nullptr, TeamGearMaterials[Fighter]);
 		for (const TCHAR* Part : FighterGearParts)
@@ -426,8 +474,6 @@ void UOpenStanceCombatDebugSubsystem::UpdateFighterMesh(int32 Index, const FVect
 	}
 	USkeletalMeshComponent* Body = FighterBodies[Index];
 	FighterPivots[Index]->SetWorldLocationAndRotation(Base, BodyRotation);
-	// Mirror across the fighter's own left-right axis (the mesh's X).
-	Body->SetRelativeScale3D(FVector(bMirror ? -1.0 : 1.0, 1.0, 1.0));
 
 	UAnimSequenceBase* Clip = nullptr;
 	float Time = 0.0f;
@@ -452,6 +498,15 @@ void UOpenStanceCombatDebugSubsystem::UpdateFighterMesh(int32 Index, const FVect
 	{
 		return;
 	}
+	// The mirror cases play the clip's mirrored copy; only without one does the fighter fall back to a -1 scale across
+	// its own left-right axis (the mesh's X).
+	UAnimSequenceBase* Mirrored = bMirror ? MirrorClip(Clip) : nullptr;
+	if (Mirrored)
+	{
+		Time = Time / FMath::Max(Clip->GetPlayLength(), 0.01f) * Mirrored->GetPlayLength();
+		Clip = Mirrored;
+	}
+	Body->SetRelativeScale3D(FVector(bMirror && !Mirrored ? -1.0 : 1.0, 1.0, 1.0));
 	if (ShownAnimation[Index] != Clip)
 	{
 		Body->SetAnimation(Clip);

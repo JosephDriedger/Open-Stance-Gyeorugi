@@ -135,10 +135,10 @@ private:
 	TArray<TObjectPtr<UMaterialInstanceDynamic>> BodyMaterials;
 
 	/**
-	 * The fighters as real characters (os.GreyboxFighterMesh): the production Medium body with its head and gear following
-	 * it, placed where the shape fighter would be and scrubbed through the technique's animation by combat phase. One
-	 * pivot per fighter carries the turn (spins included) and jump lift; the body under it is mirrored for left-leg
-	 * techniques and right-lead stances, because the placeholder clips are all authored right-leg from a left-lead stance.
+	 * The fighters as real characters (os.GreyboxFighterMesh): each chosen fighter's match build (dobok and gear in the side's
+	 * colour, one mesh; else the production Medium body with its head and gear following it), placed where the shape fighter would be and scrubbed through the technique's animation by combat phase. One
+	 * pivot per fighter carries the turn (spins included) and jump lift; left-leg techniques and right-lead stances play
+	 * the clips' mirrored copies, since the placeholder clips are all authored right-leg from a left-lead stance.
 	 */
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<USceneComponent>> FighterPivots;

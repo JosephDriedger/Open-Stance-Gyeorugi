@@ -150,7 +150,8 @@ public:
 		/** Smaller type and padding, for long lists (Fighter Select's twelve a side). */
 		SLATE_ARGUMENT(bool, Compact)
 		SLATE_ATTRIBUTE(bool, Selected)
-		SLATE_ARGUMENT(bool, Hong)
+		/** Accent in Hong red rather than Chung blue (Fighter Select: the side this fighter is picked for). */
+		SLATE_ATTRIBUTE(bool, Hong)
 		OPENSTANCE_INTERACTIVE_ARGUMENTS
 	SLATE_END_ARGS()
 
@@ -161,7 +162,7 @@ private:
 	FLinearColor GetRule() const;
 
 	TAttribute<bool> Selected;
-	bool bHong = false;
+	TAttribute<bool> Hong;
 };
 
 /** A colour choice in the fighter creator. */
