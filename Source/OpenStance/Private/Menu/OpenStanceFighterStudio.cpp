@@ -183,13 +183,23 @@ bool UOpenStanceFighterStudio::Init(UWorld* World, bool bFaceLeft)
 	return true;
 }
 
-void UOpenStanceFighterStudio::SetFighter(EOpenStanceBodyType BodyType, EOpenStanceSex Sex)
+void UOpenStanceFighterStudio::SetFighter(EOpenStanceBodyType BodyType, EOpenStanceSex Sex, const FString& PortraitKey)
 {
-	if (!Body || (bHasBody && BodyType == ShownBodyType && Sex == ShownSex))
+	if (!Body || (bHasBody && BodyType == ShownBodyType && Sex == ShownSex && PortraitKey == ShownKey))
 	{
 		return;
 	}
-	USkeletalMesh* Mesh = LoadObject<USkeletalMesh>(nullptr, *PortraitMeshPath(BodyType, Sex));
+	// The fighter's own portrait (skin tone, hair and head: Tools/Blender/build_roster_portraits.sh), else the plain build
+	USkeletalMesh* Mesh = nullptr;
+	if (!PortraitKey.IsEmpty())
+	{
+		const FString Path = FString::Printf(TEXT("/Game/Characters/Fighters/Portrait/Roster/%s/SK_Portrait_%s.SK_Portrait_%s"), *PortraitKey, *PortraitKey, *PortraitKey);
+		Mesh = LoadObject<USkeletalMesh>(nullptr, *Path, nullptr, LOAD_NoWarn | LOAD_Quiet);
+	}
+	if (!Mesh)
+	{
+		Mesh = LoadObject<USkeletalMesh>(nullptr, *PortraitMeshPath(BodyType, Sex));
+	}
 	if (!Mesh)
 	{
 		UE_LOG(LogTemp, Warning, TEXT("Fighter studio: no portrait fighter at %s; showing the body build"), *PortraitMeshPath(BodyType, Sex));
@@ -201,6 +211,7 @@ void UOpenStanceFighterStudio::SetFighter(EOpenStanceBodyType BodyType, EOpenSta
 		return;
 	}
 	ShownSex = Sex;
+	ShownKey = PortraitKey;
 	Body->SetSkeletalMesh(Mesh);
 	Body->SetAnimationMode(EAnimationMode::AnimationSingleNode);
 	Body->SetAnimation(Stance);

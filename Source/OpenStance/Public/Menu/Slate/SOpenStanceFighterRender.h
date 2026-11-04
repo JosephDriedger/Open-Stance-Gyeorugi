@@ -26,6 +26,8 @@ public:
 	}
 		SLATE_ATTRIBUTE(EOpenStanceBodyType, BodyType)
 		SLATE_ATTRIBUTE(EOpenStanceSex, Sex)
+		/** The premade fighter's portrait key (OpenStanceMenuContent::GetPortraitKey); empty shows the plain build. */
+		SLATE_ATTRIBUTE(FString, PortraitKey)
 		/** Turn toward the left of the screen (the right-hand, Hong, panel). */
 		SLATE_ARGUMENT(bool, FaceLeft)
 		/** The world the studio is built in (the screen's). */
@@ -41,6 +43,7 @@ public:
 private:
 	TAttribute<EOpenStanceBodyType> BodyType;
 	TAttribute<EOpenStanceSex> Sex;
+	TAttribute<FString> PortraitKey;
 	TStrongObjectPtr<UOpenStanceFighterStudio> Studio;
 	FSlateBrush Brush;
 	float Seconds = 0.0f;

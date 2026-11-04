@@ -12,6 +12,7 @@ void SOpenStanceFighterRender::Construct(const FArguments& InArgs)
 {
 	BodyType = InArgs._BodyType;
 	Sex = InArgs._Sex;
+	PortraitKey = InArgs._PortraitKey;
 	UWorld* World = InArgs._World.Get();
 	if (World && !World->IsNetMode(NM_DedicatedServer) && FApp::CanEverRender())
 	{
@@ -28,7 +29,7 @@ void SOpenStanceFighterRender::Construct(const FArguments& InArgs)
 		return;
 	}
 
-	Studio->SetFighter(BodyType.Get(), Sex.Get());
+	Studio->SetFighter(BodyType.Get(), Sex.Get(), PortraitKey.Get());
 	Studio->Update(0.0f);
 	static IConsoleVariable* Raw = IConsoleManager::Get().FindConsoleVariable(TEXT("os.FighterPortraitRaw"));
 	Brush.SetResourceObject(Raw && Raw->GetInt() ? static_cast<UObject*>(Studio->GetColorTarget()) : static_cast<UObject*>(Studio->GetMaterial()));
@@ -58,7 +59,7 @@ void SOpenStanceFighterRender::Tick(const FGeometry& AllottedGeometry, const dou
 	if (Studio.IsValid())
 	{
 		Seconds += InDeltaTime;
-		Studio->SetFighter(BodyType.Get(), Sex.Get());
+		Studio->SetFighter(BodyType.Get(), Sex.Get(), PortraitKey.Get());
 		Studio->Update(Seconds);
 	}
 }

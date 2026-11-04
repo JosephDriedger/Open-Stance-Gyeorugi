@@ -6,9 +6,13 @@
 Reads Resources/Models/FinalRefinement/Portrait/<Kind>_<Sex>/SK_Portrait_<Kind>_<Sex>.fbx (Tools/Blender/
 build_portrait_fighters.sh) and writes /Game/Characters/Fighters/Portrait/SK_Portrait_<Kind>_<Sex>, with its materials
 and textures, on the production fighter skeleton, so the placeholder technique clips (authored on the same suite rig)
-play on it without distortion. Existing assets of those names are replaced. Log: Saved/Logs/import_portrait_fighters.txt.
+play on it without distortion. Also imports every premade fighter's own portrait (Tools/Blender/portrait_roster.json,
+build_roster_portraits.sh) from Portrait/Roster/<Key>/ to /Game/Characters/Fighters/Portrait/Roster/<Key>/SK_Portrait_<Key>.
+Pass `roster` to import only those. Existing assets of those names are replaced. Log: Saved/Logs/import_portrait_fighters.txt.
 """
+import json
 import os
+import sys
 import traceback
 
 import unreal
@@ -17,7 +21,10 @@ REPO = "D:/Open-Stance-Gyeorugi"
 SOURCE = f"{REPO}/Resources/Models/FinalRefinement/Portrait"
 DEST = "/Game/Characters/Fighters/Portrait"
 SKELETON_FROM = "/Game/Characters/Fighters/Export/MH_FighterBase_Body"
-TARGETS = [f"{k}_{s}" for k in ("Compact", "LeanTall", "Stocky", "Tall") for s in ("Male", "Female")]
+BUILDS = [f"{k}_{s}" for k in ("Compact", "LeanTall", "Stocky", "Tall") for s in ("Male", "Female")]
+ROSTER = [f["key"] for f in json.load(open(f"{REPO}/Tools/Blender/portrait_roster.json"))["fighters"]]
+# (folder under SOURCE and DEST, asset name stem)
+TARGETS = ([] if "roster" in sys.argv[1:] else [(t, t) for t in BUILDS]) + [(f"Roster/{k}", k) for k in ROSTER]
 EAL = unreal.EditorAssetLibrary
 LOG = open(f"{REPO}/Saved/Logs/import_portrait_fighters.txt", "w", encoding="utf-8")
 
@@ -31,12 +38,12 @@ try:
     unreal.SystemLibrary.execute_console_command(None, "Interchange.FeatureFlags.Import.FBX 0")
     skeleton = EAL.load_asset(SKELETON_FROM).get_editor_property("skeleton")
     tools = unreal.AssetToolsHelpers.get_asset_tools()
-    for target in TARGETS:
-        fbx = f"{SOURCE}/{target}/SK_Portrait_{target}.fbx"
+    for sub, target in TARGETS:
+        fbx = f"{SOURCE}/{sub}/SK_Portrait_{target}.fbx"
         if not os.path.exists(fbx):
             log("missing", fbx)
             continue
-        folder = f"{DEST}/{target}"
+        folder = f"{DEST}/{sub}"
         ui = unreal.FbxImportUI()
         ui.import_mesh = True
         ui.import_as_skeletal = True
@@ -66,3 +73,5 @@ except Exception:
     log("ERROR\n" + traceback.format_exc())
 finally:
     LOG.close()
+    if "quit" in sys.argv[1:]:  # the command line's own quit can hang after an import; leave from here instead
+        unreal.SystemLibrary.quit_editor()

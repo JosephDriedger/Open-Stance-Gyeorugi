@@ -28,8 +28,11 @@ public:
 	/** Builds the studio in World. bFaceLeft turns and mirrors the fighter for the right-hand (Hong) panel. */
 	bool Init(UWorld* World, bool bFaceLeft);
 
-	/** Shows the portrait fighter of this body type and sex; does nothing if it is already showing. */
-	void SetFighter(EOpenStanceBodyType BodyType, EOpenStanceSex Sex);
+	/**
+	 * Shows a premade fighter's portrait (PortraitKey, OpenStanceMenuContent::GetPortraitKey), or with no key or no such
+	 * asset the plain build of this body type and sex; does nothing if it is already showing.
+	 */
+	void SetFighter(EOpenStanceBodyType BodyType, EOpenStanceSex Sex, const FString& PortraitKey = FString());
 
 	/** Poses the stance at Seconds into its loop and renders both captures. */
 	void Update(float Seconds);
@@ -77,5 +80,6 @@ private:
 
 	EOpenStanceBodyType ShownBodyType = EOpenStanceBodyType::Compact;
 	EOpenStanceSex ShownSex = EOpenStanceSex::Male;
+	FString ShownKey;
 	bool bHasBody = false;
 };

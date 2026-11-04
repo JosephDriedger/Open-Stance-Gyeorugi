@@ -1,5 +1,6 @@
 #include "Menu/Slate/OpenStanceMenuWidgets.h"
 
+#include "Engine/Texture2D.h"
 #include "Internationalization/Regex.h"
 #include "Menu/Slate/SOpenStanceArt.h"
 #include "Menu/Slate/SOpenStanceFrame.h"
@@ -8,6 +9,7 @@
 #include "Widgets/Layout/SBox.h"
 #include "Widgets/Layout/SWrapBox.h"
 #include "Widgets/SBoxPanel.h"
+#include "Widgets/SNullWidget.h"
 #include "Widgets/SOverlay.h"
 #include "Widgets/Text/STextBlock.h"
 
@@ -549,5 +551,60 @@ namespace OpenStanceMenuWidgets
 			Parts.AddUnique(Part);
 		}
 		return Parts;
+	}
+
+	namespace
+	{
+		/** One brush per flag, kept for the session (the textures are rooted: a few small UI images). */
+		const FSlateBrush* FindFlagBrush(const FString& CountryCode)
+		{
+			static TMap<FString, TSharedPtr<FSlateBrush>> Brushes;
+			if (const TSharedPtr<FSlateBrush>* Found = Brushes.Find(CountryCode))
+			{
+				return Found->Get();
+			}
+			TSharedPtr<FSlateBrush> Brush;
+			const FString Path = FString::Printf(TEXT("/Game/Menu/Flags/T_Flag_%s.T_Flag_%s"), *CountryCode, *CountryCode);
+			if (UTexture2D* Texture = CountryCode.IsEmpty() ? nullptr : LoadObject<UTexture2D>(nullptr, *Path, nullptr, LOAD_NoWarn | LOAD_Quiet))
+			{
+				Texture->AddToRoot();
+				Brush = MakeShared<FSlateBrush>();
+				Brush->SetResourceObject(Texture);
+				Brush->ImageSize = FVector2D(FMath::Max(Texture->GetSizeX(), 1), FMath::Max(Texture->GetSizeY(), 1));
+				Brush->DrawAs = ESlateBrushDrawType::Image;
+			}
+			Brushes.Add(CountryCode, Brush);
+			return Brush.Get();
+		}
+
+		float FlagAspect(const FSlateBrush* Brush)
+		{
+			return Brush && Brush->ImageSize.Y > 0 ? Brush->ImageSize.X / Brush->ImageSize.Y : 1.5f;
+		}
+	}
+
+	TSharedRef<SWidget> Flag(const FString& CountryCode, float Height)
+	{
+		const FSlateBrush* Brush = FindFlagBrush(CountryCode);
+		if (!Brush)
+		{
+			return SNullWidget::NullWidget;
+		}
+		return SNew(SBox)
+			.HeightOverride(U(Height))
+			.WidthOverride(U(Height) * FlagAspect(Brush))
+			[
+				SNew(SImage).Image(Brush)
+			];
+	}
+
+	TSharedRef<SWidget> LiveFlag(TFunction<FString()> GetCountryCode, float Height)
+	{
+		return SNew(SBox)
+			.HeightOverride(U(Height))
+			.WidthOverride_Lambda([GetCountryCode, Height]() { return U(Height) * FlagAspect(FindFlagBrush(GetCountryCode())); })
+			[
+				SNew(SImage).Image_Lambda([GetCountryCode]() { return FindFlagBrush(GetCountryCode()); })
+			];
 	}
 }

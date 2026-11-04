@@ -100,6 +100,13 @@ struct OPENSTANCE_API FOpenStanceFighterProfile
 	/** Overall rating shown on the select screen. */
 	UPROPERTY(BlueprintReadOnly, Category = "Open Stance|Menu")
 	int32 Overall = 70;
+
+	/** The nation the fighter represents: its three-letter code (as on a WT results sheet) and its name. */
+	UPROPERTY(BlueprintReadOnly, Category = "Open Stance|Menu")
+	FString CountryCode;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Open Stance|Menu")
+	FString CountryName;
 };
 
 /**

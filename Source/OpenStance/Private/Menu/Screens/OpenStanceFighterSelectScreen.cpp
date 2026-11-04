@@ -8,6 +8,7 @@
 #include "Menu/Slate/SOpenStanceFrame.h"
 #include "Menu/Slate/SOpenStanceItems.h"
 #include "Widgets/Layout/SBox.h"
+#include "Widgets/Layout/SUniformGridPanel.h"
 #include "Widgets/Layout/SWidgetSwitcher.h"
 #include "Widgets/SBoxPanel.h"
 
@@ -82,6 +83,7 @@ TSharedRef<SWidget> UOpenStanceFighterSelectScreen::BuildSidePanel(EOpenStanceSi
 						SNew(SOpenStanceFighterRender)
 						.BodyType_Lambda([Fighter]() { return Fighter().BodyType; })
 						.Sex_Lambda([Fighter]() { return Fighter().Sex; })
+						.PortraitKey_Lambda([Fighter]() { return OpenStanceMenuContent::GetPortraitKey(Fighter()); })
 						.FaceLeft(!bChung)
 						.World(GetWorld())
 						.Fallback()
@@ -98,14 +100,22 @@ TSharedRef<SWidget> UOpenStanceFighterSelectScreen::BuildSidePanel(EOpenStanceSi
 			]
 			+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, U(0.8f), 0.0f, 0.0f)
 			[
-				MakeLiveText([Fighter]() { return Fighter().Name; }, { EFont::Display, 2.6f, 0.03f, false }, Palette::Bone)
+				SNew(SHorizontalBox)
+				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.0f, 0.0f, U(0.8f), 0.0f)
+				[
+					LiveFlag([Fighter]() { return Fighter().CountryCode; }, 2.0f)
+				]
+				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
+				[
+					MakeLiveText([Fighter]() { return Fighter().Name; }, { EFont::Display, 2.6f, 0.03f, false }, Palette::Bone)
+				]
 			]
 			+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, U(0.8f), 0.0f, 0.0f)
 			[
 				SNew(SHorizontalBox)
 				+ SHorizontalBox::Slot().AutoWidth().Padding(0.0f, 0.0f, U(0.8f), 0.0f)
 				[
-					LiveTag([Fighter]() { return Fighter().Sex == EOpenStanceSex::Female ? FString(TEXT("Women")) : FString(TEXT("Men")); })
+					LiveTag([Fighter]() { return Fighter().CountryName; })
 				]
 				+ SHorizontalBox::Slot().AutoWidth().Padding(0.0f, 0.0f, U(0.8f), 0.0f)
 				[
@@ -128,14 +138,18 @@ TSharedRef<SWidget> UOpenStanceFighterSelectScreen::BuildRosterList(EOpenStanceS
 	const TArray<FOpenStanceFighterProfile>& Roster = OpenStanceMenuContent::GetRoster();
 	TWeakObjectPtr<UOpenStanceFighterSelectScreen> WeakThis(this);
 
-	TSharedRef<SVerticalBox> List = SNew(SVerticalBox);
+	// Two columns of compact tiles, filled row by row: twelve fighters a side fit where one column of four did
+	TSharedRef<SUniformGridPanel> List = SNew(SUniformGridPanel).SlotPadding(FMargin(U(0.4f)));
 	bool bFirst = true;
+	int32 Cell = 0;
 	for (const int32 RosterIndex : OpenStanceMenuContent::GetRosterIndices(Sex))
 	{
 		const FOpenStanceFighterProfile& Profile = Roster[RosterIndex];
 		TSharedRef<SOpenStanceFighterTile> Tile = SNew(SOpenStanceFighterTile)
 			.Name(Profile.Name)
-			.Detail(FString::Printf(TEXT("%s · %s · OVR %d"), *OpenStanceMenuContent::GetBodyTypeName(Profile.BodyType),
+			.CountryCode(Profile.CountryCode)
+			.Compact(true)
+			.Detail(FString::Printf(TEXT("%s · %s · %s · %d"), *Profile.CountryCode, *OpenStanceMenuContent::GetBodyTypeName(Profile.BodyType),
 				*OpenStanceMenuContent::GetStyleName(Profile.Style), Profile.Overall))
 			.Selected_Lambda([WeakThis, RosterIndex]()
 			{
@@ -150,10 +164,11 @@ TSharedRef<SWidget> UOpenStanceFighterSelectScreen::BuildRosterList(EOpenStanceS
 		{
 			SetDefaultFocus(Tile);
 		}
-		List->AddSlot().AutoHeight().Padding(0.0f, bFirst ? 0.0f : U(0.8f), 0.0f, 0.0f)
+		List->AddSlot(Cell % 2, Cell / 2)
 		[
 			Tile
 		];
+		++Cell;
 		bFirst = false;
 	}
 	return List;

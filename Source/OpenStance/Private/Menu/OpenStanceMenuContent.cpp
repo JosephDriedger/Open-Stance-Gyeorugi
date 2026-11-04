@@ -8,9 +8,12 @@ namespace OpenStanceMenuContent
 {
 	namespace
 	{
-		FOpenStanceFighterProfile MakeFighter(const TCHAR* Name, EOpenStanceSex Sex, EOpenStanceBodyType BodyType, EOpenStanceFightingStyle Style, int32 Overall)
+		FOpenStanceFighterProfile MakeFighter(const TCHAR* Name, EOpenStanceSex Sex, EOpenStanceBodyType BodyType, EOpenStanceFightingStyle Style,
+			int32 Overall, const TCHAR* CountryCode, const TCHAR* CountryName)
 		{
 			FOpenStanceFighterProfile Profile;
+			Profile.CountryCode = CountryCode;
+			Profile.CountryName = CountryName;
 			Profile.Name = Name;
 			Profile.Sex = Sex;
 			Profile.BodyType = BodyType;
@@ -87,16 +90,52 @@ namespace OpenStanceMenuContent
 	{
 		static const TArray<FOpenStanceFighterProfile> Roster =
 		{
-			MakeFighter(TEXT("Min-jun Park"), EOpenStanceSex::Male, EOpenStanceBodyType::Compact, EOpenStanceFightingStyle::Counter, 74),
-			MakeFighter(TEXT("Dae-ho Kim"), EOpenStanceSex::Male, EOpenStanceBodyType::Stocky, EOpenStanceFightingStyle::Pressure, 77),
-			MakeFighter(TEXT("Marcus Bell"), EOpenStanceSex::Male, EOpenStanceBodyType::Tall, EOpenStanceFightingStyle::Kicker, 80),
-			MakeFighter(TEXT("Tomas Silva"), EOpenStanceSex::Male, EOpenStanceBodyType::LeanTall, EOpenStanceFightingStyle::Counter, 76),
-			MakeFighter(TEXT("Sofia Reyes"), EOpenStanceSex::Female, EOpenStanceBodyType::LeanTall, EOpenStanceFightingStyle::Kicker, 81),
-			MakeFighter(TEXT("Amara Okafor"), EOpenStanceSex::Female, EOpenStanceBodyType::Tall, EOpenStanceFightingStyle::Counter, 79),
-			MakeFighter(TEXT("Aiko Tanaka"), EOpenStanceSex::Female, EOpenStanceBodyType::Compact, EOpenStanceFightingStyle::Pressure, 75),
-			MakeFighter(TEXT("Hana Lee"), EOpenStanceSex::Female, EOpenStanceBodyType::Stocky, EOpenStanceFightingStyle::Counter, 73)
+			// Fictional fighters. New ones go on the end: sessions and saves refer to fighters by their index here.
+			MakeFighter(TEXT("Min-jun Park"), EOpenStanceSex::Male, EOpenStanceBodyType::Compact, EOpenStanceFightingStyle::Counter, 74, TEXT("KOR"), TEXT("Korea")),
+			MakeFighter(TEXT("Dae-ho Kim"), EOpenStanceSex::Male, EOpenStanceBodyType::Stocky, EOpenStanceFightingStyle::Pressure, 77, TEXT("KOR"), TEXT("Korea")),
+			MakeFighter(TEXT("Marcus Bell"), EOpenStanceSex::Male, EOpenStanceBodyType::Tall, EOpenStanceFightingStyle::Kicker, 80, TEXT("USA"), TEXT("United States")),
+			MakeFighter(TEXT("Tomas Silva"), EOpenStanceSex::Male, EOpenStanceBodyType::LeanTall, EOpenStanceFightingStyle::Counter, 76, TEXT("BRA"), TEXT("Brazil")),
+			MakeFighter(TEXT("Sofia Reyes"), EOpenStanceSex::Female, EOpenStanceBodyType::LeanTall, EOpenStanceFightingStyle::Kicker, 81, TEXT("ESP"), TEXT("Spain")),
+			MakeFighter(TEXT("Amara Okafor"), EOpenStanceSex::Female, EOpenStanceBodyType::Tall, EOpenStanceFightingStyle::Counter, 79, TEXT("NGR"), TEXT("Nigeria")),
+			MakeFighter(TEXT("Aiko Tanaka"), EOpenStanceSex::Female, EOpenStanceBodyType::Compact, EOpenStanceFightingStyle::Pressure, 75, TEXT("JPN"), TEXT("Japan")),
+			MakeFighter(TEXT("Hana Lee"), EOpenStanceSex::Female, EOpenStanceBodyType::Stocky, EOpenStanceFightingStyle::Counter, 73, TEXT("KOR"), TEXT("Korea")),
+			MakeFighter(TEXT("Reza Karimi"), EOpenStanceSex::Male, EOpenStanceBodyType::LeanTall, EOpenStanceFightingStyle::Kicker, 79, TEXT("IRI"), TEXT("Iran")),
+			MakeFighter(TEXT("Diego Herrera"), EOpenStanceSex::Male, EOpenStanceBodyType::Compact, EOpenStanceFightingStyle::Pressure, 75, TEXT("MEX"), TEXT("Mexico")),
+			MakeFighter(TEXT("Lukas Weber"), EOpenStanceSex::Male, EOpenStanceBodyType::Tall, EOpenStanceFightingStyle::Counter, 73, TEXT("GER"), TEXT("Germany")),
+			MakeFighter(TEXT("Kwame Mensah"), EOpenStanceSex::Male, EOpenStanceBodyType::Stocky, EOpenStanceFightingStyle::Pressure, 78, TEXT("GHA"), TEXT("Ghana")),
+			MakeFighter(TEXT("Leila Haddad"), EOpenStanceSex::Female, EOpenStanceBodyType::Compact, EOpenStanceFightingStyle::Kicker, 77, TEXT("JOR"), TEXT("Jordan")),
+			MakeFighter(TEXT("Chloé Martin"), EOpenStanceSex::Female, EOpenStanceBodyType::LeanTall, EOpenStanceFightingStyle::Counter, 76, TEXT("FRA"), TEXT("France")),
+			MakeFighter(TEXT("Mei Lin"), EOpenStanceSex::Female, EOpenStanceBodyType::Tall, EOpenStanceFightingStyle::Kicker, 80, TEXT("CHN"), TEXT("China")),
+			MakeFighter(TEXT("Isabela Costa"), EOpenStanceSex::Female, EOpenStanceBodyType::Stocky, EOpenStanceFightingStyle::Pressure, 74, TEXT("BRA"), TEXT("Brazil")),
+			MakeFighter(TEXT("Emre Aydın"), EOpenStanceSex::Male, EOpenStanceBodyType::LeanTall, EOpenStanceFightingStyle::Kicker, 78, TEXT("TUR"), TEXT("Türkiye")),
+			MakeFighter(TEXT("Oliver Hughes"), EOpenStanceSex::Male, EOpenStanceBodyType::Tall, EOpenStanceFightingStyle::Counter, 75, TEXT("GBR"), TEXT("Great Britain")),
+			MakeFighter(TEXT("Ibrahim Koné"), EOpenStanceSex::Male, EOpenStanceBodyType::Compact, EOpenStanceFightingStyle::Kicker, 76, TEXT("CIV"), TEXT("Côte d’Ivoire")),
+			MakeFighter(TEXT("Jack Mitchell"), EOpenStanceSex::Male, EOpenStanceBodyType::Stocky, EOpenStanceFightingStyle::Pressure, 74, TEXT("AUS"), TEXT("Australia")),
+			MakeFighter(TEXT("Milica Jovanović"), EOpenStanceSex::Female, EOpenStanceBodyType::Tall, EOpenStanceFightingStyle::Kicker, 78, TEXT("SRB"), TEXT("Serbia")),
+			MakeFighter(TEXT("Nattaya Srisuk"), EOpenStanceSex::Female, EOpenStanceBodyType::Compact, EOpenStanceFightingStyle::Kicker, 77, TEXT("THA"), TEXT("Thailand")),
+			MakeFighter(TEXT("Emma Tremblay"), EOpenStanceSex::Female, EOpenStanceBodyType::LeanTall, EOpenStanceFightingStyle::Counter, 75, TEXT("CAN"), TEXT("Canada")),
+			MakeFighter(TEXT("Yasmine El Amrani"), EOpenStanceSex::Female, EOpenStanceBodyType::Stocky, EOpenStanceFightingStyle::Counter, 74, TEXT("MAR"), TEXT("Morocco"))
 		};
 		return Roster;
+	}
+
+	FString GetPortraitKey(const FOpenStanceFighterProfile& Fighter)
+	{
+		FString Key;
+		for (const TCHAR Char : Fighter.Name)
+		{
+			// Accented letters fold to plain ones so the key matches the asset name (Chloé Martin is ChloeMartin)
+			const TCHAR Plain = Char == TEXT('é') || Char == TEXT('è') || Char == TEXT('ê') ? TEXT('e')
+				: Char == TEXT('á') || Char == TEXT('à') ? TEXT('a') : Char == TEXT('í') || Char == TEXT('ı') ? TEXT('i')
+				: Char == TEXT('ó') || Char == TEXT('ö') ? TEXT('o') : Char == TEXT('ú') || Char == TEXT('ü') ? TEXT('u')
+				: Char == TEXT('ć') || Char == TEXT('č') || Char == TEXT('ç') ? TEXT('c') : Char == TEXT('š') ? TEXT('s')
+				: Char == TEXT('ž') ? TEXT('z') : Char;
+			if (FChar::IsAlnum(Plain) && Plain < 128)
+			{
+				Key.AppendChar(Plain);
+			}
+		}
+		return Key;
 	}
 
 	TArray<int32> GetRosterIndices(EOpenStanceSex Sex)
