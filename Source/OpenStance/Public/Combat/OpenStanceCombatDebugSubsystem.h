@@ -13,6 +13,9 @@ class UMaterialInstanceDynamic;
 class UOpenStanceMatchModel;
 class UOpenStanceMenuSubsystem;
 class UStaticMeshComponent;
+class USceneComponent;
+class USkeletalMeshComponent;
+class UAnimSequenceBase;
 
 /** How the second fighter behaves while the AI does not exist yet (os.AIMode). */
 UENUM()
@@ -63,6 +66,9 @@ public:
 
 	/** The simulation behind the display, for gameplay code that needs the state. */
 	FOpenStanceMatchSim& GetSim() { return Sim; }
+
+	/** The fighter player 1 controls: 0 Chung, 1 Hong. */
+	int32 GetPlayerIndex() const { return PlayerIndex; }
 
 	// Development switches, driven by the os.* commands (compiled out of shipping builds).
 	void SetCombatDebug(bool bOn) { bCombatDebug = bOn; }
@@ -127,6 +133,33 @@ private:
 
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<UMaterialInstanceDynamic>> BodyMaterials;
+
+	/**
+	 * The fighters as real characters (os.GreyboxFighterMesh): the production Medium body with its head and gear following
+	 * it, placed where the shape fighter would be and scrubbed through the technique's animation by combat phase. One
+	 * pivot per fighter carries the turn (spins included) and jump lift; the body under it is mirrored for left-leg
+	 * techniques and right-lead stances, because the placeholder clips are all authored right-leg from a left-lead stance.
+	 */
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<USceneComponent>> FighterPivots;
+
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<USkeletalMeshComponent>> FighterBodies;
+
+	/** The idle fighting stance, looped while a fighter is not attacking. */
+	UPROPERTY(Transient)
+	TObjectPtr<UAnimSequenceBase> StanceAnimation;
+
+	/** The clip each fighter body is showing, so it is only switched when the technique changes. */
+	UPROPERTY(Transient)
+	TObjectPtr<UAnimSequenceBase> ShownAnimation[2];
+
+	/** Builds the character fighters on the shape fighters' actors; returns false (shapes stay visible) if assets are missing. */
+	bool BuildFighterMeshes();
+
+	/** Places, mirrors and poses fighter Index for this tick. Overall is the fraction of the technique's clip. */
+	void UpdateFighterMesh(int32 Index, const FVector& Base, const FQuat& BodyRotation, bool bMirror,
+		const struct FOpenStanceAttackRequest* Attack, float Overall);
 
 	/** Mirrors the simulation into the match HUD while the menu's Match screen is showing. */
 	FOpenStanceMatchModelSync ModelSync;
