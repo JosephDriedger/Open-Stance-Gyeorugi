@@ -56,6 +56,8 @@ def import_target(path, folder, name):
     ui.set_editor_property("import_textures", False)
     ui.set_editor_property("create_physics_asset", False)
     ui.set_editor_property("automated_import_should_detect_type", False)
+    if os.environ.get('OPENSTANCE_IMPORT_NORMALS') == '1':
+        ui.skeletal_mesh_import_data.set_editor_property('normal_import_method', unreal.FBXNormalImportMethod.FBXNIM_IMPORT_NORMALS)
     task = unreal.AssetImportTask()
     task.set_editor_property("filename", path)
     task.set_editor_property("destination_path", folder)
@@ -82,7 +84,8 @@ def check(kind, sub, outfit, keep):
         return row
     target = bones(mesh)
     ref_name = "MH_FighterBase" if kind == "Medium" else f"MH_Fighter{kind}"
-    ref_mesh = EAL.load_asset(f"/Game/Characters/Fighters/Export/{ref_name}_Body")
+    ref_path = f"/Game/Characters/Fighters/Export/{ref_name}_Body"
+    ref_mesh = EAL.load_asset(ref_path) if EAL.does_asset_exist(ref_path) else None
     if ref_mesh is None:
         row["comparison_unavailable"] = "No corresponding imported project body; target import alone is not a compatibility pass."
         row["bones"] = len(target)
@@ -123,7 +126,7 @@ try:
     rows = []
     for kind in kinds:
         for sub in ([""] + (["WhiteVNeck"] if "vneck" in args else [])):
-            for outfit in ("Dobok", "Sparring"):
+            for outfit in (("Dobok",) if 'dobok-only' in args else ("Dobok", "Sparring")):
                 try:
                     row = check(kind, sub, outfit, "keep" in args)
                 except Exception:

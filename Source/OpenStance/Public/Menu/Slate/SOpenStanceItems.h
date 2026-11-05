@@ -137,15 +137,21 @@ class OPENSTANCE_API SOpenStanceFighterTile : public SOpenStanceInteractive
 {
 public:
 	SLATE_BEGIN_ARGS(SOpenStanceFighterTile)
-		: _Selected(false)
+		: _Compact(false)
+		, _Selected(false)
 		, _Hong(false)
 		, _Locked(false)
 	{
 	}
 		SLATE_ARGUMENT(FString, Name)
 		SLATE_ARGUMENT(FString, Detail)
+		/** The fighter's nation (roster country code): its flag goes before the name. */
+		SLATE_ARGUMENT(FString, CountryCode)
+		/** Smaller type and padding, for long lists (Fighter Select's twelve a side). */
+		SLATE_ARGUMENT(bool, Compact)
 		SLATE_ATTRIBUTE(bool, Selected)
-		SLATE_ARGUMENT(bool, Hong)
+		/** Accent in Hong red rather than Chung blue (Fighter Select: the side this fighter is picked for). */
+		SLATE_ATTRIBUTE(bool, Hong)
 		OPENSTANCE_INTERACTIVE_ARGUMENTS
 	SLATE_END_ARGS()
 
@@ -156,7 +162,7 @@ private:
 	FLinearColor GetRule() const;
 
 	TAttribute<bool> Selected;
-	bool bHong = false;
+	TAttribute<bool> Hong;
 };
 
 /** A colour choice in the fighter creator. */

@@ -25,6 +25,7 @@ parser.add_argument('--metahuman', action='store_true')
 parser.add_argument('--source', help='Specific body-animation FBX; absolute or repository relative')
 parser.add_argument('--name', help='Character and output filename')
 parser.add_argument('--output-dir', help='Output directory; absolute or repository relative')
+parser.add_argument('--defer-reopen', action='store_true', help='Write preparation evidence; require independent fresh-process reopen verification')
 args = parser.parse_args()
 OUT = ROOT / (args.output_dir or 'Resources/Models/MotionBuilder')
 OUT.mkdir(parents=True, exist_ok=True)
@@ -35,6 +36,9 @@ else:
 SOURCE = args.source or SOURCE
 NAME = args.name or NAME
 app = FBApplication()
+if args.defer_reopen:
+    app.FileNew()
+    FBSystem().Scene.Evaluate()
 print('Opening source '+str(ROOT / SOURCE), flush=True)
 assert app.FileOpen(str(ROOT / SOURCE), False)
 print('Source opened', flush=True)
@@ -111,6 +115,12 @@ options.EmbedMedia = True
 output = OUT / f'{NAME}.fbx'
 assert app.FileSave(str(output), options), 'FBX save failed'
 print('Saved target', flush=True)
+if args.defer_reopen:
+    preparation={'source':SOURCE,'output':str(output),'source_sha256':hashlib.sha256((ROOT/SOURCE).read_bytes()).hexdigest(),
+                 'character':NAME,'mapped_slots':len(mapping),'characterized':True,'control_rig':True,
+                 'wrist_control_hand_movement_cm':movement,'reopened_successfully':False}
+    (OUT/f'preparation_{NAME}.json').write_text(json.dumps(preparation,indent=2))
+    sys.exit(0)
 
 # Verify the delivered file, not just the in-memory setup.
 assert app.FileOpen(str(output), False)

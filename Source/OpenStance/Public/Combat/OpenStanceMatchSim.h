@@ -167,6 +167,12 @@ public:
 	/** A gam-jeom for one fighter: the opponent gets the point (GDD 8.3, 8.4) and the reason is kept for the HUD. */
 	void AddGamJeom(int32 Index, const FString& Reason);
 
+	/**
+	 * Development: fighter Index throws the move table row RowName with Leg, exactly as if the Skill Stick had produced it
+	 * (os.Throw, for demos and captures). Returns false if the row is not in the table.
+	 */
+	bool ThrowMove(int32 Index, FName RowName, EOpenStanceLegSide Leg);
+
 private:
 	void StepFighter(int32 Index, float DeltaSeconds, const FOpenStanceFighterControls& Controls);
 	void RunTraces(int32 Index);

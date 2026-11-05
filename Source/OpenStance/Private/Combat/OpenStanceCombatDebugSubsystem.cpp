@@ -1,6 +1,10 @@
 #include "Combat/OpenStanceCombatDebugSubsystem.h"
 
+#include "Animation/AnimMontage.h"
+#include "Animation/AnimSequenceBase.h"
 #include "Camera/CameraActor.h"
+#include "Camera/CameraComponent.h"
+#include "Combat/OpenStanceCameraPresets.h"
 #include "Combat/OpenStanceCombatOverlay.h"
 #include "Combat/OpenStanceGreyboxProof.h"
 #include "DrawDebugHelpers.h"
@@ -9,7 +13,9 @@
 #include "Components/SceneComponent.h"
 #include "EngineUtils.h"
 #include "GameFramework/PlayerStart.h"
+#include "Components/SkeletalMeshComponent.h"
 #include "Components/StaticMeshComponent.h"
+#include "Engine/SkeletalMesh.h"
 #include "Engine/DataTable.h"
 #include "Engine/StaticMesh.h"
 #include "Materials/MaterialInstanceDynamic.h"
@@ -36,11 +42,7 @@ namespace
 	constexpr float CombatDebugFixedStepSeconds = 1.0f / 60.0f;
 	constexpr int32 InputLogLines = 8;
 
-	// The follow camera: how far behind and above the controlling fighter, how far to his right, where it looks, how fast it catches up.
-	constexpr float FollowCameraBehindCm = 320.0f;
-	constexpr float FollowCameraHeightCm = 170.0f;
-	constexpr float FollowCameraRightCm = 60.0f;
-	constexpr float FollowCameraLookHeightCm = 105.0f;
+	// How fast the match camera catches up with its preset's pose (OpenStanceCameraPresets places it).
 	constexpr float FollowCameraSpeed = 6.0f;
 	const TCHAR* MoveTablePath = TEXT("/Game/Combat/DT_MoveData.DT_MoveData");
 	const TCHAR* MenuMapName = TEXT("L_MainMenu");
@@ -54,6 +56,62 @@ namespace
 	TAutoConsoleVariable<int32> CVarGreyboxAutoStart(TEXT("os.GreyboxAutoStart"), 1,
 		TEXT("1 starts the greybox when Play begins on any map except the main menu, so no console command is needed; 0 leaves it to os.Greybox."), ECVF_Default);
 #endif
+
+	// Shown on every build, so a demo can switch between the character fighters and the shapes.
+	TAutoConsoleVariable<int32> CVarGreyboxFighterMesh(TEXT("os.GreyboxFighterMesh"), 1,
+		TEXT("1 shows the greybox fighters as characters playing the technique animations (placeholders until mocap); 0 shows the shape fighters. Takes effect when the greybox starts."), ECVF_Default);
+
+	// The character the greybox fighters wear: the production Medium body, its head and the Medium gear.
+	const TCHAR* FighterBodyPath = TEXT("/Game/Characters/Fighters/Export/MH_FighterBase_Body.MH_FighterBase_Body");
+	const TCHAR* FighterHeadPath = TEXT("/Game/Characters/Fighters/Export/MH_FighterBase_Head.MH_FighterBase_Head");
+	const TCHAR* FighterGearFolder = TEXT("/Game/Characters/Fighters/Gear/Medium");
+	const TCHAR* FighterGearParts[] = { TEXT("Jacket"), TEXT("Pants"), TEXT("Belt"), TEXT("Protector"), TEXT("Helmet"), TEXT("Gloves"), TEXT("FootGuards") };
+	const TCHAR* TeamGearMaterials[2] = { TEXT("/Game/Characters/Fighters/Gear/Clean/MI_FighterGear_Chung.MI_FighterGear_Chung"),
+		TEXT("/Game/Characters/Fighters/Gear/Clean/MI_FighterGear_Hong.MI_FighterGear_Hong") };
+	const TCHAR* StanceAnimationPath = TEXT("/Game/Animation/Moves/Placeholder/AS_Placeholder_Stance.AS_Placeholder_Stance");
+
+	/**
+	 * The match fighter for a roster fighter and side: the suite body in the layered dobok with its sparring gear in the
+	 * side's colour (Tools/Blender/build_match_fighters.sh, Tools/Unreal/import_match_fighters.py), on the rig the
+	 * placeholder clips are authored on, so the techniques play on it without stretching the body out of the gear.
+	 */
+	FString MatchFighterPath(const FString& PortraitKey, int32 Side)
+	{
+		const FString Name = FString::Printf(TEXT("SK_Match_%s_%s"), *PortraitKey, Side == 0 ? TEXT("Chung") : TEXT("Hong"));
+		return FString::Printf(TEXT("/Game/Characters/Fighters/Match/%s/%s.%s"), *Name.RightChop(9), *Name, *Name);
+	}
+
+	/**
+	 * The mirrored copy of a placeholder clip (<clip>_Mirror beside it: left leg and right lead), or null. Playing it
+	 * replaces scaling the fighter by -1, which turned the gear's faces inside out (it read as see-through from behind).
+	 */
+	UAnimSequenceBase* MirrorClip(UAnimSequenceBase* Clip)
+	{
+		static TMap<TWeakObjectPtr<UAnimSequenceBase>, TWeakObjectPtr<UAnimSequenceBase>> Mirrors;
+		if (!Clip)
+		{
+			return nullptr;
+		}
+		if (const TWeakObjectPtr<UAnimSequenceBase>* Found = Mirrors.Find(Clip))
+		{
+			return Found->Get();
+		}
+		const FString Package = Clip->GetOutermost()->GetName() + TEXT("_Mirror");
+		const FString Name = Clip->GetName() + TEXT("_Mirror");
+		UAnimSequenceBase* Mirror = LoadObject<UAnimSequenceBase>(nullptr, *(Package + TEXT(".") + Name), nullptr, LOAD_NoWarn | LOAD_Quiet);
+		Mirrors.Add(Clip, Mirror);
+		return Mirror;
+	}
+
+	/** The animation a montage plays (its first segment), so the greybox can scrub it frame by frame. */
+	UAnimSequenceBase* MontageClip(UAnimMontage* Montage)
+	{
+		if (!Montage || Montage->SlotAnimTracks.Num() == 0 || Montage->SlotAnimTracks[0].AnimTrack.AnimSegments.Num() == 0)
+		{
+			return nullptr;
+		}
+		return Montage->SlotAnimTracks[0].AnimTrack.AnimSegments[0].GetAnimReference();
+	}
 
 	struct FPadButton
 	{
@@ -196,9 +254,9 @@ void UOpenStanceCombatDebugSubsystem::SetGreyboxActive(bool bActive)
 	// The mat plane: the floor where the player spawned, inside the level, not under the world origin.
 	Origin = FindArenaOrigin();
 
-	// The camera follows the controlling player (Chung) from behind; UpdateCamera keeps it there every tick. Placed with
-	// GetFollowCameraPose: behind and a little to the right of Chung, looking at the point between the fighters, so Hong
-	// stays in frame.
+	// The camera follows the controlling fighter with the Match preset (OpenStanceCameraPresets): behind and out to the
+	// side, looking at the point between the fighters, so the opponent stays in frame and the sticks match the screen.
+	// UpdateCamera keeps it there every tick; os.CameraPreset previews the replay angles.
 	if (APlayerController* Controller = World->GetFirstPlayerController())
 	{
 		BuildBodies();
@@ -207,6 +265,7 @@ void UOpenStanceCombatDebugSubsystem::SetGreyboxActive(bool bActive)
 		FRotator Rotation;
 		GetFollowCameraPose(Position, Rotation);
 		Camera = World->SpawnActor<ACameraActor>(Position, Rotation);
+		Camera->FindComponentByClass<UCameraComponent>()->SetFieldOfView(GetCameraPreset().FieldOfViewDeg);
 		Controller->SetViewTargetWithBlend(Camera);
 		LinkMatchModel();
 
@@ -308,6 +367,152 @@ void UOpenStanceCombatDebugSubsystem::BuildBodies()
 	SeenContacts = 0;
 	bFlashing[0] = bFlashing[1] = false;
 	FlashUntil[0] = FlashUntil[1] = 0.0;
+
+	// The character fighters replace the shapes when their assets load; the shapes keep updating underneath, hidden.
+	if (CVarGreyboxFighterMesh.GetValueOnGameThread() != 0 && BuildFighterMeshes())
+	{
+		for (UStaticMeshComponent* Component : BodyParts)
+		{
+			Component->SetVisibility(false);
+		}
+	}
+}
+
+bool UOpenStanceCombatDebugSubsystem::BuildFighterMeshes()
+{
+	USkeletalMesh* BodyMesh = LoadObject<USkeletalMesh>(nullptr, FighterBodyPath);
+	StanceAnimation = LoadObject<UAnimSequenceBase>(nullptr, StanceAnimationPath);
+	if (!BodyMesh || !StanceAnimation || BodyActors.Num() != 2)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Greybox: character fighters unavailable (body %s, stance animation %s); showing the shapes."),
+			BodyMesh ? TEXT("found") : TEXT("missing"), StanceAnimation ? TEXT("found") : TEXT("missing"));
+		return false;
+	}
+	USkeletalMesh* HeadMesh = LoadObject<USkeletalMesh>(nullptr, FighterHeadPath);
+	// The fighters chosen on Fighter Select, as match fighters in their side's colour, when those are built
+	const UOpenStanceMenuSubsystem* Menu = GetMenu();
+	const TArray<FOpenStanceFighterProfile>& Roster = OpenStanceMenuContent::GetRoster();
+	for (int32 Fighter = 0; Fighter < 2; ++Fighter)
+	{
+		const int32 RosterIndex = Menu ? (Fighter == 0 ? Menu->GetSession().ChungFighter : Menu->GetSession().HongFighter) : Fighter;
+		USkeletalMesh* MatchMesh = Roster.IsValidIndex(RosterIndex)
+			? LoadObject<USkeletalMesh>(nullptr, *MatchFighterPath(OpenStanceMenuContent::GetPortraitKey(Roster[RosterIndex]), Fighter), nullptr, LOAD_NoWarn | LOAD_Quiet)
+			: nullptr;
+		AActor* Actor = BodyActors[Fighter];
+		USceneComponent* Pivot = NewObject<USceneComponent>(Actor, TEXT("FighterPivot"));
+		Pivot->SetMobility(EComponentMobility::Movable);
+		Pivot->SetupAttachment(Actor->GetRootComponent());
+		Pivot->RegisterComponent();
+
+		USkeletalMeshComponent* Body = NewObject<USkeletalMeshComponent>(Actor, TEXT("FighterBody"));
+		Body->SetSkeletalMesh(MatchMesh ? MatchMesh : BodyMesh);
+		Body->SetupAttachment(Pivot);
+		// The fighter faces the mesh's +Y; the pivot's forward is +X.
+		Body->SetRelativeRotation(FRotator(0.0, -90.0, 0.0));
+		Body->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		Body->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::AlwaysTickPoseAndRefreshBones;
+		Body->SetAnimationMode(EAnimationMode::AnimationSingleNode);
+		Body->RegisterComponent();
+		Body->SetAnimation(StanceAnimation);
+		Body->SetPlayRate(0.0f);
+
+		const auto Follower = [Actor, Body](USkeletalMesh* Mesh, const TCHAR* Name) -> USkeletalMeshComponent*
+		{
+			if (!Mesh)
+			{
+				return nullptr;
+			}
+			USkeletalMeshComponent* Part = NewObject<USkeletalMeshComponent>(Actor, Name);
+			Part->SetSkeletalMesh(Mesh);
+			Part->SetupAttachment(Body);
+			Part->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+			Part->RegisterComponent();
+			Part->SetLeaderPoseComponent(Body);
+			return Part;
+		};
+		if (MatchMesh)
+		{
+			// One mesh: body, head, hair, dobok and gear (already in the side's colour)
+			FighterPivots.Add(Pivot);
+			FighterBodies.Add(Body);
+			ShownAnimation[Fighter] = StanceAnimation;
+			continue;
+		}
+		Follower(HeadMesh, TEXT("FighterHead"));
+		UMaterialInterface* Team = LoadObject<UMaterialInterface>(nullptr, TeamGearMaterials[Fighter]);
+		for (const TCHAR* Part : FighterGearParts)
+		{
+			const FString Path = FString::Printf(TEXT("%s/SK_Fighter_%s.SK_Fighter_%s"), FighterGearFolder, Part, Part);
+			USkeletalMeshComponent* Gear = Follower(LoadObject<USkeletalMesh>(nullptr, *Path), *FString::Printf(TEXT("Fighter%s"), Part));
+			// The protector and helmet take the side's colour (Chung blue, Hong red): their team-coloured slots only.
+			if (Gear && Team && (FCString::Strcmp(Part, TEXT("Protector")) == 0 || FCString::Strcmp(Part, TEXT("Helmet")) == 0))
+			{
+				for (int32 Slot = 0; Slot < Gear->GetNumMaterials(); ++Slot)
+				{
+					const UMaterialInterface* Current = Gear->GetMaterial(Slot);
+					if (Current && Current->GetName().Contains(TEXT("FighterGear")))
+					{
+						Gear->SetMaterial(Slot, Team);
+					}
+				}
+			}
+		}
+		FighterPivots.Add(Pivot);
+		FighterBodies.Add(Body);
+		ShownAnimation[Fighter] = StanceAnimation;
+	}
+	return true;
+}
+
+void UOpenStanceCombatDebugSubsystem::UpdateFighterMesh(int32 Index, const FVector& Base, const FQuat& BodyRotation, bool bMirror,
+	const FOpenStanceAttackRequest* Attack, float Overall)
+{
+	if (!FighterBodies.IsValidIndex(Index) || !FighterPivots.IsValidIndex(Index))
+	{
+		return;
+	}
+	USkeletalMeshComponent* Body = FighterBodies[Index];
+	FighterPivots[Index]->SetWorldLocationAndRotation(Base, BodyRotation);
+
+	UAnimSequenceBase* Clip = nullptr;
+	float Time = 0.0f;
+	if (Attack)
+	{
+		UAnimMontage* Montage = Attack->Row.ResolveMontage(Attack->Leg, true).LoadSynchronous();
+		Clip = MontageClip(Montage);
+		if (Clip)
+		{
+			// A feint only gets as far as the chamber.
+			const float Fraction = Attack->bFake ? 0.5f * FMath::Clamp(Overall, 0.0f, 1.0f) : FMath::Clamp(Overall, 0.0f, 1.0f);
+			Time = Fraction * Clip->GetPlayLength();
+		}
+	}
+	if (!Clip)
+	{
+		Clip = StanceAnimation;
+		const UWorld* World = GetWorld();
+		Time = World && Clip ? FMath::Fmod(static_cast<float>(World->GetTimeSeconds()), FMath::Max(Clip->GetPlayLength(), 0.01f)) : 0.0f;
+	}
+	if (!Clip)
+	{
+		return;
+	}
+	// The mirror cases play the clip's mirrored copy; only without one does the fighter fall back to a -1 scale across
+	// its own left-right axis (the mesh's X).
+	UAnimSequenceBase* Mirrored = bMirror ? MirrorClip(Clip) : nullptr;
+	if (Mirrored)
+	{
+		Time = Time / FMath::Max(Clip->GetPlayLength(), 0.01f) * Mirrored->GetPlayLength();
+		Clip = Mirrored;
+	}
+	Body->SetRelativeScale3D(FVector(bMirror && !Mirrored ? -1.0 : 1.0, 1.0, 1.0));
+	if (ShownAnimation[Index] != Clip)
+	{
+		Body->SetAnimation(Clip);
+		Body->SetPlayRate(0.0f);
+		ShownAnimation[Index] = Clip;
+	}
+	Body->SetPosition(Time, false);
 }
 
 void UOpenStanceCombatDebugSubsystem::DestroyBodies()
@@ -322,6 +527,9 @@ void UOpenStanceCombatDebugSubsystem::DestroyBodies()
 	BodyActors.Reset();
 	BodyParts.Reset();
 	BodyMaterials.Reset();
+	FighterPivots.Reset();
+	FighterBodies.Reset();
+	ShownAnimation[0] = ShownAnimation[1] = nullptr;
 }
 
 void UOpenStanceCombatDebugSubsystem::UpdateBodies()
@@ -445,6 +653,13 @@ void UOpenStanceCombatDebugSubsystem::UpdateBodies()
 			Component->SetWorldLocationAndRotation(Centre, BodyRotation);
 			Component->SetWorldScale3D(Size / 100.0f);
 		};
+
+		// The character fighter: authored right-leg from a left-lead stance, so a left-leg technique (or, idle, a right-lead
+		// stance) is the mirror image.
+		const bool bAttacking = Attack && (CombatState == EOpenStanceCombatState::AttackStartup || CombatState == EOpenStanceCombatState::AttackActive
+			|| CombatState == EOpenStanceCombatState::AttackRecovery);
+		const bool bMirror = bAttacking ? Attack->Leg == EOpenStanceLegSide::Left : bRightLead;
+		UpdateFighterMesh(Index, Base, BodyRotation, bMirror, bAttacking ? Attack : nullptr, Overall);
 
 		const FVector HipLeft = Hip - Right * (0.055f * H), HipRight = Hip + Right * (0.055f * H);
 		const FVector Shoulder = Hip + Up * (0.30f * H);
@@ -633,16 +848,34 @@ FVector UOpenStanceCombatDebugSubsystem::FindArenaOrigin() const
 	return Start;
 }
 
+const FOpenStanceCameraPreset& UOpenStanceCombatDebugSubsystem::GetCameraPreset() const
+{
+	const FOpenStanceCameraPreset* Preset = OpenStanceCameraPresets::Find(CameraPreset);
+	return Preset ? *Preset : OpenStanceCameraPresets::Match();
+}
+
+bool UOpenStanceCombatDebugSubsystem::SetCameraPreset(FName Name, FString& OutMessage)
+{
+	if (const FOpenStanceCameraPreset* Preset = OpenStanceCameraPresets::Find(Name))
+	{
+		CameraPreset = Preset->Name;
+		OutMessage = FString::Printf(TEXT("Camera: %s - %s"), *Preset->Name.ToString(), Preset->Use);
+		return true;
+	}
+	OutMessage = TEXT("Usage: os.CameraPreset <Name>. Presets:");
+	for (const FOpenStanceCameraPreset& Preset : OpenStanceCameraPresets::All())
+	{
+		OutMessage += FString::Printf(TEXT("\n  %s - %s"), *Preset.Name.ToString(), Preset.Use);
+	}
+	return false;
+}
+
 void UOpenStanceCombatDebugSubsystem::GetFollowCameraPose(FVector& OutPosition, FRotator& OutRotation) const
 {
-	// Behind the fighter the controller drives, whichever side that is.
+	// Placed from the fighter the controller drives, whichever side that is.
 	const FOpenStanceFighterSim& Player = Sim.Fighters[PlayerIndex];
 	const FOpenStanceFighterSim& Opponent = Sim.Fighters[1 - PlayerIndex];
-	const FVector Facing(Player.Motion.Facing.X, Player.Motion.Facing.Y, 0.0);
-	const FVector Right(-Facing.Y, Facing.X, 0.0);
-	OutPosition = ToWorld(Player.Motion.Position, FollowCameraHeightCm) - Facing * FollowCameraBehindCm + Right * FollowCameraRightCm;
-	const FVector2D Midpoint = (Player.Motion.Position + Opponent.Motion.Position) * 0.5;
-	OutRotation = (ToWorld(Midpoint, FollowCameraLookHeightCm) - OutPosition).Rotation();
+	OpenStanceCameraPresets::Pose(GetCameraPreset(), ToWorld(Player.Motion.Position), ToWorld(Opponent.Motion.Position), OutPosition, OutRotation);
 }
 
 void UOpenStanceCombatDebugSubsystem::UpdateCamera(float DeltaTime)
@@ -656,6 +889,10 @@ void UOpenStanceCombatDebugSubsystem::UpdateCamera(float DeltaTime)
 	GetFollowCameraPose(Position, Rotation);
 	Camera->SetActorLocationAndRotation(FMath::VInterpTo(Camera->GetActorLocation(), Position, DeltaTime, FollowCameraSpeed),
 		FMath::RInterpTo(Camera->GetActorRotation(), Rotation, DeltaTime, FollowCameraSpeed));
+	if (UCameraComponent* Lens = Camera->FindComponentByClass<UCameraComponent>())
+	{
+		Lens->SetFieldOfView(FMath::FInterpTo(Lens->FieldOfView, GetCameraPreset().FieldOfViewDeg, DeltaTime, FollowCameraSpeed));
+	}
 }
 
 void UOpenStanceCombatDebugSubsystem::SetShowInput(bool bOn)
@@ -1060,6 +1297,26 @@ namespace
 			}
 		}));
 
+	FAutoConsoleCommandWithWorldAndArgs ThrowCommand(TEXT("os.Throw"),
+		TEXT("os.Throw <MoveRow> [Left|Right] - the player's fighter throws that DT_MoveData row now (default the back leg), as if from the Skill Stick"),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+		{
+			if (UOpenStanceCombatDebugSubsystem* Subsystem = Find(World); Subsystem && Args.Num() >= 1)
+			{
+				FOpenStanceMatchSim& Sim = Subsystem->GetSim();
+				const int32 Index = Subsystem->GetPlayerIndex();
+				EOpenStanceLegSide Leg = Sim.Fighters[Index].State.Stance == EOpenStanceStance::RightLead ? EOpenStanceLegSide::Left : EOpenStanceLegSide::Right;
+				if (Args.Num() >= 2)
+				{
+					Leg = Args[1].Equals(TEXT("Left"), ESearchCase::IgnoreCase) ? EOpenStanceLegSide::Left : EOpenStanceLegSide::Right;
+				}
+				if (!Sim.ThrowMove(Index, FName(*Args[0]), Leg))
+				{
+					UE_LOG(LogTemp, Warning, TEXT("os.Throw: no move row %s"), *Args[0]);
+				}
+			}
+		}));
+
 	FAutoConsoleCommandWithWorldAndArgs SetClockCommand(TEXT("os.SetClock"), TEXT("os.SetClock <seconds> - sets the round clock"),
 		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
 		{
@@ -1077,6 +1334,22 @@ namespace
 				FString Message;
 				Subsystem->SetAIMode(Args.Num() ? Args[0] : FString(), Message);
 				UE_LOG(LogOpenStanceCombat, Display, TEXT("%s"), *Message);
+			}
+		}));
+
+	FAutoConsoleCommandWithWorldAndArgs CameraPresetCommand(TEXT("os.CameraPreset"),
+		TEXT("os.CameraPreset <Name> - views the match from a camera preset (Match is the combat camera; the others are for replays). No name lists them"),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+		{
+			if (UOpenStanceCombatDebugSubsystem* Subsystem = Find(World))
+			{
+				FString Message;
+				Subsystem->SetCameraPreset(Args.Num() ? FName(*Args[0]) : FName(), Message);
+				UE_LOG(LogOpenStanceCombat, Display, TEXT("%s"), *Message);
+				if (GEngine)
+				{
+					GEngine->AddOnScreenDebugMessage(9010, 4.0f, FColor::Cyan, Message);
+				}
 			}
 		}));
 

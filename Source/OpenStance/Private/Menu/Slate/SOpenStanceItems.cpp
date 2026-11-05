@@ -322,7 +322,7 @@ void SOpenStanceFighterTile::Construct(const FArguments& InArgs)
 {
 	InitInteraction(InArgs._Locked, InArgs._OnPressed, InArgs._OnStep, InArgs._OnActivated);
 	Selected = InArgs._Selected;
-	bHong = InArgs._Hong;
+	Hong = InArgs._Hong;
 
 	ChildSlot
 	[
@@ -331,12 +331,20 @@ void SOpenStanceFighterTile::Construct(const FArguments& InArgs)
 		.AccentColor(TAttribute<FLinearColor>::CreateSP(this, &SOpenStanceFighterTile::GetRule))
 		.AccentEdge(EOpenStanceFrameEdge::Bottom)
 		.AccentThickness(U(0.3f))
-		.Padding(FMargin(U(1.2f), U(1.0f)))
+		.Padding(InArgs._Compact ? FMargin(U(1.0f), U(0.6f)) : FMargin(U(1.2f), U(1.0f)))
 		[
 			SNew(SVerticalBox)
 			+ SVerticalBox::Slot().AutoHeight()
 			[
-				MakeText(InArgs._Name, { EFont::Display, 1.7f, 0.06f, true }, Palette::Bone)
+				SNew(SHorizontalBox)
+				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.0f, 0.0f, InArgs._CountryCode.IsEmpty() ? 0.0f : U(0.6f), 0.0f)
+				[
+					Flag(InArgs._CountryCode, InArgs._Compact ? 1.1f : 1.3f)
+				]
+				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
+				[
+					MakeText(InArgs._Name, { EFont::Display, InArgs._Compact ? 1.4f : 1.7f, 0.06f, true }, Palette::Bone)
+				]
 			]
 			+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, U(0.3f), 0.0f, 0.0f)
 			[
@@ -355,7 +363,7 @@ FLinearColor SOpenStanceFighterTile::GetRule() const
 {
 	if (IsActive() || Selected.Get(false))
 	{
-		return bHong ? Palette::Hong : Palette::Chung;
+		return Hong.Get(false) ? Palette::Hong : Palette::Chung;
 	}
 	return FLinearColor::Transparent;
 }

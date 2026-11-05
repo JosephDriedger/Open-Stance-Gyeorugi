@@ -17,6 +17,12 @@ namespace OpenStanceMenuContent
 	/** Roster indices of the premade fighters of one sex, in list order. */
 	OPENSTANCE_API TArray<int32> GetRosterIndices(EOpenStanceSex Sex);
 
+	/**
+	 * The fighter's portrait asset key: the name with spaces and punctuation removed ("Min-jun Park" is MinjunPark).
+	 * Its look (skin tone, hair, eyebrows, head) is in Tools/Blender/portrait_roster.json under the same key.
+	 */
+	OPENSTANCE_API FString GetPortraitKey(const FOpenStanceFighterProfile& Fighter);
+
 	OPENSTANCE_API FString GetBodyTypeName(EOpenStanceBodyType BodyType);
 	OPENSTANCE_API FString GetStyleName(EOpenStanceFightingStyle Style);
 	OPENSTANCE_API FString GetSexName(EOpenStanceSex Sex);

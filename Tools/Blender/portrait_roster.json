@@ -1,0 +1,29 @@
+{
+  "_about": "Premade fighters' looks for the menu portraits (build_roster_portraits.sh). Key = the fighter's name without spaces or punctuation, as OpenStanceMenuContent::GetPortraitKey makes it. kind/sex pick the built body (FinalRefinement/Portrait/<kind>_<sex>); the rest are the suite rig's natural-colour selectors: SkinTone 0-9 (light to deep, the MetaHuman-based chart), HairStyle 0 Crew_Cut 1 Side_Part 2 Curly_Crop 3 Chin_Length_Bob 4 Low_Ponytail 5 Compact_Bun, EyeColor 0 dark brown 1 brown 2 amber 3 hazel 4 green 5 blue 6 grey, HairColor 0 black 1 dark brown 2 brown 3 auburn 4 dark blonde 5 grey 6 light grey, EyebrowStyle 0 Natural 1 Straight 2 Full 3 Soft_Arch 4 High_Arch 5 Thin_Groomed, HeadStyle 0 Oval 1 BroadJaw 2 NarrowJaw. Keep in step with GetRoster().",
+  "fighters": [
+    {"key": "MinjunPark", "kind": "Compact", "sex": "Male", "SkinTone": 3, "HairStyle": 1, "HairColor": 0, "EyeColor": 0, "EyebrowStyle": 1, "HeadStyle": 0},
+    {"key": "DaehoKim", "kind": "Stocky", "sex": "Male", "SkinTone": 3, "HairStyle": 0, "HairColor": 0, "EyeColor": 0, "EyebrowStyle": 2, "HeadStyle": 1},
+    {"key": "MarcusBell", "kind": "Tall", "sex": "Male", "SkinTone": 7, "HairStyle": 2, "HairColor": 0, "EyeColor": 0, "EyebrowStyle": 2, "HeadStyle": 1},
+    {"key": "TomasSilva", "kind": "LeanTall", "sex": "Male", "SkinTone": 5, "HairStyle": 1, "HairColor": 1, "EyeColor": 1, "EyebrowStyle": 0, "HeadStyle": 2},
+    {"key": "SofiaReyes", "kind": "LeanTall", "sex": "Female", "SkinTone": 4, "HairStyle": 4, "HairColor": 1, "EyeColor": 2, "EyebrowStyle": 3, "HeadStyle": 2},
+    {"key": "AmaraOkafor", "kind": "Tall", "sex": "Female", "SkinTone": 8, "HairStyle": 5, "HairColor": 0, "EyeColor": 0, "EyebrowStyle": 4, "HeadStyle": 0},
+    {"key": "AikoTanaka", "kind": "Compact", "sex": "Female", "SkinTone": 3, "HairStyle": 3, "HairColor": 0, "EyeColor": 0, "EyebrowStyle": 5, "HeadStyle": 2},
+    {"key": "HanaLee", "kind": "Stocky", "sex": "Female", "SkinTone": 3, "HairStyle": 4, "HairColor": 0, "EyeColor": 0, "EyebrowStyle": 3, "HeadStyle": 0},
+    {"key": "RezaKarimi", "kind": "LeanTall", "sex": "Male", "SkinTone": 4, "HairStyle": 0, "HairColor": 0, "EyeColor": 1, "EyebrowStyle": 2, "HeadStyle": 2},
+    {"key": "DiegoHerrera", "kind": "Compact", "sex": "Male", "SkinTone": 5, "HairStyle": 0, "HairColor": 1, "EyeColor": 1, "EyebrowStyle": 1, "HeadStyle": 1},
+    {"key": "LukasWeber", "kind": "Tall", "sex": "Male", "SkinTone": 0, "HairStyle": 1, "HairColor": 4, "EyeColor": 5, "EyebrowStyle": 0, "HeadStyle": 2},
+    {"key": "KwameMensah", "kind": "Stocky", "sex": "Male", "SkinTone": 9, "HairStyle": 0, "HairColor": 0, "EyeColor": 0, "EyebrowStyle": 2, "HeadStyle": 1},
+    {"key": "LeilaHaddad", "kind": "Compact", "sex": "Female", "SkinTone": 4, "HairStyle": 5, "HairColor": 1, "EyeColor": 3, "EyebrowStyle": 4, "HeadStyle": 0},
+    {"key": "ChloeMartin", "kind": "LeanTall", "sex": "Female", "SkinTone": 1, "HairStyle": 3, "HairColor": 3, "EyeColor": 4, "EyebrowStyle": 0, "HeadStyle": 2},
+    {"key": "MeiLin", "kind": "Tall", "sex": "Female", "SkinTone": 3, "HairStyle": 4, "HairColor": 0, "EyeColor": 0, "EyebrowStyle": 5, "HeadStyle": 0},
+    {"key": "IsabelaCosta", "kind": "Stocky", "sex": "Female", "SkinTone": 6, "HairStyle": 2, "HairColor": 1, "EyeColor": 1, "EyebrowStyle": 3, "HeadStyle": 1},
+    {"key": "EmreAydin", "kind": "LeanTall", "sex": "Male", "SkinTone": 4, "HairStyle": 1, "HairColor": 0, "EyeColor": 1, "EyebrowStyle": 2, "HeadStyle": 2},
+    {"key": "OliverHughes", "kind": "Tall", "sex": "Male", "SkinTone": 1, "HairStyle": 0, "HairColor": 3, "EyeColor": 5, "EyebrowStyle": 0, "HeadStyle": 1},
+    {"key": "IbrahimKone", "kind": "Compact", "sex": "Male", "SkinTone": 8, "HairStyle": 0, "HairColor": 0, "EyeColor": 0, "EyebrowStyle": 2, "HeadStyle": 0},
+    {"key": "JackMitchell", "kind": "Stocky", "sex": "Male", "SkinTone": 1, "HairStyle": 1, "HairColor": 4, "EyeColor": 6, "EyebrowStyle": 1, "HeadStyle": 1},
+    {"key": "MilicaJovanovic", "kind": "Tall", "sex": "Female", "SkinTone": 1, "HairStyle": 4, "HairColor": 1, "EyeColor": 3, "EyebrowStyle": 3, "HeadStyle": 2},
+    {"key": "NattayaSrisuk", "kind": "Compact", "sex": "Female", "SkinTone": 4, "HairStyle": 5, "HairColor": 0, "EyeColor": 0, "EyebrowStyle": 5, "HeadStyle": 0},
+    {"key": "EmmaTremblay", "kind": "LeanTall", "sex": "Female", "SkinTone": 0, "HairStyle": 3, "HairColor": 4, "EyeColor": 5, "EyebrowStyle": 0, "HeadStyle": 2},
+    {"key": "YasmineElAmrani", "kind": "Stocky", "sex": "Female", "SkinTone": 5, "HairStyle": 4, "HairColor": 0, "EyeColor": 2, "EyebrowStyle": 4, "HeadStyle": 0}
+  ]
+}

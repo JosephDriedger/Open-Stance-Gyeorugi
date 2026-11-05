@@ -13,6 +13,9 @@ class UMaterialInstanceDynamic;
 class UOpenStanceMatchModel;
 class UOpenStanceMenuSubsystem;
 class UStaticMeshComponent;
+class USceneComponent;
+class USkeletalMeshComponent;
+class UAnimSequenceBase;
 
 /** How the second fighter behaves while the AI does not exist yet (os.AIMode). */
 UENUM()
@@ -64,6 +67,9 @@ public:
 	/** The simulation behind the display, for gameplay code that needs the state. */
 	FOpenStanceMatchSim& GetSim() { return Sim; }
 
+	/** The fighter player 1 controls: 0 Chung, 1 Hong. */
+	int32 GetPlayerIndex() const { return PlayerIndex; }
+
 	// Development switches, driven by the os.* commands (compiled out of shipping builds).
 	void SetCombatDebug(bool bOn) { bCombatDebug = bOn; }
 	void SetShowHitboxes(bool bOn) { bShowHitboxes = bOn; }
@@ -72,6 +78,8 @@ public:
 	void SetScoreCheat(int32 Chung, int32 Hong);
 	void SetClockCheat(float Seconds);
 	bool SetAIMode(const FString& Mode, FString& OutMessage);
+	/** Switches the match camera to a named preset (OpenStanceCameraPresets); not a cheat, the match is unchanged. */
+	bool SetCameraPreset(FName Name, FString& OutMessage);
 
 	/** Plays the scripted proof on a separate simulation and logs it; returns true if every stage passed. */
 	bool RunProof();
@@ -85,6 +93,8 @@ private:
 	void HandleInvertToggle();
 	void ShowLiveSticks(const FOpenStanceFighterControls& Controls) const;
 	void GetFollowCameraPose(FVector& OutPosition, FRotator& OutRotation) const;
+	/** The camera preset in use: Match unless os.CameraPreset chose another. */
+	const struct FOpenStanceCameraPreset& GetCameraPreset() const;
 	void UpdateCamera(float DeltaTime);
 	/** The menu system for the local player, whose match model is the HUD's; null in a world with no local player. */
 	UOpenStanceMenuSubsystem* GetMenu() const;
@@ -128,6 +138,33 @@ private:
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<UMaterialInstanceDynamic>> BodyMaterials;
 
+	/**
+	 * The fighters as real characters (os.GreyboxFighterMesh): each chosen fighter's match build (dobok and gear in the side's
+	 * colour, one mesh; else the production Medium body with its head and gear following it), placed where the shape fighter would be and scrubbed through the technique's animation by combat phase. One
+	 * pivot per fighter carries the turn (spins included) and jump lift; left-leg techniques and right-lead stances play
+	 * the clips' mirrored copies, since the placeholder clips are all authored right-leg from a left-lead stance.
+	 */
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<USceneComponent>> FighterPivots;
+
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<USkeletalMeshComponent>> FighterBodies;
+
+	/** The idle fighting stance, looped while a fighter is not attacking. */
+	UPROPERTY(Transient)
+	TObjectPtr<UAnimSequenceBase> StanceAnimation;
+
+	/** The clip each fighter body is showing, so it is only switched when the technique changes. */
+	UPROPERTY(Transient)
+	TObjectPtr<UAnimSequenceBase> ShownAnimation[2];
+
+	/** Builds the character fighters on the shape fighters' actors; returns false (shapes stay visible) if assets are missing. */
+	bool BuildFighterMeshes();
+
+	/** Places, mirrors and poses fighter Index for this tick. Overall is the fraction of the technique's clip. */
+	void UpdateFighterMesh(int32 Index, const FVector& Base, const FQuat& BodyRotation, bool bMirror,
+		const struct FOpenStanceAttackRequest* Attack, float Overall);
+
 	/** Mirrors the simulation into the match HUD while the menu's Match screen is showing. */
 	FOpenStanceMatchModelSync ModelSync;
 	bool bModelLinked = false;
@@ -143,6 +180,7 @@ private:
 	FDelegateHandle DebugDrawHandle;
 	FVector Origin = FVector::ZeroVector;
 	EOpenStanceAIMode AIMode = EOpenStanceAIMode::Idle;
+	FName CameraPreset = TEXT("Match");
 	float Accumulator = 0.0f;
 
 	/** Button presses and releases seen by os.ShowInput, oldest first, and the buttons held on the last tick. */

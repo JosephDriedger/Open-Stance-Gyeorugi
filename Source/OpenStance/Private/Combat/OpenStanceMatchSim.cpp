@@ -111,6 +111,27 @@ void FOpenStanceMatchSim::SetClock(float Seconds)
 	Match.ClockSeconds = FMath::Max(0.0f, Seconds);
 }
 
+bool FOpenStanceMatchSim::ThrowMove(int32 Index, FName RowName, EOpenStanceLegSide Leg)
+{
+	const FOpenStanceMoveRow* Row = MoveTable ? MoveTable->FindRow<FOpenStanceMoveRow>(RowName, TEXT("ThrowMove"), false) : nullptr;
+	if (!Row || Index < 0 || Index > 1)
+	{
+		return false;
+	}
+	FOpenStanceInputEvent Event;
+	Event.Type = EOpenStanceInputEventType::Attack;
+	Event.Technique = Row->Technique;
+	Event.Target = Row->Target;
+	Event.bJump = Row->bJump;
+	Event.Leg = Leg;
+	// The leg on the back of the current stance is the back leg.
+	const bool bRightLead = Fighters[Index].State.Stance == EOpenStanceStance::RightLead;
+	Event.LegRole = (Leg == EOpenStanceLegSide::Right) == bRightLead ? EOpenStanceLegRole::Lead : EOpenStanceLegRole::Back;
+	Event.Path = TEXT("os.Throw");
+	Start(Index, Event);
+	return true;
+}
+
 void FOpenStanceMatchSim::Start(int32 Index, const FOpenStanceInputEvent& Event)
 {
 	FOpenStanceFighterSim& F = Fighters[Index];

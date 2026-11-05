@@ -28,4 +28,12 @@ public:
 	 */
 	UFUNCTION(BlueprintCallable, Category = "Open Stance|Menu")
 	static bool CaptureScreen(EOpenStanceMenuScreen Screen, const FString& OutputPath, const FString& State, int32 Width = 1920, int32 Height = 1080);
+
+	/**
+	 * Build a fighter portrait studio (UOpenStanceFighterStudio) in the editor world, pose it Seconds into the stance and
+	 * write its colour capture to OutputPath as a PNG. Returns a summary of the depth capture (min, max, share of pixels
+	 * nearer than the cut-off) for checking the cut-out, or an error message.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Open Stance|Menu")
+	static FString CaptureFighterStudio(EOpenStanceBodyType BodyType, EOpenStanceSex Sex, bool bFaceLeft, float Seconds, const FString& OutputPath);
 };

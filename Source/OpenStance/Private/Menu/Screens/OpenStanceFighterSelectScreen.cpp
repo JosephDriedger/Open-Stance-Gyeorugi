@@ -4,9 +4,11 @@
 #include "Menu/OpenStanceMenuSubsystem.h"
 #include "Menu/OpenStanceMenuTheme.h"
 #include "Menu/Slate/SOpenStanceArt.h"
+#include "Menu/Slate/SOpenStanceFighterRender.h"
 #include "Menu/Slate/SOpenStanceFrame.h"
 #include "Menu/Slate/SOpenStanceItems.h"
 #include "Widgets/Layout/SBox.h"
+#include "Widgets/Layout/SUniformGridPanel.h"
 #include "Widgets/Layout/SWidgetSwitcher.h"
 #include "Widgets/SBoxPanel.h"
 
@@ -15,7 +17,34 @@ using namespace OpenStanceMenuWidgets;
 
 TArray<FOpenStanceHint> UOpenStanceFighterSelectScreen::GetHints() const
 {
-	return TabHints(TEXT("Men"), TEXT("Women"));
+	TArray<FOpenStanceHint> Hints = TabHints(TEXT("Men"), TEXT("Women"));
+	Hints.Add({ TEXT("X"), EOpenStanceGlyphLook::X, TEXT("Random") });
+	Hints.Add({ TEXT("Y"), EOpenStanceGlyphLook::Y, TEXT("You / Opponent") });
+	return Hints;
+}
+
+EOpenStanceSide UOpenStanceFighterSelectScreen::GetPickSide() const
+{
+	const UOpenStanceMenuSubsystem* Menu = GetMenu();
+	const EOpenStanceSide Yours = Menu ? Menu->GetSession().PlayerSide : EOpenStanceSide::Chung;
+	const EOpenStanceSide Theirs = Yours == EOpenStanceSide::Chung ? EOpenStanceSide::Hong : EOpenStanceSide::Chung;
+	return bChoosingOpponent ? Theirs : Yours;
+}
+
+FReply UOpenStanceFighterSelectScreen::NativeOnKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent)
+{
+	const FKey Key = InKeyEvent.GetKey();
+	if (Key == EKeys::Gamepad_FaceButton_Top || Key == EKeys::Tab || Key == EKeys::Y)
+	{
+		bChoosingOpponent = !bChoosingOpponent;
+		return FReply::Handled();
+	}
+	if (Key == EKeys::Gamepad_FaceButton_Left || Key == EKeys::R)
+	{
+		PickRandom();
+		return FReply::Handled();
+	}
+	return Super::NativeOnKeyDown(InGeometry, InKeyEvent);
 }
 
 const FOpenStanceFighterProfile& UOpenStanceFighterSelectScreen::GetFighter(EOpenStanceSide Side) const
@@ -77,25 +106,43 @@ TSharedRef<SWidget> UOpenStanceFighterSelectScreen::BuildSidePanel(EOpenStanceSi
 					.Fill(Palette::Panel)
 					.Padding(FMargin(U(1.0f)))
 					[
-						SNew(SOpenStanceFighterFigure)
-						.BodyColor(Colour)
-						.TrimColor(Dark)
-						.GearOn(true)
-						.Kick(bChung)
+						// The fighter's body build in the sparring stance, without gear; the silhouette if it cannot render
+						SNew(SOpenStanceFighterRender)
+						.BodyType_Lambda([Fighter]() { return Fighter().BodyType; })
 						.Sex_Lambda([Fighter]() { return Fighter().Sex; })
+						.PortraitKey_Lambda([Fighter]() { return OpenStanceMenuContent::GetPortraitKey(Fighter()); })
+						.FaceLeft(!bChung)
+						.World(GetWorld())
+						.Fallback()
+						[
+							SNew(SOpenStanceFighterFigure)
+							.BodyColor(Colour)
+							.TrimColor(Dark)
+							.GearOn(true)
+							.Kick(bChung)
+							.Sex_Lambda([Fighter]() { return Fighter().Sex; })
+						]
 					]
 				]
 			]
 			+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, U(0.8f), 0.0f, 0.0f)
 			[
-				MakeLiveText([Fighter]() { return Fighter().Name; }, { EFont::Display, 2.6f, 0.03f, false }, Palette::Bone)
+				SNew(SHorizontalBox)
+				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.0f, 0.0f, U(0.8f), 0.0f)
+				[
+					LiveFlag([Fighter]() { return Fighter().CountryCode; }, 2.0f)
+				]
+				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
+				[
+					MakeLiveText([Fighter]() { return Fighter().Name; }, { EFont::Display, 2.6f, 0.03f, false }, Palette::Bone)
+				]
 			]
 			+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, U(0.8f), 0.0f, 0.0f)
 			[
 				SNew(SHorizontalBox)
 				+ SHorizontalBox::Slot().AutoWidth().Padding(0.0f, 0.0f, U(0.8f), 0.0f)
 				[
-					LiveTag([Fighter]() { return Fighter().Sex == EOpenStanceSex::Female ? FString(TEXT("Women")) : FString(TEXT("Men")); })
+					LiveTag([Fighter]() { return Fighter().CountryName; })
 				]
 				+ SHorizontalBox::Slot().AutoWidth().Padding(0.0f, 0.0f, U(0.8f), 0.0f)
 				[
@@ -118,21 +165,31 @@ TSharedRef<SWidget> UOpenStanceFighterSelectScreen::BuildRosterList(EOpenStanceS
 	const TArray<FOpenStanceFighterProfile>& Roster = OpenStanceMenuContent::GetRoster();
 	TWeakObjectPtr<UOpenStanceFighterSelectScreen> WeakThis(this);
 
-	TSharedRef<SVerticalBox> List = SNew(SVerticalBox);
+	// Two columns of compact tiles, filled row by row: twelve fighters a side fit where one column of four did
+	TSharedRef<SUniformGridPanel> List = SNew(SUniformGridPanel).SlotPadding(FMargin(U(0.4f)));
 	bool bFirst = true;
+	int32 Cell = 0;
 	for (const int32 RosterIndex : OpenStanceMenuContent::GetRosterIndices(Sex))
 	{
 		const FOpenStanceFighterProfile& Profile = Roster[RosterIndex];
 		TSharedRef<SOpenStanceFighterTile> Tile = SNew(SOpenStanceFighterTile)
 			.Name(Profile.Name)
-			.Detail(FString::Printf(TEXT("%s · %s · OVR %d"), *OpenStanceMenuContent::GetBodyTypeName(Profile.BodyType),
+			.CountryCode(Profile.CountryCode)
+			.Compact(true)
+			.Detail(FString::Printf(TEXT("%s · %s · %s · %d"), *Profile.CountryCode, *OpenStanceMenuContent::GetBodyTypeName(Profile.BodyType),
 				*OpenStanceMenuContent::GetStyleName(Profile.Style), Profile.Overall))
 			.Selected_Lambda([WeakThis, RosterIndex]()
 			{
 				const UOpenStanceFighterSelectScreen* Screen = WeakThis.Get();
 				const UOpenStanceMenuSubsystem* Menu = Screen ? Screen->GetMenu() : nullptr;
-				// The fighter highlighted is the one on your side.
-				return Menu && (Menu->GetSession().PlayerSide == EOpenStanceSide::Chung ? Menu->GetSession().ChungFighter : Menu->GetSession().HongFighter) == RosterIndex;
+				// Both picks are marked, each in its side's colour
+				return Menu && (Menu->GetSession().ChungFighter == RosterIndex || Menu->GetSession().HongFighter == RosterIndex);
+			})
+			.Hong_Lambda([WeakThis, RosterIndex]()
+			{
+				const UOpenStanceFighterSelectScreen* Screen = WeakThis.Get();
+				const UOpenStanceMenuSubsystem* Menu = Screen ? Screen->GetMenu() : nullptr;
+				return Menu && Menu->GetSession().HongFighter == RosterIndex;
 			})
 			.OnPressed(FSimpleDelegate::CreateWeakLambda(this, [this, RosterIndex]() { PickFighter(RosterIndex); }));
 
@@ -140,10 +197,11 @@ TSharedRef<SWidget> UOpenStanceFighterSelectScreen::BuildRosterList(EOpenStanceS
 		{
 			SetDefaultFocus(Tile);
 		}
-		List->AddSlot().AutoHeight().Padding(0.0f, bFirst ? 0.0f : U(0.8f), 0.0f, 0.0f)
+		List->AddSlot(Cell % 2, Cell / 2)
 		[
 			Tile
 		];
+		++Cell;
 		bFirst = false;
 	}
 	return List;
@@ -167,6 +225,20 @@ TSharedRef<SWidget> UOpenStanceFighterSelectScreen::BuildContent()
 			.Padding(FMargin(U(2.0f), U(0.7f)))
 			.Current_Lambda([GetCategory, Sex]() { return GetCategory() == Sex; })
 			.OnPressed(FSimpleDelegate::CreateWeakLambda(this, [this, Sex]() { SetCategory(Sex); }));
+	};
+
+	const auto MakePickTab = [this, WeakThis](const FString& Label, bool bOpponent)
+	{
+		return SNew(SOpenStanceOption)
+			.Label(Label)
+			.FontSize(1.3f)
+			.Padding(FMargin(U(1.1f), U(0.35f)))
+			.Current_Lambda([WeakThis, bOpponent]()
+			{
+				const UOpenStanceFighterSelectScreen* Screen = WeakThis.Get();
+				return Screen && Screen->bChoosingOpponent == bOpponent;
+			})
+			.OnPressed(FSimpleDelegate::CreateWeakLambda(this, [this, bOpponent]() { bChoosingOpponent = bOpponent; }));
 	};
 
 	const FString ModeName = Menu && Menu->GetSession().Mode == EOpenStanceMatchMode::Tournament ? TEXT("Tournament") : TEXT("Sparring");
@@ -199,17 +271,30 @@ TSharedRef<SWidget> UOpenStanceFighterSelectScreen::BuildContent()
 		]
 		+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, U(0.8f), 0.0f, U(0.8f))
 		[
-			MakeLiveText([GetCategory]()
-			{
-				return GetCategory() == EOpenStanceSex::Female ? FString(TEXT("Premade Women’s Fighters · Choose One"))
-					: FString(TEXT("Premade Men’s Fighters · Choose One"));
-			}, { EFont::BodyBold, 1.05f, 0.2f, true }, Palette::Mute)
+			// Which fighter a pick sets: yours or your opponent's (Y switches)
+			SNew(SHorizontalBox)
+			+ SHorizontalBox::Slot().AutoWidth().Padding(0.0f, 0.0f, U(0.4f), 0.0f)
+			[
+				MakePickTab(TEXT("Your Fighter"), false)
+			]
+			+ SHorizontalBox::Slot().AutoWidth().Padding(0.0f, 0.0f, U(1.2f), 0.0f)
+			[
+				MakePickTab(TEXT("Opponent"), true)
+			]
+			+ SHorizontalBox::Slot().AutoWidth()
+			[
+				SNew(SOpenStanceOption)
+				.Label(TEXT("Random"))
+				.FontSize(1.3f)
+				.Padding(FMargin(U(1.1f), U(0.35f)))
+				.OnPressed(FSimpleDelegate::CreateWeakLambda(this, [this]() { PickRandom(); }))
+			]
 		]
 		+ SVerticalBox::Slot().AutoHeight()
 		[
 			Rosters
 		]
-		+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, U(1.4f), 0.0f, 0.0f)
+		+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, U(1.0f), 0.0f, 0.0f)
 		[
 			SNew(SOpenStanceOption)
 			.Label(TEXT("Start Match"))
@@ -273,6 +358,26 @@ void UOpenStanceFighterSelectScreen::SetCategory(EOpenStanceSex Sex)
 	}
 }
 
+void UOpenStanceFighterSelectScreen::PickRandom()
+{
+	UOpenStanceMenuSubsystem* Menu = GetMenu();
+	if (!Menu)
+	{
+		return;
+	}
+	FOpenStanceMenuSession& Session = Menu->GetSession();
+	TArray<int32> Indices = OpenStanceMenuContent::GetRosterIndices(Session.Category);
+	if (Indices.Num() < 2)
+	{
+		return;
+	}
+	// Two different fighters: the first draw, then one from the rest
+	const int32 First = FMath::RandRange(0, Indices.Num() - 1);
+	Session.ChungFighter = Indices[First];
+	Indices.RemoveAt(First);
+	Session.HongFighter = Indices[FMath::RandRange(0, Indices.Num() - 1)];
+}
+
 void UOpenStanceFighterSelectScreen::PickFighter(int32 RosterIndex)
 {
 	UOpenStanceMenuSubsystem* Menu = GetMenu();
@@ -281,22 +386,14 @@ void UOpenStanceFighterSelectScreen::PickFighter(int32 RosterIndex)
 		return;
 	}
 
-	// The pick is the fighter on the side you chose; the other side keeps its fighter unless that is the same one.
+	// The pick sets yours, or the opponent's while choosing the opponent; picking the fighter the other side has swaps them.
 	FOpenStanceMenuSession& Session = Menu->GetSession();
-	int32& Yours = Session.PlayerSide == EOpenStanceSide::Chung ? Session.ChungFighter : Session.HongFighter;
-	int32& Theirs = Session.PlayerSide == EOpenStanceSide::Chung ? Session.HongFighter : Session.ChungFighter;
-	Yours = RosterIndex;
-	if (Theirs == RosterIndex)
+	const bool bChungPick = GetPickSide() == EOpenStanceSide::Chung;
+	int32& Picked = bChungPick ? Session.ChungFighter : Session.HongFighter;
+	int32& Other = bChungPick ? Session.HongFighter : Session.ChungFighter;
+	if (Other == RosterIndex)
 	{
-		// The opponent may not be the same fighter: take the first other one in this roster
-		const TArray<int32> Indices = OpenStanceMenuContent::GetRosterIndices(Session.Category);
-		for (const int32 Candidate : Indices)
-		{
-			if (Candidate != RosterIndex)
-			{
-				Theirs = Candidate;
-				break;
-			}
-		}
+		Other = Picked;
 	}
+	Picked = RosterIndex;
 }

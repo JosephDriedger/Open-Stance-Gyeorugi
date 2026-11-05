@@ -2,6 +2,8 @@
 import hashlib
 import json
 import math
+import argparse
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -10,8 +12,12 @@ pyfbstandalone.initialize()
 from pyfbsdk import *
 
 ROOT = Path(__file__).resolve().parents[2]
-SOURCE = ROOT / 'Resources/Models/Animation/MotionBuilder/Medium/OpenStance_Medium_Sparring.fbx'
-OUT = ROOT / 'tmp/mocap_rig_readiness' / datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')
+parser=argparse.ArgumentParser()
+parser.add_argument('--source',default='Resources/Models/Animation/MotionBuilder/Medium/OpenStance_Medium_Sparring.fbx')
+parser.add_argument('--output-dir')
+args=parser.parse_args()
+SOURCE = ROOT / args.source
+OUT = ROOT / args.output_dir if args.output_dir else ROOT / 'tmp/mocap_rig_readiness' / datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')
 OUT.mkdir(parents=True, exist_ok=False)
 report = {'source': str(SOURCE), 'source_sha256': hashlib.sha256(SOURCE.read_bytes()).hexdigest(),
           'passed': False, 'captured_motion_tested': False, 'visual_clipping_checked': False}
@@ -29,6 +35,8 @@ def distance(a, b):
 
 
 def load(path):
+    app.FileNew()
+    FBSystem().Scene.Evaluate()
     assert app.FileOpen(str(path), False), f'Cannot open {path}'
     scene = FBSystem().Scene
     characters = list(scene.Characters)
@@ -44,6 +52,10 @@ def load(path):
 
 
 def sample_meshes(scene):
+    scene.EvaluateDeformations()
+    time.sleep(.1)
+    scene.Evaluate()
+    scene.EvaluateDeformations()
     result = {}
     for model in scene.Components:
         if isinstance(model, FBModel) and model.Geometry and model.IsDeformable:
@@ -106,7 +118,7 @@ try:
         report['mesh_checks'].append({'mesh': name, 'max_coordinate_change_cm': maximum})
     report['deformed_arrays_nonzero'] = any(max(abs(v) for v in values) > 1 for values in base_meshes.values())
     for garment in ['Gloves', 'Pants', 'FootGuards', 'Jacket']:
-        matches = [r for r in report['mesh_checks'] if r['mesh'].startswith(garment + '.')]
+        matches = [r for r in report['mesh_checks'] if r['mesh'].split('.')[0]==garment or r['mesh'].split('.')[0].startswith(garment+'_')]
         assert matches and max(r['max_coordinate_change_cm'] for r in matches) > 1, f'{garment} did not deform'
     player.Goto(FBTime(0, 0, 0, 30))
     scene.Evaluate()
@@ -120,7 +132,7 @@ try:
     scene.Evaluate()
     options = FBFbxOptions(False)
     options.EmbedMedia = True
-    output = OUT / 'Medium_Sparring_Rig_Test.fbx'
+    output = OUT / (SOURCE.stem+'_Rig_Test.fbx')
     assert app.FileSave(str(output), options), 'Scratch save failed'
     scene, char = load(output)
     for frame, expected in [(0, base_bones), (15, moved_bones), (30, base_bones)]:

@@ -71,6 +71,15 @@ namespace OpenStanceMenuWidgets
 	/** A standard tag whose text is read each frame, e.g. the selected fighter's body type. */
 	OPENSTANCE_API TSharedRef<SWidget> LiveTag(TFunction<FString()> GetText);
 
+	/**
+	 * A nation's flag (country code as on the roster, e.g. KOR) Height units tall at its own proportions, from
+	 * /Game/Menu/Flags/T_Flag_<Code> (Tools/Unreal/import_flags.py); an empty widget if there is no flag for the code.
+	 */
+	OPENSTANCE_API TSharedRef<SWidget> Flag(const FString& CountryCode, float Height);
+
+	/** As Flag, for a code that changes (the side panels follow the chosen fighter). */
+	OPENSTANCE_API TSharedRef<SWidget> LiveFlag(TFunction<FString()> GetCountryCode, float Height);
+
 	/** Amber "Future" tag: features the design lists for after v1.0. */
 	OPENSTANCE_API TSharedRef<SWidget> FutureTag();
 
