@@ -3,7 +3,8 @@
 # its sparring gear, once per side (Chung blue, Hong red), on the rig the placeholder technique clips are authored on.
 #   1. per body type and sex: the portrait start file (prepare_portrait_fighter.py's warp and hair) with gloves and foot
 #      guards on, then build_traditional_dobok.py --upto=8 (protector fit, hip lift and hidden covered layers; no belt
-#      chain, whose bones are not on the production skeleton) -> FinalRefinement/Match/<Kind>_<Sex>/Candidate.blend
+#      chain, whose bones are not on the production skeleton), then refine_match_weights.py (smooths the weights wherever
+#      the technique clips stretch the dobok) -> FinalRefinement/Match/<Kind>_<Sex>/Candidate.blend
 #   2. per fighter and side: export_portrait_fighter.py --gear MatchSide=0|1 with the fighter's look
 #      -> FinalRefinement/Match/Roster/<Key>_<Chung|Hong>/SK_Match_<Key>_<Chung|Hong>.fbx
 # Needs build_portrait_fighters.sh run first. Logs: Saved/Logs/match_<name>.log.
@@ -29,6 +30,8 @@ bpy.ops.wm.save_as_mainfile(filepath=r'$dir/Work.blend', compress=True)
 " &&
                 MSYS_NO_PATHCONV=1 "$BLENDER" -b "$dir/Work.blend" --python-exit-code 1 \
                     -P "$ROOT/Tools/Blender/build_traditional_dobok.py" -- "$dir" --upto=8 &&
+                MSYS_NO_PATHCONV=1 "$BLENDER" -b "$dir/Candidate.blend" --python-exit-code 1 \
+                    -P "$ROOT/Tools/Blender/refine_match_weights.py" -- --save &&
                 echo "MATCH BODY DONE $target" || echo "MATCH BODY FAILED $target"
             } > "$log" 2>&1
             grep -hE "MATCH BODY (DONE|FAILED)" "$log"

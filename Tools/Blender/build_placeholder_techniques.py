@@ -24,6 +24,7 @@ from mathutils import Matrix, Quaternion, Vector
 ROOT = Path(__file__).resolve().parents[2]
 OUT = Path(sys.argv[sys.argv.index('--') + 1]) if '--' in sys.argv else ROOT / 'Resources/Models/Animation/PlaceholderTechniques'
 FPS = 30
+NECK_YAW = 80       # most the head turns from the chest (degrees), about a real neck's range
 scene = bpy.context.scene
 rig = next(o for o in bpy.data.objects if o.type == 'ARMATURE' and o.name.startswith('RIG_Body_'))
 W = rig.matrix_world
@@ -128,6 +129,21 @@ def solve(p):
     m = REST['pelvis']
     h = m.translation.copy()
     posed['pelvis'] = Matrix.Translation(h + V(0, 0, -pv['drop'] * S) + pv['shift'] * S) @ turn.to_matrix().to_4x4() @ Matrix.Translation(-h) @ m
+    # A planted foot has to reach the mat: if the hips sit too high for the standing leg (a kick lifts them), lower
+    # them until it reaches with the knee just short of straight, instead of leaving the foot hovering.
+    reach = (LEG[0] + LEG[1]) * .995
+    sink = 0.0
+    for side in 'lr':
+        foot = p['foot_' + side]
+        if foot['at'].z != FOOT_Z:
+            continue
+        hip = child_head('pelvis', 'thigh_' + side)
+        target = V(foot['at'].x * S, foot['at'].y * S, FOOT_Z)
+        across = math.hypot(target.x - hip.x, target.y - hip.y)
+        if (target - hip).length > reach and across < reach:
+            sink = max(sink, (hip.z - target.z) - math.sqrt(reach * reach - across * across))
+    if sink > 0:
+        posed['pelvis'] = Matrix.Translation(V(0, 0, -sink)) @ posed['pelvis']
 
     # chest: spread over the spine
     ch = p['chest']
@@ -137,12 +153,21 @@ def solve(p):
     for name in spine:
         rotate(name, part)
 
-    # head: face the opponent line (-Y), turned by `look`
+    # head: face the opponent line (-Y), turned by `look`, but never more than NECK_YAW from the chest (a spinning kick
+    # looks back over the shoulder; it cannot turn the face round to the back)
+    chest = posed['spine_05'].to_3x3() @ (REST['spine_05'].to_3x3().inverted() @ V(0, -1, 0))
+    chest.z = 0
+    want = yaw(p['look']) @ V(0, -1, 0)
+    if chest.length > 1e-6:
+        chest.normalize()
+        turn_from_chest = math.atan2(chest.cross(want).z, chest.dot(want))
+        limit = math.radians(NECK_YAW)
+        if abs(turn_from_chest) > limit:
+            want = Quaternion((0, 0, 1), math.copysign(limit, turn_from_chest)) @ chest
     for name, share in (('neck_01', .5), ('head', 1.0)):
         m = baseline(name)
         forward = m.to_3x3() @ (REST[name].to_3x3().inverted() @ V(0, -1, 0))
         forward.z = 0
-        want = yaw(p['look']) @ V(0, -1, 0)
         r = Quaternion().slerp(aim_rotation(forward, want), share) if forward.length > 1e-6 else Quaternion()
         rotate(name, r)
 
@@ -153,7 +178,14 @@ def solve(p):
         hip = posed_thigh.translation.copy()
         target = foot['at'] * 1.0
         target = V(target.x * S, target.y * S, target.z if foot['at'].z == FOOT_Z else target.z * S)
-        knee = two_bone(hip, target, LEG, foot['pole'])
+        pole = foot['pole']
+        if foot['at'].z == FOOT_Z:
+            # A planted foot's knee tracks over its toes, as a fighter's does (a knee turned away from the toes twists
+            # the leg and looks injured); the pose's pole keeps only its lift.
+            flat = V(foot['toe'].x, foot['toe'].y, 0)
+            if flat.length > 1e-6:
+                pole = flat.normalized() + V(0, 0, pole.z)
+        knee = two_bone(hip, target, LEG, pole)
         posed['thigh_' + side] = posed_thigh
         rotate('thigh_' + side, aim_rotation(child_head('thigh_' + side, 'calf_' + side) - hip, knee - hip))
         calf = baseline('calf_' + side)
@@ -169,7 +201,15 @@ def solve(p):
         if abs(toe.z) < 1e-6:
             rest = head('ball_' + side) - head('foot_' + side)
             toe = (toe * math.hypot(rest.x, rest.y) + V(0, 0, rest.z)).normalized()
-        rotate('foot_' + side, aim_rotation(child_head('foot_' + side, 'ball_' + side) - f0, toe))
+        if foot['at'].z == FOOT_Z and abs(foot['toe'].z) < 1e-6:
+            # Planted: the sole lies flat on the mat. Only turn the rest foot about the vertical (a shortest-arc aim
+            # would keep the leg's twist and roll the foot onto its side when the fighter pivots on it).
+            rest_toe = head('ball_' + side) - head('foot_' + side)
+            turn = math.atan2(toe.x, -toe.y) - math.atan2(rest_toe.x, -rest_toe.y)
+            want = Quaternion((0, 0, 1), turn).to_matrix() @ REST['foot_' + side].to_3x3()
+            rotate('foot_' + side, (want @ ft.to_3x3().inverted()).to_quaternion())
+        else:
+            rotate('foot_' + side, aim_rotation(child_head('foot_' + side, 'ball_' + side) - f0, toe))
 
         hand = p['hand_' + side]
         upper = baseline('upperarm_' + side)

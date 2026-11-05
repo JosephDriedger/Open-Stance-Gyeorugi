@@ -78,6 +78,8 @@ public:
 	void SetScoreCheat(int32 Chung, int32 Hong);
 	void SetClockCheat(float Seconds);
 	bool SetAIMode(const FString& Mode, FString& OutMessage);
+	/** Switches the match camera to a named preset (OpenStanceCameraPresets); not a cheat, the match is unchanged. */
+	bool SetCameraPreset(FName Name, FString& OutMessage);
 
 	/** Plays the scripted proof on a separate simulation and logs it; returns true if every stage passed. */
 	bool RunProof();
@@ -91,6 +93,8 @@ private:
 	void HandleInvertToggle();
 	void ShowLiveSticks(const FOpenStanceFighterControls& Controls) const;
 	void GetFollowCameraPose(FVector& OutPosition, FRotator& OutRotation) const;
+	/** The camera preset in use: Match unless os.CameraPreset chose another. */
+	const struct FOpenStanceCameraPreset& GetCameraPreset() const;
 	void UpdateCamera(float DeltaTime);
 	/** The menu system for the local player, whose match model is the HUD's; null in a world with no local player. */
 	UOpenStanceMenuSubsystem* GetMenu() const;
@@ -176,6 +180,7 @@ private:
 	FDelegateHandle DebugDrawHandle;
 	FVector Origin = FVector::ZeroVector;
 	EOpenStanceAIMode AIMode = EOpenStanceAIMode::Idle;
+	FName CameraPreset = TEXT("Match");
 	float Accumulator = 0.0f;
 
 	/** Button presses and releases seen by os.ShowInput, oldest first, and the buttons held on the last tick. */

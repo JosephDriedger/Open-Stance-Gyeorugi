@@ -5,9 +5,10 @@
 
 Starts Play on the training dojang (the greybox auto-starts there), then for each technique row in DT_MoveData asks the
 simulation to throw it with Chung (os.* debug command `os.Throw <Row>`) and saves side-on captures at the chamber, the
-strike and the recovery. Images: Saved/Screenshots/TechniqueDemo/<Row>_<phase>.png; log Saved/Logs/technique_demo.txt.
+strike and the recovery (`follow`: from the player's follow camera, into Follow/). Images: Saved/Screenshots/TechniqueDemo/<Row>_<phase>.png; log Saved/Logs/technique_demo.txt.
 """
 import os
+import sys
 import time
 import traceback
 
@@ -20,6 +21,10 @@ LEVEL = "/Game/Maps/L_TrainingDojang"
 ROWS = ["SideKick_Trunk", "Roundhouse_Trunk", "Hook_Head", "Axe_Head", "Punch_Trunk", "SpinSide_Trunk", "SpinHook_Head",
         "Tornado_Trunk"]
 W, H = 900, 700
+FOLLOW = "follow" in sys.argv[1:]          # shoot from the player's follow camera instead of side-on
+if FOLLOW:
+    OUT += "/Follow"
+    W, H = 1280, 720
 levels = unreal.get_editor_subsystem(unreal.LevelEditorSubsystem)
 actors = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
 
@@ -65,15 +70,21 @@ class Demo:
         if len(bodies) < 2:
             self.log(f"{name}: character fighters not found ({len(bodies)})")
             return
-        a, b = bodies[0].get_socket_location("pelvis"), bodies[1].get_socket_location("pelvis")
-        mid = (a + b) * 0.5
-        line = b - a
-        line.z = 0
-        side = unreal.Vector(-line.y, line.x, 0).normal()
-        loc = mid + side * 380 + unreal.Vector(0, 0, 20)
         cam = next(x for x in unreal.GameplayStatics.get_all_actors_of_class(world, unreal.SceneCapture2D))
-        cam.set_actor_location_and_rotation(loc, unreal.MathLibrary.find_look_at_rotation(loc, mid), False, False)
         cc = cam.capture_component2d
+        follow = next((x for x in unreal.GameplayStatics.get_all_actors_of_class(world, unreal.CameraActor)), None)
+        if FOLLOW and follow:
+            # the player's view: the greybox follow camera's pose and field of view
+            cam.set_actor_location_and_rotation(follow.get_actor_location(), follow.get_actor_rotation(), False, False)
+            cc.set_editor_property("fov_angle", follow.camera_component.field_of_view)
+        else:
+            a, b = bodies[0].get_socket_location("pelvis"), bodies[1].get_socket_location("pelvis")
+            mid = (a + b) * 0.5
+            line = b - a
+            line.z = 0
+            side = unreal.Vector(-line.y, line.x, 0).normal()
+            loc = mid + side * 380 + unreal.Vector(0, 0, 20)
+            cam.set_actor_location_and_rotation(loc, unreal.MathLibrary.find_look_at_rotation(loc, mid), False, False)
         cc.capture_scene()
         unreal.RenderingLibrary.export_render_target(world, cc.get_editor_property("texture_target"), OUT, name + ".png")
 

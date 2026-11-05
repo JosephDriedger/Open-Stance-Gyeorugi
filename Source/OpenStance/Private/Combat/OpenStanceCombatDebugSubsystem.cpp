@@ -3,6 +3,8 @@
 #include "Animation/AnimMontage.h"
 #include "Animation/AnimSequenceBase.h"
 #include "Camera/CameraActor.h"
+#include "Camera/CameraComponent.h"
+#include "Combat/OpenStanceCameraPresets.h"
 #include "Combat/OpenStanceCombatOverlay.h"
 #include "Combat/OpenStanceGreyboxProof.h"
 #include "DrawDebugHelpers.h"
@@ -40,11 +42,7 @@ namespace
 	constexpr float CombatDebugFixedStepSeconds = 1.0f / 60.0f;
 	constexpr int32 InputLogLines = 8;
 
-	// The follow camera: how far behind and above the controlling fighter, how far to his right, where it looks, how fast it catches up.
-	constexpr float FollowCameraBehindCm = 320.0f;
-	constexpr float FollowCameraHeightCm = 170.0f;
-	constexpr float FollowCameraRightCm = 60.0f;
-	constexpr float FollowCameraLookHeightCm = 105.0f;
+	// How fast the match camera catches up with its preset's pose (OpenStanceCameraPresets places it).
 	constexpr float FollowCameraSpeed = 6.0f;
 	const TCHAR* MoveTablePath = TEXT("/Game/Combat/DT_MoveData.DT_MoveData");
 	const TCHAR* MenuMapName = TEXT("L_MainMenu");
@@ -256,9 +254,9 @@ void UOpenStanceCombatDebugSubsystem::SetGreyboxActive(bool bActive)
 	// The mat plane: the floor where the player spawned, inside the level, not under the world origin.
 	Origin = FindArenaOrigin();
 
-	// The camera follows the controlling player (Chung) from behind; UpdateCamera keeps it there every tick. Placed with
-	// GetFollowCameraPose: behind and a little to the right of Chung, looking at the point between the fighters, so Hong
-	// stays in frame.
+	// The camera follows the controlling fighter with the Match preset (OpenStanceCameraPresets): behind and out to the
+	// side, looking at the point between the fighters, so the opponent stays in frame and the sticks match the screen.
+	// UpdateCamera keeps it there every tick; os.CameraPreset previews the replay angles.
 	if (APlayerController* Controller = World->GetFirstPlayerController())
 	{
 		BuildBodies();
@@ -267,6 +265,7 @@ void UOpenStanceCombatDebugSubsystem::SetGreyboxActive(bool bActive)
 		FRotator Rotation;
 		GetFollowCameraPose(Position, Rotation);
 		Camera = World->SpawnActor<ACameraActor>(Position, Rotation);
+		Camera->FindComponentByClass<UCameraComponent>()->SetFieldOfView(GetCameraPreset().FieldOfViewDeg);
 		Controller->SetViewTargetWithBlend(Camera);
 		LinkMatchModel();
 
@@ -849,16 +848,34 @@ FVector UOpenStanceCombatDebugSubsystem::FindArenaOrigin() const
 	return Start;
 }
 
+const FOpenStanceCameraPreset& UOpenStanceCombatDebugSubsystem::GetCameraPreset() const
+{
+	const FOpenStanceCameraPreset* Preset = OpenStanceCameraPresets::Find(CameraPreset);
+	return Preset ? *Preset : OpenStanceCameraPresets::Match();
+}
+
+bool UOpenStanceCombatDebugSubsystem::SetCameraPreset(FName Name, FString& OutMessage)
+{
+	if (const FOpenStanceCameraPreset* Preset = OpenStanceCameraPresets::Find(Name))
+	{
+		CameraPreset = Preset->Name;
+		OutMessage = FString::Printf(TEXT("Camera: %s - %s"), *Preset->Name.ToString(), Preset->Use);
+		return true;
+	}
+	OutMessage = TEXT("Usage: os.CameraPreset <Name>. Presets:");
+	for (const FOpenStanceCameraPreset& Preset : OpenStanceCameraPresets::All())
+	{
+		OutMessage += FString::Printf(TEXT("\n  %s - %s"), *Preset.Name.ToString(), Preset.Use);
+	}
+	return false;
+}
+
 void UOpenStanceCombatDebugSubsystem::GetFollowCameraPose(FVector& OutPosition, FRotator& OutRotation) const
 {
-	// Behind the fighter the controller drives, whichever side that is.
+	// Placed from the fighter the controller drives, whichever side that is.
 	const FOpenStanceFighterSim& Player = Sim.Fighters[PlayerIndex];
 	const FOpenStanceFighterSim& Opponent = Sim.Fighters[1 - PlayerIndex];
-	const FVector Facing(Player.Motion.Facing.X, Player.Motion.Facing.Y, 0.0);
-	const FVector Right(-Facing.Y, Facing.X, 0.0);
-	OutPosition = ToWorld(Player.Motion.Position, FollowCameraHeightCm) - Facing * FollowCameraBehindCm + Right * FollowCameraRightCm;
-	const FVector2D Midpoint = (Player.Motion.Position + Opponent.Motion.Position) * 0.5;
-	OutRotation = (ToWorld(Midpoint, FollowCameraLookHeightCm) - OutPosition).Rotation();
+	OpenStanceCameraPresets::Pose(GetCameraPreset(), ToWorld(Player.Motion.Position), ToWorld(Opponent.Motion.Position), OutPosition, OutRotation);
 }
 
 void UOpenStanceCombatDebugSubsystem::UpdateCamera(float DeltaTime)
@@ -872,6 +889,10 @@ void UOpenStanceCombatDebugSubsystem::UpdateCamera(float DeltaTime)
 	GetFollowCameraPose(Position, Rotation);
 	Camera->SetActorLocationAndRotation(FMath::VInterpTo(Camera->GetActorLocation(), Position, DeltaTime, FollowCameraSpeed),
 		FMath::RInterpTo(Camera->GetActorRotation(), Rotation, DeltaTime, FollowCameraSpeed));
+	if (UCameraComponent* Lens = Camera->FindComponentByClass<UCameraComponent>())
+	{
+		Lens->SetFieldOfView(FMath::FInterpTo(Lens->FieldOfView, GetCameraPreset().FieldOfViewDeg, DeltaTime, FollowCameraSpeed));
+	}
 }
 
 void UOpenStanceCombatDebugSubsystem::SetShowInput(bool bOn)
@@ -1313,6 +1334,22 @@ namespace
 				FString Message;
 				Subsystem->SetAIMode(Args.Num() ? Args[0] : FString(), Message);
 				UE_LOG(LogOpenStanceCombat, Display, TEXT("%s"), *Message);
+			}
+		}));
+
+	FAutoConsoleCommandWithWorldAndArgs CameraPresetCommand(TEXT("os.CameraPreset"),
+		TEXT("os.CameraPreset <Name> - views the match from a camera preset (Match is the combat camera; the others are for replays). No name lists them"),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+		{
+			if (UOpenStanceCombatDebugSubsystem* Subsystem = Find(World))
+			{
+				FString Message;
+				Subsystem->SetCameraPreset(Args.Num() ? FName(*Args[0]) : FName(), Message);
+				UE_LOG(LogOpenStanceCombat, Display, TEXT("%s"), *Message);
+				if (GEngine)
+				{
+					GEngine->AddOnScreenDebugMessage(9010, 4.0f, FColor::Cyan, Message);
+				}
 			}
 		}));
 
