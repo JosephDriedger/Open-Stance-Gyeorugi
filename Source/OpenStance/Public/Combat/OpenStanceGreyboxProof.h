@@ -10,7 +10,7 @@
  * what the rules should say, so the same script is the automation test (OpenStance.Greybox.Proof), the os.RunProof
  * console command and the record written to Saved/Logs/OpenStanceGreyboxProof.txt.
  *
- * The retargeted capture playing on the fighter (issue 8) is not part of this script: it needs the capture itself.
+ * The fighters play the placeholder technique clips; the retargeted capture (issue 8) replaces them at Milestone 2.
  */
 struct OPENSTANCE_API FOpenStanceGreyboxProof
 {
@@ -21,8 +21,23 @@ struct OPENSTANCE_API FOpenStanceGreyboxProof
 		FString Detail;
 	};
 
-	/** Starts a match on Sim (whose move table must be set) and plays the script. */
-	static TArray<FStage> Run(FOpenStanceMatchSim& Sim);
+	/**
+	 * The script's controller input, one entry per 60 Hz step, and a caption for each stage (the step it starts on), so
+	 * the live greybox can replay the same proof on screen (os.PlayProof). Replayed into a match started with
+	 * StartDistanceCm, default Skill Stick settings and an idle Hong, it gives the same result as Run.
+	 */
+	struct FTrack
+	{
+		TArray<FOpenStanceFighterControls> Chung;
+		TArray<TPair<int32, FString>> Captions;
+	};
+
+	static constexpr float StepSeconds = 1.0f / 60.0f;
+	static constexpr float StartDistanceCm = 100.0f;
+	static constexpr int32 ExpectedChungScore = 16;
+
+	/** Starts a match on Sim (whose move table must be set) and plays the script; OutTrack, if given, records it. */
+	static TArray<FStage> Run(FOpenStanceMatchSim& Sim, FTrack* OutTrack = nullptr);
 
 	/** The stages and the match log as text. */
 	static FString Format(const TArray<FStage>& Stages, const FOpenStanceMatchSim& Sim);

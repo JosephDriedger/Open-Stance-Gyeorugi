@@ -57,6 +57,32 @@ bool FOpenStanceGreyboxProofTest::RunTest(const FString& Parameters)
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FOpenStanceGreyboxProofReplayTest, "OpenStance.Greybox.ProofReplay", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FOpenStanceGreyboxProofReplayTest::RunTest(const FString& Parameters)
+{
+	// os.PlayProof records the script, then feeds it step by step into a fresh match: the replay must end the same way.
+	FOpenStanceMatchSim Recorded;
+	Recorded.SetMoveTable(FOpenStanceMoveData::CreateSeedTable(GetTransientPackage()));
+	FOpenStanceGreyboxProof::FTrack Track;
+	const TArray<FOpenStanceGreyboxProof::FStage> Stages = FOpenStanceGreyboxProof::Run(Recorded, &Track);
+	TestTrue(TEXT("the recorded run passes"), FOpenStanceGreyboxProof::AllPassed(Stages));
+	TestTrue(TEXT("a step was recorded per 60 Hz tick"), Track.Chung.Num() > 300);
+	TestEqual(TEXT("an intro, six stages and the final score are captioned"), Track.Captions.Num(), 8);
+
+	FOpenStanceMatchSim Live;
+	Live.SetMoveTable(FOpenStanceMoveData::CreateSeedTable(GetTransientPackage()));
+	Live.StartMatch(FOpenStanceGreyboxProof::StartDistanceCm);
+	const FOpenStanceFighterControls Idle;
+	for (const FOpenStanceFighterControls& Chung : Track.Chung)
+	{
+		Live.Step(FOpenStanceGreyboxProof::StepSeconds, Chung, Idle);
+	}
+	TestEqual(TEXT("the replay scores the same for Chung"), Live.Fighters[0].State.Score, FOpenStanceGreyboxProof::ExpectedChungScore);
+	TestEqual(TEXT("and for Hong"), Live.Fighters[1].State.Score, 0);
+	TestEqual(TEXT("and logs the same match"), Live.Log.Num(), Recorded.Log.Num());
+	return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FOpenStanceMatchSimTest, "OpenStance.Greybox.Sim", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
 bool FOpenStanceMatchSimTest::RunTest(const FString& Parameters)
 {

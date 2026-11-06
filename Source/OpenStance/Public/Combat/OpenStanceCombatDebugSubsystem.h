@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Combat/OpenStanceMatchModelSync.h"
+#include "Combat/OpenStanceGreyboxProof.h"
 #include "Combat/OpenStanceMatchSim.h"
 #include "Menu/OpenStanceMenuTypes.h"
 #include "Subsystems/WorldSubsystem.h"
@@ -84,7 +85,18 @@ public:
 	/** Plays the scripted proof on a separate simulation and logs it; returns true if every stage passed. */
 	bool RunProof();
 
+	/**
+	 * Plays the same proof in the live greybox, on screen (os.PlayProof): the match restarts as the proof starts it
+	 * (Chung is the player, Hong idle, default Skill Stick settings) and the recorded controller input drives Chung, with
+	 * a caption for each stage, until the script ends and the result is shown. The controller takes over again after.
+	 * Returns false if the greybox is not running.
+	 */
+	bool PlayProof();
+	bool IsPlayingProof() const { return bPlayingProof; }
+
 private:
+	void FinishProof();
+	void DrawProofCaption(UCanvas* Canvas) const;
 	void DrawOverlay(UCanvas* Canvas, APlayerController* Controller);
 	void DrawWorld() const;
 	void DrawInputPanel(UCanvas* Canvas, APlayerController* Controller) const;
@@ -198,4 +210,12 @@ private:
 	bool bShowHitboxes = false;
 	bool bTrainingDisplay = false;
 	bool bCheatsUsed = false;
+
+	/** os.PlayProof: the recorded script, the next step to feed, the caption showing and the result once it ends. */
+	FOpenStanceGreyboxProof::FTrack ProofTrack;
+	int32 ProofFrame = 0;
+	FString ProofCaption;
+	FString ProofResult;
+	double ProofResultUntil = 0.0;
+	bool bPlayingProof = false;
 };

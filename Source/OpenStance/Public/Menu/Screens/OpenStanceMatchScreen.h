@@ -56,4 +56,7 @@ private:
 
 	bool bCheckedPause = false;
 	bool bLeaving = false;
+	/** Seconds since the match finished: the winning score and call stay up for ResultsHoldSeconds before Results. */
+	float FinishedFor = 0.0f;
+	static constexpr float ResultsHoldSeconds = 3.0f;
 };

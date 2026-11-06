@@ -2,7 +2,7 @@
 
 namespace
 {
-	constexpr float Tick = 1.0f / 60.0f;
+	constexpr float Tick = FOpenStanceGreyboxProof::StepSeconds;
 
 	struct FProofRun
 	{
@@ -10,15 +10,35 @@ namespace
 		FOpenStanceFighterControls Chung;
 		FOpenStanceFighterControls Hong;
 		TArray<FOpenStanceGreyboxProof::FStage> Stages;
+		FOpenStanceGreyboxProof::FTrack* Track = nullptr;
 
 		explicit FProofRun(FOpenStanceMatchSim& InSim) : Sim(InSim) {}
+
+		/** One 60 Hz step, recorded for the live replay. */
+		void Step()
+		{
+			if (Track)
+			{
+				Track->Chung.Add(Chung);
+			}
+			Sim.Step(Tick, Chung, Hong);
+		}
+
+		/** The on-screen caption for the stage that starts with the next step. */
+		void Caption(const TCHAR* Text)
+		{
+			if (Track)
+			{
+				Track->Captions.Emplace(Track->Chung.Num(), Text);
+			}
+		}
 
 		void Hold(float Seconds)
 		{
 			const int32 Count = FMath::Max(1, FMath::RoundToInt(Seconds / Tick));
 			for (int32 Index = 0; Index < Count; ++Index)
 			{
-				Sim.Step(Tick, Chung, Hong);
+				Step();
 			}
 		}
 
@@ -36,7 +56,7 @@ namespace
 		{
 			for (int32 Index = 0; Index < 400; ++Index)
 			{
-				Sim.Step(Tick, Chung, Hong);
+				Step();
 				if (Sim.Fighters[0].State.CombatState == EOpenStanceCombatState::IdleMovement
 					&& Sim.Fighters[1].State.CombatState == EOpenStanceCombatState::IdleMovement
 					&& Sim.Fighters[0].Machine.GetCooldownLeft() <= 0.0f && Sim.Fighters[1].Machine.GetCooldownLeft() <= 0.0f)
@@ -59,10 +79,16 @@ namespace
 	};
 }
 
-TArray<FOpenStanceGreyboxProof::FStage> FOpenStanceGreyboxProof::Run(FOpenStanceMatchSim& Sim)
+TArray<FOpenStanceGreyboxProof::FStage> FOpenStanceGreyboxProof::Run(FOpenStanceMatchSim& Sim, FTrack* OutTrack)
 {
 	FProofRun Run(Sim);
-	Sim.StartMatch(100.0f);
+	if (OutTrack)
+	{
+		*OutTrack = FTrack();
+		Run.Track = OutTrack;
+	}
+	Sim.StartMatch(StartDistanceCm);
+	Run.Caption(TEXT("M1 greybox proof: Chung (blue) uses the Skill Stick only, Hong stands still"));
 	Run.Hold(0.2f);
 
 	const FVector2D Up(0.0, 1.0), Down(0.0, -1.0), Left(-1.0, 0.0), Right(1.0, 0.0);
@@ -74,18 +100,21 @@ TArray<FOpenStanceGreyboxProof::FStage> FOpenStanceGreyboxProof::Run(FOpenStance
 	};
 
 	// 1. RS Up: the side kick with the lead leg.
+	Run.Caption(TEXT("1. Side kick: RS Up, lead leg (2 points)"));
 	int32 Before = Run.ChungScore();
 	Run.Flick(Up);
 	Run.Settle();
 	Scored(TEXT("Side kick (RS Up)"), Before, 2, TEXT("Right (lead)"), TEXT("Side Kick"));
 
 	// 2. RS toward the lead leg: the roundhouse.
+	Run.Caption(TEXT("2. Roundhouse: RS toward the lead leg (2 points)"));
 	Before = Run.ChungScore();
 	Run.Flick(Right);
 	Run.Settle();
 	Scored(TEXT("Roundhouse (RS toward the lead leg)"), Before, 2, TEXT("Right (lead)"), TEXT("Roundhouse"));
 
 	// 3. RS Down then Up: the spin side kick, 4 points.
+	Run.Caption(TEXT("3. Spin side kick: RS Down, Up (4 points); it lands in front and switches sides"));
 	Before = Run.ChungScore();
 	Run.Chung.RightStick = Down;
 	Run.Hold(0.05f);
@@ -101,6 +130,7 @@ TArray<FOpenStanceGreyboxProof::FStage> FOpenStanceGreyboxProof::Run(FOpenStance
 		FString::Printf(TEXT("the spin side kick left the fighter in %s"), Run.Chung0().State.Stance == EOpenStanceStance::LeftLead ? TEXT("Left Lead") : TEXT("Right Lead")));
 
 	// 5. The same RT roundhouse from the other side: the back leg is now the right one and RS Right throws it.
+	Run.Caption(TEXT("4. After the switch: RT + RS toward the back leg, back-leg roundhouse (2 points)"));
 	Run.Chung.bRT = true;
 	Before = Run.ChungScore();
 	Run.Flick(Right);
@@ -109,6 +139,7 @@ TArray<FOpenStanceGreyboxProof::FStage> FOpenStanceGreyboxProof::Run(FOpenStance
 	Scored(TEXT("Back-leg roundhouse after switching (RT + RS toward the back leg)"), Before, 2, TEXT("Right (back)"), TEXT("Roundhouse"));
 
 	// 6. Step back out of range and kick: a clean miss.
+	Run.Caption(TEXT("5. Step back out of range: the side kick misses, no score"));
 	Run.Chung.LeftStick = FVector2D(0.0, -1.0);
 	Run.Hold(1.0f);
 	Run.Chung.LeftStick = FVector2D::ZeroVector;
@@ -120,6 +151,7 @@ TArray<FOpenStanceGreyboxProof::FStage> FOpenStanceGreyboxProof::Run(FOpenStance
 		FString::Printf(TEXT("%s, %s; score stays %d"), *Run.Chung0().LastMove, *Run.Chung0().LastResult, Run.ChungScore()));
 
 	// 7. Close in and score a spinning head kick: 6 points.
+	Run.Caption(TEXT("6. Close in: RB + RS Down, Up, spin side kick to the head (6 points)"));
 	Run.Chung.LeftStick = FVector2D(0.0, 1.0);
 	Run.Hold(0.8f);
 	Run.Chung.LeftStick = FVector2D::ZeroVector;
@@ -136,7 +168,9 @@ TArray<FOpenStanceGreyboxProof::FStage> FOpenStanceGreyboxProof::Run(FOpenStance
 	Run.Settle();
 	Scored(TEXT("Spin side kick to the head (RB, RS Down, Up)"), Before, 6, TEXT("Right (lead)"), TEXT("Spin Side"));
 
-	const bool bTotals = Run.ChungScore() == 16 && Sim.Fighters[1].State.Score == 0;
+	Run.Caption(TEXT("Final score: Chung 16, Hong 0"));
+	Run.Hold(1.5f);
+	const bool bTotals = Run.ChungScore() == ExpectedChungScore && Sim.Fighters[1].State.Score == 0;
 	Run.Stage(TEXT("Final score"), bTotals, FString::Printf(TEXT("Chung %d, Hong %d (expected 16 to 0)"), Run.ChungScore(), Sim.Fighters[1].State.Score));
 	return Run.Stages;
 }

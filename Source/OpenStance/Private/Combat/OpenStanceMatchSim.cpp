@@ -208,7 +208,7 @@ void FOpenStanceMatchSim::ApplyContact(const FOpenStanceContact& Contact)
 		TArray<FOpenStanceCombatEvent> Events;
 		D.Machine.ApplyHit(Contact.Reaction, D.State, Events);
 		A.LastResult = FString::Printf(TEXT("HIT +%d (%s)"), Contact.Points, *ZoneName(Contact.Zone));
-		D.LastResult = FString::Printf(TEXT("hit, %s"), *UEnum::GetValueAsString(Contact.Reaction));
+		D.LastResult = FString::Printf(TEXT("hit, %s reaction"), *UEnum::GetDisplayValueAsText(Contact.Reaction).ToString().ToLower());
 		AddLog(A.Side, FString::Printf(TEXT("score +%d %s to the %s"), Contact.Points, *Contact.Move.ToString(), *ZoneName(Contact.Zone)));
 		break;
 	}
