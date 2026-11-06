@@ -8,17 +8,16 @@ Open Stance covers sparring only. Forms (poomsae) and breaking are out of scope.
 
 ## Status
 
-**Mocap test:** open `Models and Rigs/01 Mocap Test/1 OPEN IN MOTIONBUILDER - Medium Sparring`.
-Use the characterized `Resources/Models/Animation/MotionBuilder/Medium/OpenStance_Medium_Sparring.fbx` in MotionBuilder.
-The [test checklist](Docs/Mocap_Test.md) covers opening the target, simple rig movement and save/reopen. The separate [recording-day workflow](Docs/Mocap_Record.md) and shot list are under `Models and Rigs/03 Technical and Experiments/Mocap Record`. The full asset library is under `02 Asset Library`.
+Milestone 1 (Skill Stick proof of concept, due 9 November 2026). The combat core is playable in a greybox match: two fighters throw techniques through the Skill Stick, animated with placeholder technique clips until motion capture starts at Milestone 2. What exists today:
 
-Pre-production. The design is a draft and there is no gameplay prototype yet: `Source/OpenStance` holds the menu system but no gameplay code, so the Skill Stick is untested until Milestone 1. What exists today:
-
-- Game Design Document (v0.12 draft), controls layout, project plan and mocap shot list in `Docs/`.
+- The combat core in C++ (`Source/OpenStance/Public/Combat`): Skill Stick recognition and input buffering, footwork and lead/back-leg resolution, the combat state machine with committed startup, active and recovery phases, and limb-trace hit registration with WT scoring, gam-jeom, stamina and rounds. 52 automation tests cover it.
+- A greybox match reached from Sparring in the menus (Setup, Side Select, Fighter Select), with a HUD, a debug and Training overlay and development console commands such as `os.RunProof` and `os.ShowHitboxes`. See [Docs/Combat_Debug.md](Docs/Combat_Debug.md).
+- 24 premade fighters on four body types in the layered traditional dobok and sparring gear, playing placeholder clips for every technique (Blender-keyed, mirrored for the left leg).
+- Game Design Document (v0.13 draft), controls layout, project plan, mocap shot list and art asset inventory in `Docs/`.
 - A base MetaHuman fighter with a seven-piece wardrobe (dobok jacket and pants, belt, chest protector, helmet, gloves, foot guards) and Chung/Hong materials. It passes a full-body range-of-motion test.
 - A roster of six MetaHuman referees in uniform, with Chaos cloth on ties and trousers.
 - Staging levels `L_CompetitionArena` (8 m octagon mat in a 12 m square) and `L_TrainingDojang`, plus arena and dojang props.
-- A MotionBuilder test character for the first motion-capture session (`Docs/Vicon_Nexus_Test.md`).
+- A MotionBuilder test character for the first motion-capture session at Milestone 2: open `Models and Rigs/01 Mocap Test/1 OPEN IN MOTIONBUILDER - Medium Sparring` (the characterized `Resources/Models/Animation/MotionBuilder/Medium/OpenStance_Medium_Sparring.fbx`). The [test checklist](Docs/Mocap_Test.md), [recording-day workflow](Docs/Mocap_Record.md) and [Vicon/Nexus notes](Docs/Vicon_Nexus_Test.md) cover the session.
 - The whole menu system (title, main menu, setup, fighter select, match HUD, results, bracket, training, Career, fighter creator, options, controls and the Future pages), written in C++ from the HTML prototype in `Docs/Prototype` and running in the empty level `L_MainMenu`. See [Docs/Menu_System.md](Docs/Menu_System.md).
 
 ## Design at a glance
@@ -36,7 +35,7 @@ The full design is in `Docs/GDD_Open_Stance.docx`.
 | Path | Contents |
 | --- | --- |
 | `OpenStance.uproject` | Unreal project (UE 5.8 source build) |
-| `Source/OpenStance` | Runtime game module: the menu system (`Public/Menu`, Slate and UMG written in C++) and the combat data contracts (`Public/Combat`) |
+| `Source/OpenStance` | Runtime game module: the menu system (`Public/Menu`, Slate and UMG written in C++) and the combat core and greybox match (`Public/Combat`) |
 | `Source/OpenStanceEditorTools` | Editor module that exposes Chaos cloth creation and menu screenshots to Python |
 | `Config/` | Engine, editor, game, input and MetaHuman wardrobe configuration |
 | `Docs/` | Game Design Document, controls, project plan, mocap shot list, UML diagrams, [menu system notes](Docs/Menu_System.md), [combat data](Docs/Combat_Data.md), [Skill Stick input and footwork](Docs/Combat_Input.md), [combat state](Docs/Combat_State.md), [hit registration](Docs/Combat_Hits.md), [greybox and test commands](Docs/Combat_Debug.md), [character customization rules](Docs/Character_Customization.md), [Vicon/Nexus test plan](Docs/Vicon_Nexus_Test.md) |
