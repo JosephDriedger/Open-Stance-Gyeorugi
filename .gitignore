@@ -78,7 +78,7 @@ DerivedDataCache/*
 Tools/Blender/logs/
 __pycache__/
 
-# Binary game assets now versioned in Perforce (see //depot/...)
+# Binary game assets are versioned in Perforce (//depot/Content/...)
 Content/
 
 # Large Blender working files and generated study/archive folders: too big for git

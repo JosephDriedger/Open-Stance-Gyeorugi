@@ -45,13 +45,13 @@ The full design is in `Docs/GDD_Open_Stance.docx`.
 | `Tools/MotionBuilder/` | Script that prepares the MotionBuilder test character |
 | `Tools/Environment/` | Procedural environment texture generator |
 
-`Content/` is not tracked in git. Binary game assets are versioned in Perforce.
+Perforce (`//depot/...`, workspace root = the project folder) holds the full project: everything in this repository plus `Content/` and the final art sources under `Resources/Models` (the character suite start files, the current fighter builds, the placeholder clips and the MotionBuilder characters). This GitHub repository holds only the text part: code, config, docs and tools. Build output, caches, and the generated study, repair and archive folders under `Resources/Models` are in neither; `.p4ignore` and `.gitignore` list them.
 
 ## Getting started
 
 Requirements: Unreal Engine 5.8 (source build) on Windows with Visual Studio, plus Blender for the art pipeline. The project enables the MetaHuman Character, Chaos Outfit Asset, Groom (HairStrands), Python Script and Editor Scripting Utilities plugins.
 
-1. Sync `Content/` from Perforce and clone this repository into the same folder.
+1. Sync the project from Perforce into the project folder (`//depot/...`). To work with GitHub as well, clone this repository into the same folder; the two overlap on the code, config, docs and tools.
 2. Right-click `OpenStance.uproject` and choose **Generate Visual Studio project files**.
 3. Build the editor:
    ```
