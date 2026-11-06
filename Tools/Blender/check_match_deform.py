@@ -8,7 +8,7 @@ every `step` frames (default 2) of each (mirrors included) and reports, per show
 - growth_cm: the most any edge grows; stretch: the largest edge length ratio (edges over MIN_EDGE_CM) to the bind pose and how many edges pass 1.6x (tearing, spikes);
 - crush: the smallest ratio and how many edges fall under 0.35x (folding, crumpling into a lump);
 - poke: for each layer pair (skin under the jacket, trousers and gloves, trousers under the jacket skirt, the jacket
-  under the protector), how many points of the inner layer that were covered at bind come out more than POKE_MM
+  under the protector, the head's neck skin under the jacket, collar and yoke), how many points of the inner layer that were covered at bind come out more than POKE_MM
   through the outer one (show-through).
 
 Solidify is switched off for the measurement (it doubles the surface); masks stay on, so hidden skin is ignored.
@@ -29,7 +29,9 @@ REPORT = Path(args[0]) if args else None
 STEP = int(args[1]) if len(args) > 1 else 2
 STRETCH, CRUSH, POKE_MM, COVER_MM, MIN_EDGE_CM = 1.6, 0.35, 6.0, 40.0, 0.8
 PROTECTOR = "Quilted_Lace_Back__Padded_Torso_Shell"
-PAIRS = [("Body", "Jacket"), ("Body", "Pants"), ("Body", "Gloves"), ("Pants", "Jacket_Skirt"), ("Jacket", PROTECTOR)]
+YOKE = "Quilted_Lace_Back__Continuous_White_Shoulder_Yoke"
+PAIRS = [("Body", "Jacket"), ("Body", "Pants"), ("Body", "Gloves"), ("Pants", "Jacket_Skirt"), ("Jacket", PROTECTOR),
+         ("Head", "Jacket"), ("Head", "Jacket_Collar"), ("Head", YOKE)]
 
 rig = next(o for o in bpy.data.objects if o.type == "ARMATURE" and o.name.startswith("RIG_Body_"))
 with bpy.data.libraries.load(str(CLIPS)) as (src, dst):

@@ -25,6 +25,7 @@ ROOT = Path(__file__).resolve().parents[2]
 OUT = Path(sys.argv[sys.argv.index('--') + 1]) if '--' in sys.argv else ROOT / 'Resources/Models/Animation/PlaceholderTechniques'
 FPS = 30
 NECK_YAW = 80       # most the head turns from the chest (degrees), about a real neck's range
+HEAD_LEVEL = .8     # share of the body's lean and roll the neck and head take back to keep the eyes level
 scene = bpy.context.scene
 rig = next(o for o in bpy.data.objects if o.type == 'ARMATURE' and o.name.startswith('RIG_Body_'))
 W = rig.matrix_world
@@ -164,12 +165,17 @@ def solve(p):
         limit = math.radians(NECK_YAW)
         if abs(turn_from_chest) > limit:
             want = Quaternion((0, 0, 1), math.copysign(limit, turn_from_chest)) @ chest
+    # ...and with the eyes about level: a fighter leaning back for a back kick or rolled over for a side kick still
+    # watches the target, so the neck and head take back most of the tilt the hips and chest give them (the turn alone
+    # left the face pointing at the ceiling in the spinning side kick).
     for name, share in (('neck_01', .5), ('head', 1.0)):
         m = baseline(name)
         forward = m.to_3x3() @ (REST[name].to_3x3().inverted() @ V(0, -1, 0))
         forward.z = 0
         r = Quaternion().slerp(aim_rotation(forward, want), share) if forward.length > 1e-6 else Quaternion()
-        rotate(name, r)
+        up = r @ (m.to_3x3() @ (REST[name].to_3x3().inverted() @ V(0, 0, 1)))
+        level = Quaternion().slerp(aim_rotation(up, V(0, 0, 1)), share * HEAD_LEVEL)
+        rotate(name, level @ r)
 
     # legs and arms: two-bone IK onto targets
     for side in 'lr':

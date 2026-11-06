@@ -6,7 +6,8 @@ outer one. Games avoid that the way the body already is: the covered part of the
 on each inner garment, the vertices whose outward ray meets the outer layer within REACH, shrinks that set back
 ERODE edge rings from the outer layer's edges (so a pose or the cloth's sway cannot open a hole at a rim), stores it as
 the vertex group HIDDEN_GROUP and puts an inverted Mask modifier first in the stack (the export applies it).
-The protector is measured with its hip-driven hem fold fully on, its smallest coverage.
+The protector is measured with its hip-driven hem fold fully on, its smallest coverage. The head meshes (every head style)
+are masked too: they carry the neck and shoulder tops, which sit under the jacket, collar and protector yoke.
 
     blender.exe -b <Candidate.blend> -P hide_covered_layers.py -- <out folder>
 """
@@ -30,10 +31,20 @@ ERODE = {'Pants': 1, 'Jacket': 3, 'Jacket_Collar': 3}
 # with the trousers, so trouser left under the skirt shows through it as patches. The skirt shares the trousers' weights,
 # so its hem stays over them in poses and a single ring of margin is enough.
 
+# The head mesh carries the neck and the tops of the shoulders (the body stops at the upper chest), so its skin there is
+# under the jacket, collar and protector yoke like the body's, and pokes through them when the head turns or the
+# shoulders shrug. Only its neck and shoulder skin is tested (vertices mostly off the head bone, so the face, jaw and
+# chin never hide) and with a short reach (the jacket sits a few cm off the shoulders; a longer ray from under the chin
+# would reach the jacket's chest). Every head style is masked the same way.
+HEADS = [o.name for o in bpy.data.objects if o.type == 'MESH' and (o.name == 'Head' or o.name.startswith('Head_'))
+         and o.vertex_groups.get('head') is not None]
+HEAD_REACH, HEAD_MAX_HEAD_WEIGHT = .05, .5
+
 worn_protector = [o for o in scene.objects if o.type == 'MESH' and o.name.startswith(PROTECTOR) and not o.hide_get() and not o.hide_render]
+neck_cover = [bpy.data.objects[n] for n in ('Jacket', 'Jacket_Collar') if n in bpy.data.objects] + worn_protector
 PAIRS = (('Pants', [bpy.data.objects['Jacket_Skirt']]),
          ('Jacket', worn_protector),
-         ('Jacket_Collar', worn_protector))
+         ('Jacket_Collar', worn_protector)) + tuple((h, neck_cover) for h in HEADS)
 
 pose_position = rig.data.pose_position
 rig.data.pose_position = 'REST'
@@ -74,16 +85,23 @@ for inner_name, outers in PAIRS:
         continue
     tree = outer_tree(outers)
     mesh = inner.data
-    world = inner.matrix_world
+    # A style hidden from the viewport (Head_BroadJaw ...) keeps a stale matrix_world, so build it from the parent.
+    world = (inner.parent.matrix_world @ inner.matrix_parent_inverse @ inner.matrix_basis) if inner.parent else inner.matrix_world
     normal_matrix = world.to_3x3().inverted().transposed()
     centre = sum((world @ v.co for v in mesh.vertices), Vector()) / len(mesh.vertices)
+    is_head = inner_name in HEADS
+    head_group = inner.vertex_groups['head'].index if is_head else None
     covered = set()
     for v in mesh.vertices:
+        if is_head and sum(g.weight for g in v.groups if g.group == head_group) > HEAD_MAX_HEAD_WEIGHT:
+            continue
         p = world @ v.co
         n = (normal_matrix @ v.normal).normalized()
-        if n.dot(Vector((p.x - centre.x, p.y - centre.y, 0))) < 0:
+        # Open garment panels have no reliable side, so their normal is turned to face away from the middle; the head
+        # is a closed skin with outward normals already (and a shoulder-top normal is nearly vertical).
+        if not is_head and n.dot(Vector((p.x - centre.x, p.y - centre.y, 0))) < 0:
             n = -n
-        if tree.ray_cast(p + n * .001, n, REACH)[0] is not None:
+        if tree.ray_cast(p + n * .001, n, HEAD_REACH if is_head else REACH)[0] is not None:
             covered.add(v.index)
     links = defaultdict(list)
     for e in mesh.edges:
