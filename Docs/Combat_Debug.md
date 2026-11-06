@@ -18,9 +18,10 @@ os.ShowHitboxes 1  capsules, target zones and the limb trace
 os.Greybox 0       stop
 ```
 
-The fighters are capsules with target zones; there is no animation yet, so a technique is the fighter's state plus a synthetic
-foot or glove travelling to the move's reach. The overlay and gamepad path are written but have not been looked at on a
-screen; the rules under them are covered by the automation tests and the headless run of `os.RunProof`.
+The fighters are the premade match fighters (Fighter Select's picks, in the side's gear) playing the placeholder technique
+clips; the hits are still judged on the simulation's target zones and limb traces, which `os.ShowHitboxes 1` draws. The
+overlay, captions and the live proof were checked on screen on 2026-11-06 (`os.PlayProof`, below); the controller path
+itself still needs a hand-played check with a real pad.
 
 ## What is shown
 
@@ -51,7 +52,9 @@ Development builds only; the commands are compiled out of shipping. `slomo <scal
 | `os.CombatDebug 0\|1` | The debug overlay |
 | `os.ShowInput 0\|1` | Live controller input at the top of the screen: both sticks, both triggers, held buttons and the last eight presses and releases. Works without the greybox, so it also checks that the pad reaches the game |
 | `os.TrainingDisplay 0\|1` | The Training display |
-| `os.Greybox 0\|1`, `os.RunProof` | Start or stop the greybox, play the scripted proof |
+| `os.Greybox 0\|1` | Start or stop the greybox |
+| `os.RunProof` | Plays the scripted proof on a hidden copy of the simulation and writes the log (no picture) |
+| `os.PlayProof` | Plays the same proof in the live match, on screen, for the proof video (below) |
 | `os.SetRank` | Not added: there is no Career rank to set until Career lands |
 
 `UOpenStanceCombatDebugSubsystem::AreCheatsActive()` becomes true as soon as `os.InfiniteStamina 1`, `os.SetScore`, `os.SetClock`
@@ -72,8 +75,28 @@ with controller input only and writes `Saved/Logs/OpenStanceGreyboxProof.txt`. T
 7. Close in and a spin side kick to the head (RB): +6.
 8. Final score Chung 16, Hong 0.
 
-Not in the proof: the retargeted capture playing on the geared fighter. That needs the capture and retarget (issue 8), and the
-greybox keeps placeholder timing until then.
+The fighters play the placeholder technique clips. The retargeted capture replaces them at Milestone 2 (issue 8, moved there
+by GDD v0.13).
+
+### Recording the proof video
+
+`os.PlayProof` replays the script in the live match so it can be filmed. It records the script's controller input on a
+hidden copy of the simulation (one entry per 60 Hz step), restarts the match the way the proof starts it (Chung is the
+player, Hong stands still, 100 cm apart, default Skill Stick settings), and feeds that input to Chung step by step, so the
+match on screen ends exactly as the checked run does (automation test `OpenStance.Greybox.ProofReplay`). While it plays:
+
+- a caption above the score call names each stage and its input;
+- the debug bars are on, under the HUD's name plates and stamina: stance, guard, state, held buttons, stick, the last
+  inputs (rejected and expired gestures included), leg, move, target, stamina and the hit result;
+- the 12-point gap ends the match on the spinning head kick; the arena holds for 3 seconds (as every match now does) so
+  the kick and the referee's call are seen, then Results shows the match with "Greybox proof PASSED: Chung 16, Hong 0".
+
+The controller takes over again when it ends. To film it: press Play on `L_TrainingDojang` (or start a Sparring match from
+the menu), open the console and type `os.PlayProof`. Started from the command line:
+
+```
+UnrealEditor.exe OpenStance.uproject /Game/Maps/L_TrainingDojang -game -windowed -ResX=1920 -ResY=1080 -ExecCmds="os.PlayProof"
+```
 
 ## Connection to the menu's match HUD
 

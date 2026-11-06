@@ -353,7 +353,10 @@ void UOpenStanceMatchScreen::NativeTick(const FGeometry& MyGeometry, float InDel
 	{
 		Model->Advance(InDeltaTime);
 	}
-	if (Model->IsFinished())
+	// The match ends on the frame the deciding point lands (the point gap or the clock); hold the arena a moment so the
+	// winning technique and its score call are seen before Results.
+	FinishedFor = Model->IsFinished() ? FinishedFor + InDeltaTime : 0.0f;
+	if (Model->IsFinished() && (FinishedFor >= ResultsHoldSeconds || Model->bDemoMode))
 	{
 		bLeaving = true;
 		Menu->ReplaceScreen(EOpenStanceMenuScreen::Results);

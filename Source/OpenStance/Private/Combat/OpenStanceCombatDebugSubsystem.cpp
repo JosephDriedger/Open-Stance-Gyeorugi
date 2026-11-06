@@ -225,6 +225,8 @@ void UOpenStanceCombatDebugSubsystem::SetGreyboxActive(bool bActive)
 		DestroyBodies();
 		SetDefaultPawnHidden(false);
 		bModelLinked = false;
+		bPlayingProof = false;
+		ProofCaption.Reset();
 		return;
 	}
 
@@ -232,7 +234,16 @@ void UOpenStanceCombatDebugSubsystem::SetGreyboxActive(bool bActive)
 	bCombatDebug = true;
 
 	// The side chosen on Side Select: the controller drives that fighter and the other side is idle (or blocking, os.AIMode).
-	if (const UOpenStanceMenuSubsystem* Menu = GetMenu())
+	// os.PlayProof starts the match the way the scripted proof does: Chung is the player, Hong idle, the proof's distance
+	// and default Skill Stick settings, so the recorded input plays out exactly as it did when it was checked.
+	if (bPlayingProof)
+	{
+		PlayerIndex = 0;
+		AIMode = EOpenStanceAIMode::Idle;
+		ProofFrame = 0;
+		ProofCaption.Reset();
+	}
+	else if (const UOpenStanceMenuSubsystem* Menu = GetMenu())
 	{
 		PlayerIndex = Menu->GetSession().PlayerSide == EOpenStanceSide::Hong ? 1 : 0;
 	}
@@ -241,12 +252,19 @@ void UOpenStanceCombatDebugSubsystem::SetGreyboxActive(bool bActive)
 		PlayerIndex = 0;
 	}
 	Sim.SetMoveTable(GetMoveTable());
-	Sim.StartMatch(200.0f);
+	Sim.StartMatch(bPlayingProof ? FOpenStanceGreyboxProof::StartDistanceCm : 200.0f);
 
 	// The Skill Stick follows the Options screen: the dead zone and the input window, 0.20 to 0.40 s (GDD 7.8).
-	if (const UOpenStanceUserSettings* Settings = UOpenStanceUserSettings::Get())
+	if (const UOpenStanceUserSettings* Settings = bPlayingProof ? nullptr : UOpenStanceUserSettings::Get())
 	{
 		Sim.Fighters[PlayerIndex].Recognizer.Config = FOpenStanceSkillStickConfig::FromSettings(Settings->SkillStickDeadZone, Settings->StickInputWindow);
+	}
+	else if (bPlayingProof)
+	{
+		for (FOpenStanceFighterSim& Fighter : Sim.Fighters)
+		{
+			Fighter.Recognizer.Config = FOpenStanceSkillStickConfig();
+		}
 	}
 	Accumulator = 0.0f;
 	PrintedInputEvents = 0;
@@ -269,10 +287,11 @@ void UOpenStanceCombatDebugSubsystem::SetGreyboxActive(bool bActive)
 		Controller->SetViewTargetWithBlend(Camera);
 		LinkMatchModel();
 
-		// With the match HUD showing, the side-bar debug text would overlap its name plates; os.CombatDebug 1 brings it back.
+		// With the match HUD showing the side bars sit lower, under its name plates and stamina; they stay off in a normal
+		// match (os.CombatDebug 1 brings them back) and on for os.PlayProof, which shows what every input resolved to.
 		if (bModelLinked)
 		{
-			bCombatDebug = false;
+			bCombatDebug = bPlayingProof;
 		}
 	}
 }
@@ -1052,6 +1071,61 @@ bool UOpenStanceCombatDebugSubsystem::RunProof()
 	return FOpenStanceGreyboxProof::AllPassed(Stages);
 }
 
+bool UOpenStanceCombatDebugSubsystem::PlayProof()
+{
+	// Record the script on a separate simulation first: the same input, step for step, then replays into the live match.
+	FOpenStanceMatchSim Scratch;
+	Scratch.SetMoveTable(GetMoveTable());
+	const TArray<FOpenStanceGreyboxProof::FStage> Stages = FOpenStanceGreyboxProof::Run(Scratch, &ProofTrack);
+	if (!FOpenStanceGreyboxProof::AllPassed(Stages) || ProofTrack.Chung.Num() == 0)
+	{
+		UE_LOG(LogOpenStanceCombat, Warning, TEXT("os.PlayProof: the scripted proof does not pass on its own (see os.RunProof)"));
+		return false;
+	}
+	Sim.bInfiniteStamina = false;
+	ProofResult.Reset();
+	bPlayingProof = true;
+	SetGreyboxActive(true);
+	return true;
+}
+
+void UOpenStanceCombatDebugSubsystem::FinishProof()
+{
+	bPlayingProof = false;
+	ProofCaption.Reset();
+	const int32 Chung = Sim.Fighters[0].State.Score, Hong = Sim.Fighters[1].State.Score;
+	const bool bPassed = Chung == FOpenStanceGreyboxProof::ExpectedChungScore && Hong == 0;
+	ProofResult = FString::Printf(TEXT("Greybox proof %s: Chung %d, Hong %d"), bPassed ? TEXT("PASSED") : TEXT("FAILED"), Chung, Hong);
+	ProofResultUntil = FPlatformTime::Seconds() + 8.0;
+	UE_LOG(LogOpenStanceCombat, Display, TEXT("%s (live playback)"), *ProofResult);
+}
+
+void UOpenStanceCombatDebugSubsystem::DrawProofCaption(UCanvas* Canvas) const
+{
+	const bool bResult = !ProofResult.IsEmpty() && FPlatformTime::Seconds() < ProofResultUntil;
+	const FString& Text = bPlayingProof ? ProofCaption : (bResult ? ProofResult : ProofCaption);
+	if (Text.IsEmpty() || !GEngine)
+	{
+		return;
+	}
+	// Above the HUD's score call at the bottom, clear of the scoreboard, large enough to read on video.
+	UFont* Font = GEngine->GetLargeFont();
+	const float Scale = FMath::Max(1.0f, Canvas->SizeY / 600.0f);
+	float Width = 0.0f, Height = 0.0f;
+	Canvas->StrLen(Font, Text, Width, Height);
+	Width *= Scale;
+	Height *= Scale;
+	const FVector2D At((Canvas->SizeX - Width) * 0.5f, Canvas->SizeY * 0.71f);
+	FCanvasTileItem Back(At - FVector2D(14.0f, 8.0f), FVector2D(Width + 28.0f, Height + 16.0f), FLinearColor(0.0f, 0.0f, 0.0f, 0.55f));
+	Back.BlendMode = SE_BLEND_Translucent;
+	Canvas->DrawItem(Back);
+	const FColor Colour = bPlayingProof ? FColor::White : (ProofResult.Contains(TEXT("PASSED")) ? FColor(120, 230, 120) : FColor(255, 110, 110));
+	FCanvasTextItem Item(At, FText::FromString(Text), Font, Colour);
+	Item.Scale = FVector2D(Scale, Scale);
+	Item.EnableShadow(FLinearColor::Black);
+	Canvas->DrawItem(Item);
+}
+
 FOpenStanceFighterControls UOpenStanceCombatDebugSubsystem::PollController() const
 {
 	FOpenStanceFighterControls C;
@@ -1113,13 +1187,33 @@ void UOpenStanceCombatDebugSubsystem::Tick(float DeltaTime)
 
 	// A fixed step keeps the simulation the same whatever the frame rate, and slomo scales DeltaTime for free.
 	Accumulator = bHeld ? 0.0f : Accumulator + FMath::Min(DeltaTime, 0.1f);
-	const FOpenStanceFighterControls PlayerControls = PollController();
+	FOpenStanceFighterControls PlayerControls = PollController();
 	FOpenStanceFighterControls OpponentControls;
 	OpponentControls.bLT = AIMode == EOpenStanceAIMode::Block;
-	const FOpenStanceFighterControls& Chung = PlayerIndex == 0 ? PlayerControls : OpponentControls;
-	const FOpenStanceFighterControls& Hong = PlayerIndex == 0 ? OpponentControls : PlayerControls;
 	while (Accumulator >= CombatDebugFixedStepSeconds)
 	{
+		// os.PlayProof: the recorded script drives Chung, one entry per step, and Hong stands still.
+		if (bPlayingProof)
+		{
+			if (!ProofTrack.Chung.IsValidIndex(ProofFrame))
+			{
+				FinishProof();
+			}
+			else
+			{
+				for (const TPair<int32, FString>& Caption : ProofTrack.Captions)
+				{
+					if (Caption.Key == ProofFrame)
+					{
+						ProofCaption = Caption.Value;
+					}
+				}
+				PlayerControls = ProofTrack.Chung[ProofFrame++];
+				OpponentControls = FOpenStanceFighterControls();
+			}
+		}
+		const FOpenStanceFighterControls& Chung = PlayerIndex == 0 ? PlayerControls : OpponentControls;
+		const FOpenStanceFighterControls& Hong = PlayerIndex == 0 ? OpponentControls : PlayerControls;
 		Sim.Step(CombatDebugFixedStepSeconds, Chung, Hong);
 		Accumulator -= CombatDebugFixedStepSeconds;
 	}
@@ -1130,8 +1224,16 @@ void UOpenStanceCombatDebugSubsystem::Tick(float DeltaTime)
 	UpdateCamera(DeltaTime);
 	UpdateBodies();
 	HandleInvertToggle();
-	PrintNewInputs();
-	ShowLiveSticks(PlayerControls);
+	// The proof's input is in the side bar; Unreal's on-screen lines would sit on top of the HUD's video review panel.
+	if (bPlayingProof || (!ProofResult.IsEmpty() && FPlatformTime::Seconds() < ProofResultUntil))
+	{
+		PrintedInputEvents = Sim.Fighters[PlayerIndex].InputEventCount;
+	}
+	else
+	{
+		PrintNewInputs();
+		ShowLiveSticks(PlayerControls);
+	}
 	DrawWorld();
 }
 
@@ -1223,25 +1325,35 @@ void UOpenStanceCombatDebugSubsystem::DrawOverlay(UCanvas* Canvas, APlayerContro
 	{
 		DrawInputPanel(Canvas, Controller);
 	}
-	if (!bGreybox || !Canvas || (!bCombatDebug && !bTrainingDisplay) || !GEngine)
+	if (bGreybox && Canvas)
+	{
+		DrawProofCaption(Canvas);
+	}
+	// Once the match is over the Results page is up; the bars would sit on top of it.
+	const bool bMatchOver = Sim.Fighters[0].State.CombatState == EOpenStanceCombatState::MatchFinished;
+	if (!bGreybox || !Canvas || (!bCombatDebug && !bTrainingDisplay) || !GEngine || bMatchOver)
 	{
 		return;
 	}
 	UFont* Font = GEngine->GetSmallFont();
-	const float LineHeight = Font ? Font->GetMaxCharHeight() + 2.0f : 14.0f;
+	// Under the match HUD the bars start below its name plates and stamina, a little larger so they read on video.
+	const float TextScale = bModelLinked ? 1.3f : 1.0f;
+	const float LineHeight = (Font ? Font->GetMaxCharHeight() + 2.0f : 14.0f) * TextScale;
 
 	// One bar per fighter at its own edge of the screen: Chung on the left, Hong on the right (GDD 7.6).
 	for (int32 Index = 0; Index < 2; ++Index)
 	{
 		const TArray<FString> Lines = FOpenStanceCombatOverlay::BuildLines(Sim, Index, !bCombatDebug);
 		const FColor Colour = Index == 0 ? FColor(150, 190, 255) : FColor(255, 150, 150);
-		float Y = Canvas->SizeY * 0.15f;
+		float Y = Canvas->SizeY * (bModelLinked ? 0.38f : 0.15f);
 		for (const FString& Line : Lines)
 		{
 			float Width = 0.0f, Height = 0.0f;
 			Canvas->StrLen(Font, Line, Width, Height);
+			Width *= TextScale;
 			const float X = Index == 0 ? 20.0f : Canvas->SizeX - 20.0f - Width;
 			FCanvasTextItem Item(FVector2D(X, Y), FText::FromString(Line), Font, Colour);
+			Item.Scale = FVector2D(TextScale, TextScale);
 			Item.EnableShadow(FLinearColor::Black);
 			Canvas->DrawItem(Item);
 			Y += LineHeight;
@@ -1404,6 +1516,16 @@ namespace
 			if (UOpenStanceCombatDebugSubsystem* Subsystem = Find(World))
 			{
 				UE_LOG(LogOpenStanceCombat, Display, TEXT("Greybox proof %s"), Subsystem->RunProof() ? TEXT("PASSED") : TEXT("FAILED"));
+			}
+		}));
+
+	FAutoConsoleCommandWithWorldAndArgs PlayProofCommand(TEXT("os.PlayProof"),
+		TEXT("os.PlayProof - plays the scripted M1 greybox proof in the live match, on screen, with a caption per stage (for the proof video)"),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+		{
+			if (UOpenStanceCombatDebugSubsystem* Subsystem = Find(World))
+			{
+				Subsystem->PlayProof();
 			}
 		}));
 }
