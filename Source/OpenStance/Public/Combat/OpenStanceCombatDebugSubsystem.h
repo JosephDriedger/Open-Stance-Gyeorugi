@@ -5,6 +5,7 @@
 #include "Combat/OpenStanceGreyboxProof.h"
 #include "Combat/OpenStanceCameraDirector.h"
 #include "Combat/OpenStanceReferee.h"
+#include "GenericPlatform/GenericPlatformInputDeviceMapper.h"
 #include "Combat/OpenStanceMatchSim.h"
 #include "Menu/OpenStanceMenuTypes.h"
 #include "Subsystems/WorldSubsystem.h"
@@ -139,6 +140,19 @@ private:
 	void UpdateReferee(float DeltaSeconds);
 	void PlayRefereeVoice(const FOpenStanceRefereeCall& Call);
 	FOpenStanceFighterControls PollController() const;
+
+	/** One player's pad, read through that local player's controller only, so neither player's input reaches the other. */
+	static FOpenStanceFighterControls PollPad(const APlayerController* PC);
+
+	/** 1P vs 2P on the Sparring setup (Side Select gives player 1 a side, player 2 the other). */
+	bool IsTwoPlayerMatch() const;
+
+	/** Player 2's controller, made when a 1P vs 2P match starts (no split screen: both share the match camera). */
+	APlayerController* GetPlayerTwo(bool bCreate);
+	void RemovePlayerTwo();
+
+	/** A pad dropped out mid-match: the match pauses until the player resumes it (GDD 7.10). */
+	void HandleInputDeviceConnection(EInputDeviceConnectionState NewState, FPlatformUserId User, FInputDeviceId Device);
 	FVector ToWorld(const FVector2D& Position, float Z = 0.0f) const;
 	const UDataTable* GetMoveTable();
 
@@ -149,6 +163,10 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<AActor> Camera;
+
+	/** Player 2's camera in a split-screen 1P vs 2P match: behind player 2's fighter, framed by DirectorTwo. */
+	UPROPERTY(Transient)
+	TObjectPtr<AActor> CameraTwo;
 
 	/** The solid greybox fighters: one actor each, built from the engine's basic shapes (see BuildBodies for the part order). */
 	UPROPERTY(Transient)
@@ -230,8 +248,22 @@ private:
 	/** A was down on the last tick, so one press skips one break. */
 	bool bPrevSkipBreak = false;
 
+	/** Player 2's Menu button was down on the last tick. */
+	bool bPrevPlayerTwoMenu = false;
+
+	/** This match is 1P vs 2P: the other fighter reads player 2's pad instead of the AI. */
+	bool bTwoPlayers = false;
+
+	FDelegateHandle DeviceConnectionHandle;
+
 	/** Follows the match as the NPC referee: calls, gestures and where to stand. */
 	FOpenStanceReferee Referee;
+
+	/** Player 2's half of the split screen. */
+	FOpenStanceCameraDirector DirectorTwo;
+
+	/** Moves one match camera to its director's frame for FighterIndex: eased, or straight there on a cut. */
+	void DriveCamera(AActor* CameraActor, FOpenStanceCameraDirector& CameraDirector, int32 FighterIndex, float DeltaTime);
 
 	/** Picks and frames the match camera's shot (GDD 13): combat, ceremony, break, spin-score cuts, results. */
 	FOpenStanceCameraDirector Director;

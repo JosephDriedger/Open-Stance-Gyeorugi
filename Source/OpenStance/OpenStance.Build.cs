@@ -15,6 +15,7 @@ public class OpenStance : ModuleRules
 			"SlateCore",
 			"UMG",
 			"DeveloperSettings",
+			"ApplicationCore",
 		});
 	}
 }

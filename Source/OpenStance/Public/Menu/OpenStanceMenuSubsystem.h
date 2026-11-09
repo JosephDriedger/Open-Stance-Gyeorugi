@@ -142,6 +142,9 @@ public:
 	UOpenStanceScreen* CreateDialogForCapture(UWorld* World, FOpenStanceDialogRequest Request);
 
 private:
+	/** Puts a menu widget on screen: player 1's screen, or the whole window while a second local player is in. */
+	void AddToScreen(UUserWidget* Widget, int32 ZOrder) const;
+
 	static TSubclassOf<UOpenStanceScreen> GetScreenClass(EOpenStanceMenuScreen Screen);
 
 	/** Builds and shows a screen, replacing the current one in the viewport. */

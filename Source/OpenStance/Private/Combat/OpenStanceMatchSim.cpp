@@ -137,8 +137,38 @@ void FOpenStanceMatchSim::StartMatch(float DistanceCm)
 	}
 }
 
+void FOpenStanceMatchSim::ApplyChoices(const TMap<FName, FString>& Choices)
+{
+	RoundRules = FOpenStanceRoundTuning();
+	bNoGamJeom = false;
+	if (const FString* Ruleset = Choices.Find(TEXT("Ruleset")))
+	{
+		// Golden Point is offered on the setup screen but not defined in the GDD yet: it plays as World Taekwondo.
+		bNoGamJeom = Ruleset->StartsWith(TEXT("Casual"));
+	}
+	if (const FString* Rounds = Choices.Find(TEXT("Rounds")))
+	{
+		RoundRules.RoundCount = *Rounds == TEXT("Single Round") ? 1 : 3;
+	}
+	if (const FString* Length = Choices.Find(TEXT("RoundLength")))
+	{
+		RoundRules.RoundSeconds = *Length == TEXT("1:00") ? 60.0f : *Length == TEXT("1:30") ? 90.0f : 120.0f;
+	}
+	if (const FString* Gap = Choices.Find(TEXT("PointGap")))
+	{
+		RoundRules.GapToEnd = *Gap == TEXT("Off") ? 0 : *Gap == TEXT("20") ? 20 : 12;
+	}
+}
+
 void FOpenStanceMatchSim::AddGamJeom(int32 Index, const FString& Reason)
 {
+	if (bNoGamJeom)
+	{
+		// Casual: the foul is noted for the overlay, nothing more.
+		Fighters[Index].LastResult = TEXT("foul (casual: no gam-jeom)");
+		AddLog(Fighters[Index].Side, FString::Printf(TEXT("foul, no gam-jeom: %s"), *Reason.ToLower()));
+		return;
+	}
 	FOpenStanceFighterSim& F = Fighters[Index];
 	FOpenStanceFighterSim& Other = Fighters[1 - Index];
 	F.Round.GamJeom++;

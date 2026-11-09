@@ -225,4 +225,39 @@ bool FOpenStanceCameraShotsTest::RunTest(const FString& Parameters)
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FOpenStanceCameraSplitTest, "OpenStance.Camera.SplitScreen", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FOpenStanceCameraSplitTest::RunTest(const FString& Parameters)
+{
+	// 1P vs 2P side by side: each half is 8:9, and each player's camera, behind their own fighter, keeps both in frame.
+	FCameraRig Rig;
+	FOpenStanceCameraDirector Halves[2];
+	for (FOpenStanceCameraDirector& Half : Halves)
+	{
+		Half.Tuning.AspectRatio = 8.0f / 9.0f;
+		Half.Tuning.MaxFieldOfViewDeg = 95.0f;
+	}
+	for (int32 Player = 0; Player < 2; ++Player)
+	{
+		for (const float Gap : { 70.0f, 200.0f, 400.0f, 600.0f })
+		{
+			for (int32 Step = 0; Step < 4; ++Step)
+			{
+				const FVector2D Dir(FMath::Cos(Step * UE_PI / 2.0), FMath::Sin(Step * UE_PI / 2.0));
+				Rig.Place(-Dir * Gap * 0.5, Dir * Gap * 0.5);
+				const FOpenStanceCameraFrame Frame = Halves[Player].FrameCombat(Rig.Sim, Player);
+				TestTrue(*FString::Printf(TEXT("player %d, %.0f cm apart, step %d: both in the half-screen"), Player + 1, Gap, Step),
+					Halves[Player].FramesBoth(Frame, Rig.Sim));
+			}
+		}
+	}
+
+	// The two cameras sit behind different fighters: each player looks past their own fighter at the opponent.
+	Rig.Place(FVector2D(-100.0, 0.0), FVector2D(100.0, 0.0));
+	const FOpenStanceCameraFrame One = Halves[0].FrameCombat(Rig.Sim, 0);
+	const FOpenStanceCameraFrame Two = Halves[1].FrameCombat(Rig.Sim, 1);
+	TestTrue(TEXT("player 1's camera is behind Chung"), One.Position.X < -100.0);
+	TestTrue(TEXT("player 2's camera is behind Hong"), Two.Position.X > 100.0);
+	return true;
+}
+
 #endif

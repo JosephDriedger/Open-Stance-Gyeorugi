@@ -390,9 +390,11 @@ void FOpenStanceSkillStickRecognizer::Update(float DeltaSeconds, const FOpenStan
 
 	if (CurrentDir == EOpenStanceStickDir::Neutral)
 	{
+		// At rest the stick has reached neutral, so offence is free again. That includes a stick already centred when LT
+		// is released: it used to stay spent until it moved out and back, swallowing the first kick after a guard.
+		bSpent = false;
 		if (bChanged)
 		{
-			bSpent = false;
 			NeutralStart = Clock;
 		}
 		// A gesture ends once the stick has rested at neutral; passing through the centre on the way to the next step is not rest.

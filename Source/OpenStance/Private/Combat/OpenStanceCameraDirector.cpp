@@ -21,7 +21,7 @@ namespace
 	}
 }
 
-bool FOpenStanceCameraDirector::IsOnScreen(const FOpenStanceCameraFrame& Frame, const FVector& Point, float Margin)
+bool FOpenStanceCameraDirector::IsOnScreen(const FOpenStanceCameraFrame& Frame, const FVector& Point, float Margin, float AspectRatio)
 {
 	const FRotationMatrix Axes(Frame.Rotation);
 	const FVector D = Point - Frame.Position;
@@ -33,7 +33,8 @@ bool FOpenStanceCameraDirector::IsOnScreen(const FOpenStanceCameraFrame& Frame, 
 	const double Right = FVector::DotProduct(D, Axes.GetScaledAxis(EAxis::Y));
 	const double Up = FVector::DotProduct(D, Axes.GetScaledAxis(EAxis::Z));
 	const double TanH = FMath::Tan(FMath::DegreesToRadians(Frame.FieldOfViewDeg * 0.5));
-	const double TanV = TanH * 9.0 / 16.0;
+	// Unreal keeps the horizontal field of view; the vertical one follows the view's shape.
+	const double TanV = TanH / FMath::Max(AspectRatio, 0.1f);
 	return FMath::Abs(Right / Forward) <= TanH * Margin && FMath::Abs(Up / Forward) <= TanV * Margin;
 }
 
@@ -43,7 +44,7 @@ bool FOpenStanceCameraDirector::FramesBoth(const FOpenStanceCameraFrame& Frame, 
 	{
 		const FVector Feet = Floor(F);
 		const FVector Head = Feet + FVector(0.0, 0.0, F.State.CombatState == EOpenStanceCombatState::KnockedDown ? 30.0f : F.Motion.HeightCm);
-		if (!IsOnScreen(Frame, Feet, Tuning.FrameMargin) || !IsOnScreen(Frame, Head, Tuning.FrameMargin))
+		if (!IsOnScreen(Frame, Feet, Tuning.FrameMargin, Tuning.AspectRatio) || !IsOnScreen(Frame, Head, Tuning.FrameMargin, Tuning.AspectRatio))
 		{
 			return false;
 		}

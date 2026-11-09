@@ -15,6 +15,7 @@
 #include "EngineUtils.h"
 #include "GameFramework/PlayerStart.h"
 #include "Components/SkeletalMeshComponent.h"
+#include "Engine/GameViewportClient.h"
 #include "Sound/SoundBase.h"
 #include "Components/StaticMeshComponent.h"
 #include "Engine/SkeletalMesh.h"
@@ -164,6 +165,11 @@ void UOpenStanceCombatDebugSubsystem::Deinitialize()
 		Menu->OnMatchRequested.RemoveDynamic(this, &UOpenStanceCombatDebugSubsystem::HandleMatchRequested);
 		Menu->OnLeaveMatch.Remove(LeaveMatchHandle);
 	}
+	if (DeviceConnectionHandle.IsValid())
+	{
+		IPlatformInputDeviceMapper::Get().GetOnInputDeviceConnectionChange().Remove(DeviceConnectionHandle);
+		DeviceConnectionHandle.Reset();
+	}
 	DestroyBodies();
 	UDebugDrawService::Unregister(DebugDrawHandle);
 	Super::Deinitialize();
@@ -224,11 +230,18 @@ void UOpenStanceCombatDebugSubsystem::SetGreyboxActive(bool bActive)
 			Camera->Destroy();
 			Camera = nullptr;
 		}
+		if (CameraTwo)
+		{
+			CameraTwo->Destroy();
+			CameraTwo = nullptr;
+		}
 		DestroyBodies();
 		SetDefaultPawnHidden(false);
 		bModelLinked = false;
 		bPlayingProof = false;
 		ProofCaption.Reset();
+		RemovePlayerTwo();
+		bTwoPlayers = false;
 		return;
 	}
 
@@ -262,9 +275,21 @@ void UOpenStanceCombatDebugSubsystem::SetGreyboxActive(bool bActive)
 	}
 	else
 	{
-		Sim.RoundRules = FOpenStanceRoundTuning();
+		// The setup screen's rules (GDD 8.2): ruleset, rounds, round length and point gap; Equal Terms is always on here.
+		const UOpenStanceMenuSubsystem* SetupMenu = GetMenu();
+		Sim.ApplyChoices(SetupMenu ? SetupMenu->BuildMatchSetup().Choices : TMap<FName, FString>());
 		Sim.StaminaRules = UOpenStanceCombatSettings::GetStamina();
 		Sim.bEqualTerms = true;
+	}
+	// 1P vs 2P: player 2's pad drives the other side; otherwise the AI stand-in does.
+	bTwoPlayers = !bPlayingProof && IsTwoPlayerMatch() && GetPlayerTwo(true) != nullptr;
+	if (!bTwoPlayers)
+	{
+		RemovePlayerTwo();
+	}
+	if (!DeviceConnectionHandle.IsValid())
+	{
+		DeviceConnectionHandle = IPlatformInputDeviceMapper::Get().GetOnInputDeviceConnectionChange().AddUObject(this, &UOpenStanceCombatDebugSubsystem::HandleInputDeviceConnection);
 	}
 	Sim.StartMatch(bPlayingProof ? FOpenStanceGreyboxProof::StartDistanceCm : 200.0f);
 	Director.Reset(Sim);
@@ -303,6 +328,25 @@ void UOpenStanceCombatDebugSubsystem::SetGreyboxActive(bool bActive)
 		Camera = World->SpawnActor<ACameraActor>(Position, Rotation);
 		Camera->FindComponentByClass<UCameraComponent>()->SetFieldOfView(GetCameraPreset().FieldOfViewDeg);
 		Controller->SetViewTargetWithBlend(Camera);
+
+		// Split screen: each half is 8:9, and player 2 gets a camera of their own behind their fighter.
+		const float Aspect = bTwoPlayers ? 8.0f / 9.0f : 16.0f / 9.0f;
+		Director.Tuning.AspectRatio = DirectorTwo.Tuning.AspectRatio = Aspect;
+		Director.Tuning.MaxFieldOfViewDeg = DirectorTwo.Tuning.MaxFieldOfViewDeg = bTwoPlayers ? 95.0f : 80.0f;
+		if (CameraTwo)
+		{
+			CameraTwo->Destroy();
+			CameraTwo = nullptr;
+		}
+		if (bTwoPlayers)
+		{
+			DirectorTwo.Reset(Sim);
+			CameraTwo = World->SpawnActor<ACameraActor>(Position, Rotation);
+			if (APlayerController* Two = GetPlayerTwo(false))
+			{
+				Two->SetViewTarget(CameraTwo);
+			}
+		}
 		LinkMatchModel();
 
 		// With the match HUD showing the side bars sit lower, under its name plates and stamina; they stay off in a normal
@@ -1022,39 +1066,49 @@ void UOpenStanceCombatDebugSubsystem::UpdateCamera(float DeltaTime)
 	{
 		return;
 	}
-	FVector Position;
-	FRotator Rotation;
-	float FieldOfView = GetCameraPreset().FieldOfViewDeg;
-	bool bCut = false;
+	if (CameraTwo)
+	{
+		// Player 2's half of the split screen: the same shots, framed from behind player 2's fighter.
+		DriveCamera(CameraTwo, DirectorTwo, 1 - PlayerIndex, DeltaTime);
+	}
 	if (&GetCameraPreset() == &OpenStanceCameraPresets::Match())
 	{
-		// The match camera: the director picks the shot (combat, ceremony, break, a spin-score cut, results) and frames it.
-		const FOpenStanceCameraFrame Frame = Director.Update(DeltaTime, Sim, PlayerIndex, bCameraHeld);
-		Position = Origin + Frame.Position;
-		Rotation = Frame.Rotation;
-		FieldOfView = Frame.FieldOfViewDeg;
-		bCut = Frame.bCut;
+		DriveCamera(Camera, Director, PlayerIndex, DeltaTime);
+		return;
 	}
-	else
+
+	// os.CameraPreset previews another angle as it is.
+	FVector Position;
+	FRotator Rotation;
+	GetFollowCameraPose(Position, Rotation);
+	Camera->SetActorLocationAndRotation(FMath::VInterpTo(Camera->GetActorLocation(), Position, DeltaTime, FollowCameraSpeed),
+		FMath::RInterpTo(Camera->GetActorRotation(), Rotation, DeltaTime, FollowCameraSpeed));
+	if (UCameraComponent* Lens = Camera->FindComponentByClass<UCameraComponent>())
 	{
-		// os.CameraPreset previews another angle as it is.
-		GetFollowCameraPose(Position, Rotation);
+		Lens->SetFieldOfView(FMath::FInterpTo(Lens->FieldOfView, GetCameraPreset().FieldOfViewDeg, DeltaTime, FollowCameraSpeed));
 	}
-	UCameraComponent* Lens = Camera->FindComponentByClass<UCameraComponent>();
-	if (bCut)
+}
+
+void UOpenStanceCombatDebugSubsystem::DriveCamera(AActor* CameraActor, FOpenStanceCameraDirector& CameraDirector, int32 FighterIndex, float DeltaTime)
+{
+	// The director picks the shot (combat, ceremony, break, a spin-score cut, results) and frames it.
+	const FOpenStanceCameraFrame Frame = CameraDirector.Update(DeltaTime, Sim, FighterIndex, bCameraHeld);
+	const FVector Position = Origin + Frame.Position;
+	UCameraComponent* Lens = CameraActor->FindComponentByClass<UCameraComponent>();
+	if (Frame.bCut)
 	{
-		Camera->SetActorLocationAndRotation(Position, Rotation);
+		CameraActor->SetActorLocationAndRotation(Position, Frame.Rotation);
 		if (Lens)
 		{
-			Lens->SetFieldOfView(FieldOfView);
+			Lens->SetFieldOfView(Frame.FieldOfViewDeg);
 		}
 		return;
 	}
-	Camera->SetActorLocationAndRotation(FMath::VInterpTo(Camera->GetActorLocation(), Position, DeltaTime, FollowCameraSpeed),
-		FMath::RInterpTo(Camera->GetActorRotation(), Rotation, DeltaTime, FollowCameraSpeed));
+	CameraActor->SetActorLocationAndRotation(FMath::VInterpTo(CameraActor->GetActorLocation(), Position, DeltaTime, FollowCameraSpeed),
+		FMath::RInterpTo(CameraActor->GetActorRotation(), Frame.Rotation, DeltaTime, FollowCameraSpeed));
 	if (Lens)
 	{
-		Lens->SetFieldOfView(FMath::FInterpTo(Lens->FieldOfView, FieldOfView, DeltaTime, FollowCameraSpeed));
+		Lens->SetFieldOfView(FMath::FInterpTo(Lens->FieldOfView, Frame.FieldOfViewDeg, DeltaTime, FollowCameraSpeed));
 	}
 }
 
@@ -1273,8 +1327,72 @@ void UOpenStanceCombatDebugSubsystem::DrawProofCaption(UCanvas* Canvas) const
 
 FOpenStanceFighterControls UOpenStanceCombatDebugSubsystem::PollController() const
 {
+	return PollPad(GetWorld() ? GetWorld()->GetFirstPlayerController() : nullptr);
+}
+
+bool UOpenStanceCombatDebugSubsystem::IsTwoPlayerMatch() const
+{
+	const UOpenStanceMenuSubsystem* Menu = GetMenu();
+	return Menu && Menu->GetSession().Mode == EOpenStanceMatchMode::Sparring
+		&& Menu->GetChoiceIndex(EOpenStanceMenuScreen::Sparring, TEXT("Players"), 0) == 1;
+}
+
+APlayerController* UOpenStanceCombatDebugSubsystem::GetPlayerTwo(bool bCreate)
+{
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		return nullptr;
+	}
+	APlayerController* Two = UGameplayStatics::GetPlayerController(World, 1);
+	if (!Two && bCreate)
+	{
+		// The second local player takes the second pad. No split screen: one match camera for both (GDD 7.5).
+		if (UGameViewportClient* Viewport = World->GetGameViewport())
+		{
+			Viewport->SetForceDisableSplitscreen(false);
+		}
+		Two = UGameplayStatics::CreatePlayer(World, 1, true);
+		UE_LOG(LogOpenStanceCombat, Display, TEXT("Greybox: player 2 %s"), Two ? TEXT("joined on the second controller") : TEXT("could not be created"));
+	}
+	if (Two && CameraTwo)
+	{
+		Two->SetViewTarget(CameraTwo);
+	}
+	return Two;
+}
+
+void UOpenStanceCombatDebugSubsystem::RemovePlayerTwo()
+{
+	UWorld* World = GetWorld();
+	if (APlayerController* Two = World ? UGameplayStatics::GetPlayerController(World, 1) : nullptr)
+	{
+		UGameplayStatics::RemovePlayer(Two, true);
+	}
+	bPrevPlayerTwoMenu = false;
+}
+
+void UOpenStanceCombatDebugSubsystem::HandleInputDeviceConnection(EInputDeviceConnectionState NewState, FPlatformUserId User, FInputDeviceId Device)
+{
+	if (!bGreybox || NewState != EInputDeviceConnectionState::Disconnected)
+	{
+		return;
+	}
+	// A player lost their pad: hold the match on the pause menu; play resumes when they reconnect and choose Resume.
+	UE_LOG(LogOpenStanceCombat, Display, TEXT("Greybox: a controller disconnected (device %d); match paused"), Device.GetId());
+	if (UOpenStanceMenuSubsystem* Menu = GetMenu())
+	{
+		if (!Menu->GetMatchModel()->IsPaused())
+		{
+			Menu->ShowPauseMenu();
+		}
+		Menu->GetMatchModel()->SetCall(TEXT("CONTROLLER"), TEXT("Reconnect the controller, then Resume"));
+	}
+}
+
+FOpenStanceFighterControls UOpenStanceCombatDebugSubsystem::PollPad(const APlayerController* PC)
+{
 	FOpenStanceFighterControls C;
-	const APlayerController* PC = GetWorld() ? GetWorld()->GetFirstPlayerController() : nullptr;
 	if (!PC)
 	{
 		return C;
@@ -1335,13 +1453,33 @@ void UOpenStanceCombatDebugSubsystem::Tick(float DeltaTime)
 	Accumulator = bHeld ? 0.0f : Accumulator + FMath::Min(DeltaTime, 0.1f);
 	FOpenStanceFighterControls PlayerControls = PollController();
 	FOpenStanceFighterControls OpponentControls;
-	OpponentControls.bLT = AIMode == EOpenStanceAIMode::Block;
-	// A in the break between rounds skips it, once per press (GDD 8.2); in play A switches sides as usual.
-	if (!bHeld && PlayerControls.bA && !bPrevSkipBreak)
+	if (bTwoPlayers)
+	{
+		// Player 2's own pad, through player 2's controller.
+		const APlayerController* Two = GetPlayerTwo(false);
+		OpponentControls = PollPad(Two);
+		// Either player can pause: player 2's Menu button opens the same pause menu (player 1's is the match screen's).
+		const bool bTwoMenu = Two && Two->IsInputKeyDown(EKeys::Gamepad_Special_Right);
+		if (bTwoMenu && !bPrevPlayerTwoMenu && !bHeld)
+		{
+			if (UOpenStanceMenuSubsystem* Menu = GetMenu())
+			{
+				Menu->ShowPauseMenu();
+			}
+		}
+		bPrevPlayerTwoMenu = bTwoMenu;
+	}
+	else
+	{
+		OpponentControls.bLT = AIMode == EOpenStanceAIMode::Block;
+	}
+	// A in the break between rounds skips it, once per press, from either player (GDD 8.2); in play A switches sides.
+	const bool bSkipPressed = PlayerControls.bA || (bTwoPlayers && OpponentControls.bA);
+	if (!bHeld && bSkipPressed && !bPrevSkipBreak)
 	{
 		Sim.SkipBreak();
 	}
-	bPrevSkipBreak = PlayerControls.bA;
+	bPrevSkipBreak = bSkipPressed;
 	// The deciding kick ends the proof: the result replaces the last stage's caption through the hold and on Results,
 	// which can pause the simulation before the recorded track runs out.
 	if (bPlayingProof && Sim.Fighters[0].State.CombatState == EOpenStanceCombatState::MatchFinished)

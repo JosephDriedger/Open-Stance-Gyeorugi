@@ -228,3 +228,26 @@ Code: `Combat/OpenStanceReferee` (`FOpenStanceReferee`) and the greybox's `Build
   referee counts HANA to YEODEOL a second apart (to eight even once the fighter is up), then KYE-SOK 0.5 s later.
   Nothing scores during the count. A fighter still down at eight (not possible yet: the get-up takes 3.6 s) is Future.
 - Referee Mode (playing as the referee) stays Future.
+
+## Local versus (1P vs 2P)
+
+Code: the greybox subsystem (`IsTwoPlayerMatch`, `GetPlayerTwo`, `PollPad`) and `FOpenStanceMatchSim::ApplyChoices`.
+Tests: `OpenStance.Versus.*` (GDD 7.5, 8.2, issue 14).
+
+- Sparring setup rows: Players (1P vs AI, 1P vs 2P), Ruleset, Rounds (Best of 3, Single Round), Round Length (2:00,
+  1:30, 1:00), Point Gap (12, 20, Off), AI Difficulty, Arena. The rules rows set the simulation before the match;
+  Equal Terms is always on. Casual (No Gam-jeom) notes fouls without penalties or stops. Golden Point is offered but not
+  defined in the GDD yet, so it plays as World Taekwondo.
+- 1P vs 2P: the match creates a second local player and the screen splits side by side (Config/DefaultEngine.ini,
+  `TwoPlayerSplitscreenLayout=Vertical`): player 1 on the left, player 2 on the right, each with their own combat camera
+  behind their fighter (a second `FOpenStanceCameraDirector`, framed for the 8:9 half, widening up to 95 degrees). The
+  HUD, pause menu and dialogs span the whole window over both halves. Player 1's pad drives the side chosen on Side
+  Select, player 2's pad the other. Each pad is read only through its own player's
+  controller, so input never crosses. Either player's Menu button pauses; either player's A skips the break. Pause-menu
+  navigation is player 1's. Leaving the match removes player 2; Restart (and Results' rematch) starts a fresh match in
+  the same arena with the same players.
+- A controller disconnecting mid-match pauses it on the pause menu with "CONTROLLER: Reconnect the controller, then
+  Resume". Reconnection itself is Windows/Unreal's: the pad comes back to the same player.
+- 1P vs AI: the other side is the AI stand-in (`os.AIMode`, idle or block) until the AI (issue 24).
+- Fixed with this: the Skill Stick stayed spent after LT was released with the stick centred, swallowing the first
+  kick after any guard; a centred stick now frees it.

@@ -50,8 +50,11 @@ struct OPENSTANCE_API FOpenStanceCameraTuning
 	float MaxFieldOfViewDeg = 80.0f;
 	int32 FitSteps = 14;
 
-	/** The share of the frame's half-width and half-height a fighter must stay inside (16:9). */
+	/** The share of the frame's half-width and half-height a fighter must stay inside. */
 	float FrameMargin = 0.9f;
+
+	/** The view's width over its height: 16:9 full screen, 8:9 for each half of a side-by-side split screen. */
+	float AspectRatio = 16.0f / 9.0f;
 };
 
 /** Where the camera is this frame, in the simulation's space (cm, the mat centre at the origin). */
@@ -88,8 +91,8 @@ public:
 	/** The combat framing on its own, for the tests: the Match preset adjusted to the fighters' spacing, heights and state. */
 	FOpenStanceCameraFrame FrameCombat(const FOpenStanceMatchSim& Sim, int32 PlayerIndex) const;
 
-	/** True if a point is inside the frame's 16:9 picture, within Margin of its half-width and half-height. */
-	static bool IsOnScreen(const FOpenStanceCameraFrame& Frame, const FVector& Point, float Margin);
+	/** True if a point is inside the frame's picture (AspectRatio wide over high), within Margin of its half-width and height. */
+	static bool IsOnScreen(const FOpenStanceCameraFrame& Frame, const FVector& Point, float Margin, float AspectRatio = 16.0f / 9.0f);
 
 	/** True if both fighters' feet and heads are on screen (a fighter on the floor counts at 30 cm). */
 	bool FramesBoth(const FOpenStanceCameraFrame& Frame, const FOpenStanceMatchSim& Sim) const;

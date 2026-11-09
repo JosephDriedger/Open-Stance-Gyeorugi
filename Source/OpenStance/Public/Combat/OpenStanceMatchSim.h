@@ -271,6 +271,16 @@ public:
 	/** Every attribute at 70, so only skill decides (GDD 5.6). The default in Sparring and Tournament. */
 	bool bEqualTerms = true;
 
+	/** The Casual ruleset: fouls are noted but give no gam-jeom and never stop play. */
+	bool bNoGamJeom = false;
+
+	/**
+	 * Sets the rules from the setup screen's choices, as shown on screen (FOpenStanceMatchSetup::Choices): Ruleset
+	 * ("World Taekwondo", "Casual (No Gam-jeom)", "Golden Point"), Rounds ("Best of 3", "Single Round"), RoundLength
+	 * ("2:00", "1:30", "1:00") and PointGap ("12", "20", "Off"). Missing rows keep the WT default. Call before StartMatch.
+	 */
+	void ApplyChoices(const TMap<FName, FString>& Choices);
+
 	/** Counts up with every log entry, so a reader can tell what is new when the log has dropped old ones. */
 	int32 LogEventCount = 0;
 
