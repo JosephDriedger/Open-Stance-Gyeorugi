@@ -4,6 +4,7 @@
 #include "Combat/OpenStanceCombatMachine.h"
 #include "Combat/OpenStanceFootwork.h"
 #include "Combat/OpenStanceHit.h"
+#include "Combat/OpenStanceMatchRules.h"
 #include "Combat/OpenStanceSkillStick.h"
 #include "Menu/OpenStanceMenuTypes.h"
 
@@ -44,19 +45,6 @@ struct OPENSTANCE_API FOpenStanceClinchTuning
 	float StoppageSeconds = 0.8f;
 };
 
-/** Round and match length rules (WT rules, GDD 8.2). The same numbers the match HUD's model uses. */
-struct OPENSTANCE_API FOpenStanceRoundTuning
-{
-	int32 RoundCount = 3;
-	float RoundSeconds = 120.0f;
-
-	/** The point gap that ends a match. */
-	int32 GapToEnd = 12;
-
-	/** The break between rounds, with the fighters back on their marks when it ends. */
-	float BreakSeconds = 2.0f;
-};
-
 /** Where a clinch is: none, held while the referee is on the way, or the referee separating the fighters. */
 enum class EOpenStanceClinchPhase : uint8
 {
@@ -92,8 +80,19 @@ struct OPENSTANCE_API FOpenStanceFighterSim
 	/** X was down on the last step, so a held button throws one punch. */
 	bool bPrevPunch = false;
 
-	/** Why each of this fighter's gam-jeom was given, oldest first, for the HUD and the results page. */
+	/** Why each of this fighter's gam-jeom was given across the match, oldest first, for the HUD and the results page. */
 	TArray<FString> PenaltyReasons;
+
+	/** This round's points, penalties and tie-break counts; State.Score and State.GamJeom mirror its round numbers. */
+	FOpenStanceRoundTally Round;
+
+	/** Gam-jeom across the whole match, for the 10-gam-jeom match limit. */
+	int32 MatchGamJeom = 0;
+
+	int32 RoundWins = 0;
+
+	/** The attack whose active phase was last counted in Round.ActiveAttacks. */
+	int32 CountedActiveSerial = 0;
 
 	/** What the last attack resolved to and how it ended. */
 	FString LastMove = TEXT("-");
@@ -153,12 +152,28 @@ public:
 	/** Sets the move table the recognizer's gestures are looked up in. The table must outlive the simulation. */
 	void SetMoveTable(const UDataTable* InTable) { MoveTable = InTable; }
 
-	/** Places the fighters on their start marks facing each other and starts play. */
+	/** Every round played so far, in order, for the referee, the HUD and the results page. */
+	TArray<FOpenStanceRoundResult> RoundHistory;
+
+	/** Set when the match is Finished. */
+	EOpenStanceSide MatchWinner = EOpenStanceSide::Chung;
+	EOpenStanceRoundEnd MatchEnd = EOpenStanceRoundEnd::None;
+
+	/**
+	 * Places the fighters on their start marks facing each other and starts the opening ceremony (Match.State Ready),
+	 * then play. With RoundRules.CeremonySeconds at 0 play starts at once.
+	 */
 	void StartMatch(float DistanceCm = 200.0f);
 
 	void Step(float DeltaSeconds, const FOpenStanceFighterControls& Chung, const FOpenStanceFighterControls& Hong);
 
-	/** Cheats. Setting the clock and score changes the match, not the rules. */
+	/** Local play may skip the break between rounds (GDD 8.2): the next round starts on the next step. */
+	bool SkipBreak();
+
+	/** Seconds left in the opening ceremony or the round break; 0 otherwise. */
+	float GetPauseSecondsLeft() const;
+
+	/** Cheats. Setting the clock and score changes the match, not the rules. The score is the current round's. */
 	void SetScore(int32 Chung, int32 Hong);
 	void SetClock(float Seconds);
 
@@ -180,12 +195,26 @@ private:
 	void ApplyContact(const FOpenStanceContact& Contact);
 	void StepClinch(float DeltaSeconds, const FOpenStanceFighterControls& Chung, const FOpenStanceFighterControls& Hong);
 
+	/** The round and match flow: ceremony, clock, round stops, breaks and the end (GDD 8.2-8.4). */
+	void StepRules(float DeltaSeconds);
+	void EndRound(EOpenStanceSide Winner, EOpenStanceRoundEnd Reason);
+	void FinishMatch(EOpenStanceSide Winner, EOpenStanceRoundEnd Reason);
+	void StartRound();
+	void SyncFighterNumbers();
+
 	const UDataTable* MoveTable = nullptr;
 
 	bool bClinchFouled = false;
 	float ClinchStartDistance = 0.0f;
 
-	/** Where the fighters start each round, and how long the break between rounds has run. */
+	/** Where the fighters start each round, and how long the ceremony or the break between rounds has run. */
 	float StartDistanceCm = 200.0f;
 	float RoundBreakElapsed = 0.0f;
+	float CeremonyElapsed = 0.0f;
+
+	/** Seconds of play in the current round, for its result. */
+	float RoundPlayed = 0.0f;
+
+	/** Breaks the referee's decision when every count is level: a seeded coin, so a replay decides the same. */
+	FRandomStream RefereeCoin;
 };

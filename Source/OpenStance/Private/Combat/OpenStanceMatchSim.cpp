@@ -71,20 +71,72 @@ void FOpenStanceMatchSim::StartMatch(float DistanceCm)
 		F.SinceSpend = 0.0f;
 		F.bContactThisAttack = false;
 		F.ResolvedSerial = 0;
+		F.Round = FOpenStanceRoundTally();
+		F.MatchGamJeom = 0;
+		F.RoundWins = 0;
+		F.CountedActiveSerial = 0;
 	}
+	RoundHistory.Reset();
+	MatchWinner = EOpenStanceSide::Chung;
+	MatchEnd = EOpenStanceRoundEnd::None;
+	RefereeCoin.Initialize(7);
+	RoundPlayed = 0.0f;
+	CeremonyElapsed = 0.0f;
 	Match = FOpenStanceMatchStatus();
-	Match.State = EOpenStanceMatchState::Running;
 	Match.ClockSeconds = RoundRules.RoundSeconds;
+	if (RoundRules.CeremonySeconds > 0.0f)
+	{
+		// Charyeot first; kyeongrye, joon-bi and shi-jak follow through the ceremony (GDD 8.5).
+		Match.State = EOpenStanceMatchState::Ready;
+		AddLog(EOpenStanceSide::Chung, TEXT("charyeot"));
+	}
+	else
+	{
+		Match.State = EOpenStanceMatchState::Running;
+	}
 }
 
 void FOpenStanceMatchSim::AddGamJeom(int32 Index, const FString& Reason)
 {
 	FOpenStanceFighterSim& F = Fighters[Index];
-	F.State.GamJeom++;
-	Fighters[1 - Index].State.Score++;
+	FOpenStanceFighterSim& Other = Fighters[1 - Index];
+	F.Round.GamJeom++;
+	F.MatchGamJeom++;
+	Other.Round.GamJeomPoints++;
+	Other.Round.Points++;
+	SyncFighterNumbers();
 	F.LastResult = TEXT("FOUL");
 	F.PenaltyReasons.Add(Reason);
 	AddLog(F.Side, FString::Printf(TEXT("gam-jeom: %s"), *Reason.ToLower()));
+}
+
+void FOpenStanceMatchSim::SyncFighterNumbers()
+{
+	for (FOpenStanceFighterSim& F : Fighters)
+	{
+		F.State.Score = F.Round.Points;
+		F.State.GamJeom = F.Round.GamJeom;
+	}
+}
+
+bool FOpenStanceMatchSim::SkipBreak()
+{
+	if (Match.State != EOpenStanceMatchState::RoundBreak)
+	{
+		return false;
+	}
+	RoundBreakElapsed = FMath::Max(RoundBreakElapsed, RoundRules.BreakSeconds);
+	return true;
+}
+
+float FOpenStanceMatchSim::GetPauseSecondsLeft() const
+{
+	switch (Match.State)
+	{
+	case EOpenStanceMatchState::Ready: return FMath::Max(0.0f, RoundRules.CeremonySeconds - CeremonyElapsed);
+	case EOpenStanceMatchState::RoundBreak: return FMath::Max(0.0f, RoundRules.BreakSeconds - RoundBreakElapsed);
+	default: return 0.0f;
+	}
 }
 
 void FOpenStanceMatchSim::AddLog(EOpenStanceSide Side, const FString& Text)
@@ -102,8 +154,9 @@ void FOpenStanceMatchSim::AddLog(EOpenStanceSide Side, const FString& Text)
 
 void FOpenStanceMatchSim::SetScore(int32 Chung, int32 Hong)
 {
-	Fighters[0].State.Score = Chung;
-	Fighters[1].State.Score = Hong;
+	Fighters[0].Round.Points = Chung;
+	Fighters[1].Round.Points = Hong;
+	SyncFighterNumbers();
 }
 
 void FOpenStanceMatchSim::SetClock(float Seconds)
@@ -204,7 +257,8 @@ void FOpenStanceMatchSim::ApplyContact(const FOpenStanceContact& Contact)
 	{
 	case EOpenStanceContactType::Score:
 	{
-		A.State.Score += Contact.Points;
+		A.Round.AddScore(Contact.Points, Contact.Zone == EOpenStanceBodyZone::Head, Contact.Technique == EOpenStanceTechnique::Punch, Contact.bSpinning);
+		SyncFighterNumbers();
 		TArray<FOpenStanceCombatEvent> Events;
 		D.Machine.ApplyHit(Contact.Reaction, D.State, Events);
 		A.LastResult = FString::Printf(TEXT("HIT +%d (%s)"), Contact.Points, *ZoneName(Contact.Zone));
@@ -213,6 +267,8 @@ void FOpenStanceMatchSim::ApplyContact(const FOpenStanceContact& Contact)
 		break;
 	}
 	case EOpenStanceContactType::WeakImpact:
+		// The protector registered it without scoring: it counts late in a tie-break (WT Article 15).
+		++A.Round.ProtectorHits;
 		A.LastResult = TEXT("NO SCORE: low impact");
 		AddLog(A.Side, FString::Printf(TEXT("%s touched the trunk below the impact threshold (%.0f)"), *Contact.Move.ToString(), Contact.Impact));
 		break;
@@ -236,6 +292,12 @@ void FOpenStanceMatchSim::RunTraces(int32 Index)
 
 	F.Registry.Tuning = Hits;
 	const bool bActive = F.State.CombatState == EOpenStanceCombatState::AttackActive;
+	if (bActive && !Attack->bFake && F.CountedActiveSerial != F.Machine.GetAttackSerial())
+	{
+		// One more technique brought to its active phase: what the referee weighs when every other count is level.
+		F.CountedActiveSerial = F.Machine.GetAttackSerial();
+		++F.Round.ActiveAttacks;
+	}
 	const float Progress = bActive ? FMath::Clamp(F.Machine.GetStateElapsed() / FMath::Max(Attack->Row.ActiveSeconds, 0.001f), 0.0f, 1.0f) : 0.0f;
 	const FOpenStanceFighterBody Body = F.GetBody();
 	const FVector Tip = FOpenStanceHitRegistry::SyntheticTip(Body, FVector(F.Motion.Facing.X, F.Motion.Facing.Y, 0.0), Attack->Row, Progress, Hits);
@@ -463,44 +525,142 @@ void FOpenStanceMatchSim::Step(float DeltaSeconds, const FOpenStanceFighterContr
 	StepClinch(DeltaSeconds, Chung, Hong);
 	RunTraces(0);
 	RunTraces(1);
+	StepRules(DeltaSeconds);
+}
 
-	if (Match.State == EOpenStanceMatchState::Running)
+void FOpenStanceMatchSim::StepRules(float DeltaSeconds)
+{
+	switch (Match.State)
 	{
-		Match.ClockSeconds = FMath::Max(0.0f, Match.ClockSeconds - DeltaSeconds);
-		if (FMath::Abs(Fighters[0].State.Score - Fighters[1].State.Score) >= RoundRules.GapToEnd)
+	case EOpenStanceMatchState::Ready:
+	{
+		// The opening ceremony: charyeot (logged at the start), kyeongrye at a quarter, joon-bi at half, shi-jak at the end.
+		const float Before = CeremonyElapsed;
+		CeremonyElapsed += DeltaSeconds;
+		const float Length = RoundRules.CeremonySeconds;
+		if (Before < Length * 0.25f && CeremonyElapsed >= Length * 0.25f)
 		{
-			// The 12-point gap ends the match on the spot (WT rules, GDD 4.4).
-			Match.State = EOpenStanceMatchState::Finished;
-			AddLog(Fighters[0].State.Score > Fighters[1].State.Score ? EOpenStanceSide::Chung : EOpenStanceSide::Hong, TEXT("point gap"));
+			AddLog(EOpenStanceSide::Chung, TEXT("kyeongrye"));
+		}
+		if (Before < Length * 0.5f && CeremonyElapsed >= Length * 0.5f)
+		{
+			AddLog(EOpenStanceSide::Chung, TEXT("joon-bi"));
+		}
+		if (CeremonyElapsed >= Length)
+		{
+			Match.State = EOpenStanceMatchState::Running;
+			AddLog(EOpenStanceSide::Chung, TEXT("shi-jak"));
+		}
+		return;
+	}
+	case EOpenStanceMatchState::Running:
+	case EOpenStanceMatchState::Stopped:
+	{
+		// The clock runs only while play does; a referee stop (a clinch) holds it.
+		if (Match.State == EOpenStanceMatchState::Running)
+		{
+			Match.ClockSeconds = FMath::Max(0.0f, Match.ClockSeconds - DeltaSeconds);
+			RoundPlayed += DeltaSeconds;
+		}
+
+		// The match gam-jeom limit loses the match at once, whatever the rounds (WT Article 14).
+		for (int32 Index = 0; Index < 2; ++Index)
+		{
+			if (RoundRules.MatchGamJeomLimit > 0 && Fighters[Index].MatchGamJeom >= RoundRules.MatchGamJeomLimit)
+			{
+				EndRound(Fighters[1 - Index].Side, EOpenStanceRoundEnd::MatchPenaltyLimit);
+				return;
+			}
+		}
+
+		const FOpenStanceRoundTally Tally[2] = { Fighters[0].Round, Fighters[1].Round };
+		EOpenStanceSide Winner;
+		EOpenStanceRoundEnd Reason;
+		if (FOpenStanceMatchRules::CheckRoundStop(RoundRules, Tally, Winner, Reason))
+		{
+			EndRound(Winner, Reason);
 		}
 		else if (Match.ClockSeconds <= 0.0f)
 		{
-			if (Match.Round < RoundRules.RoundCount)
-			{
-				// Keu-man: the round is over and the fighters rest before the next.
-				Match.State = EOpenStanceMatchState::RoundBreak;
-				RoundBreakElapsed = 0.0f;
-				AddLog(EOpenStanceSide::Chung, TEXT("keu-man"));
-			}
-			else
-			{
-				Match.State = EOpenStanceMatchState::Finished;
-				AddLog(EOpenStanceSide::Chung, TEXT("time"));
-			}
+			const EOpenStanceSide Coin = RefereeCoin.RandRange(0, 1) == 0 ? EOpenStanceSide::Chung : EOpenStanceSide::Hong;
+			FOpenStanceMatchRules::DecideAtTime(Tally, Coin, Winner, Reason);
+			EndRound(Winner, Reason);
 		}
+		return;
 	}
-	else if (Match.State == EOpenStanceMatchState::RoundBreak)
-	{
+	case EOpenStanceMatchState::RoundBreak:
 		RoundBreakElapsed += DeltaSeconds;
 		if (RoundBreakElapsed >= RoundRules.BreakSeconds)
 		{
-			// The next round: the clock is full again and the fighters are back on their marks, scores and penalties kept.
-			++Match.Round;
-			Match.ClockSeconds = RoundRules.RoundSeconds;
-			Match.State = EOpenStanceMatchState::Running;
-			Fighters[0].Motion.Position = FVector2D(-StartDistanceCm * 0.5, 0.0);
-			Fighters[1].Motion.Position = FVector2D(StartDistanceCm * 0.5, 0.0);
-			AddLog(EOpenStanceSide::Chung, TEXT("shi-jak"));
+			StartRound();
 		}
+		return;
+	default:
+		return;
 	}
+}
+
+void FOpenStanceMatchSim::EndRound(EOpenStanceSide Winner, EOpenStanceRoundEnd Reason)
+{
+	const int32 WinnerIndex = Winner == EOpenStanceSide::Chung ? 0 : 1;
+	FOpenStanceRoundResult& Result = RoundHistory.AddDefaulted_GetRef();
+	Result.Round = Match.Round;
+	Result.Winner = Winner;
+	Result.Reason = Reason;
+	Result.Tally[0] = Fighters[0].Round;
+	Result.Tally[1] = Fighters[1].Round;
+	Result.PlayedSeconds = RoundPlayed;
+	++Fighters[WinnerIndex].RoundWins;
+
+	// A clinch the round ended in is over with it.
+	ClinchPhase = EOpenStanceClinchPhase::None;
+	ClinchElapsed = 0.0f;
+
+	AddLog(EOpenStanceSide::Chung, TEXT("keu-man"));
+	AddLog(Winner, FString::Printf(TEXT("round %d: %s"), Match.Round, *FOpenStanceMatchRules::Describe(Reason).ToLower()));
+
+	// Two round wins take a best of three; a match gam-jeom limit ends it now; the last round always ends it.
+	if (Reason == EOpenStanceRoundEnd::MatchPenaltyLimit || Fighters[WinnerIndex].RoundWins >= RoundRules.GetRoundsToWin() || Match.Round >= RoundRules.RoundCount)
+	{
+		const EOpenStanceSide MatchSide = Reason == EOpenStanceRoundEnd::MatchPenaltyLimit || Fighters[0].RoundWins == Fighters[1].RoundWins
+			? Winner
+			: (Fighters[0].RoundWins > Fighters[1].RoundWins ? EOpenStanceSide::Chung : EOpenStanceSide::Hong);
+		FinishMatch(MatchSide, Reason);
+		return;
+	}
+	Match.State = EOpenStanceMatchState::RoundBreak;
+	RoundBreakElapsed = 0.0f;
+}
+
+void FOpenStanceMatchSim::FinishMatch(EOpenStanceSide Winner, EOpenStanceRoundEnd Reason)
+{
+	Match.State = EOpenStanceMatchState::Finished;
+	MatchWinner = Winner;
+	MatchEnd = Reason;
+	// The winner's hand goes up with the side named, then the final bow (GDD 8.5).
+	AddLog(Winner, Winner == EOpenStanceSide::Chung ? TEXT("chung seung") : TEXT("hong seung"));
+	AddLog(EOpenStanceSide::Chung, TEXT("kyeongrye"));
+}
+
+void FOpenStanceMatchSim::StartRound()
+{
+	// The next round: a full clock, the round's score and gam-jeom back to zero, stamina refilled and the fighters on their
+	// marks facing each other (GDD 8.2, 8.9). Round wins, match gam-jeom and the history carry on.
+	++Match.Round;
+	Match.ClockSeconds = RoundRules.RoundSeconds;
+	Match.State = EOpenStanceMatchState::Running;
+	RoundPlayed = 0.0f;
+	for (int32 Index = 0; Index < 2; ++Index)
+	{
+		FOpenStanceFighterSim& F = Fighters[Index];
+		const bool bChung = Index == 0;
+		F.Round = FOpenStanceRoundTally();
+		F.State.Stamina = FOpenStanceFighterState::FullStamina;
+		F.PreviousStamina = F.State.Stamina;
+		F.SinceSpend = 0.0f;
+		F.Motion.Position = FVector2D(bChung ? -StartDistanceCm * 0.5 : StartDistanceCm * 0.5, 0.0);
+		F.Motion.Facing = FVector2D(bChung ? 1.0 : -1.0, 0.0);
+	}
+	SyncFighterNumbers();
+	AddLog(EOpenStanceSide::Chung, TEXT("shi-jak"));
 }

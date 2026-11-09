@@ -252,6 +252,16 @@ void UOpenStanceCombatDebugSubsystem::SetGreyboxActive(bool bActive)
 		PlayerIndex = 0;
 	}
 	Sim.SetMoveTable(GetMoveTable());
+	// A real match runs WT rules (GDD 8.2): opening ceremony, best of three, 1:00 breaks. The proof plays one round from
+	// the first step, as it was recorded.
+	if (bPlayingProof)
+	{
+		FOpenStanceGreyboxProof::UseProofRules(Sim);
+	}
+	else
+	{
+		Sim.RoundRules = FOpenStanceRoundTuning();
+	}
 	Sim.StartMatch(bPlayingProof ? FOpenStanceGreyboxProof::StartDistanceCm : 200.0f);
 
 	// The Skill Stick follows the Options screen: the dead zone and the input window, 0.20 to 0.40 s (GDD 7.8).
@@ -1191,6 +1201,12 @@ void UOpenStanceCombatDebugSubsystem::Tick(float DeltaTime)
 	FOpenStanceFighterControls PlayerControls = PollController();
 	FOpenStanceFighterControls OpponentControls;
 	OpponentControls.bLT = AIMode == EOpenStanceAIMode::Block;
+	// A in the break between rounds skips it, once per press (GDD 8.2); in play A switches sides as usual.
+	if (!bHeld && PlayerControls.bA && !bPrevSkipBreak)
+	{
+		Sim.SkipBreak();
+	}
+	bPrevSkipBreak = PlayerControls.bA;
 	// The deciding kick ends the proof: the result replaces the last stage's caption through the hold and on Results,
 	// which can pause the simulation before the recorded track runs out.
 	if (bPlayingProof && Sim.Fighters[0].State.CombatState == EOpenStanceCombatState::MatchFinished)
@@ -1442,6 +1458,15 @@ namespace
 			if (UOpenStanceCombatDebugSubsystem* Subsystem = Find(World); Subsystem && Args.Num() >= 1)
 			{
 				Subsystem->SetClockCheat(FCString::Atof(*Args[0]));
+			}
+		}));
+
+	FAutoConsoleCommandWithWorld SkipBreakCommand(TEXT("os.SkipBreak"), TEXT("os.SkipBreak - ends the break between rounds now"),
+		FConsoleCommandWithWorldDelegate::CreateLambda([](UWorld* World)
+		{
+			if (UOpenStanceCombatDebugSubsystem* Subsystem = Find(World))
+			{
+				Subsystem->SkipBreak();
 			}
 		}));
 

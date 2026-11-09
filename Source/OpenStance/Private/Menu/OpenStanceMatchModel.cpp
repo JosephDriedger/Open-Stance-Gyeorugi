@@ -25,12 +25,29 @@ void UOpenStanceMatchModel::Reset(const FString& ChungName, const FString& HongN
 	Sides[0].Name = ChungName;
 	Sides[1].Name = HongName;
 	Events.Reset();
+	RoundOutcomes.Reset();
+	RoundCount = DefaultRoundCount;
+	RoundSeconds = DefaultRoundSeconds;
+	PointGap = DefaultPointGap;
+	bHasMatchResult = false;
+	MatchWinner = EOpenStanceSide::Chung;
+	MatchReason.Reset();
+	BreakSecondsLeft = 0.0f;
+	bCeremony = false;
 	Round = 1;
 	TimeRemaining = RoundSeconds;
 	bPaused = false;
 	bFinished = false;
 	CallTerm = TEXT("SHI-JAK");
 	CallMeaning = TEXT("Begin");
+}
+
+void UOpenStanceMatchModel::SetRules(int32 InRoundCount, float InRoundSeconds, int32 InPointGap)
+{
+	RoundCount = FMath::Max(1, InRoundCount);
+	RoundSeconds = FMath::Max(1.0f, InRoundSeconds);
+	PointGap = FMath::Max(0, InPointGap);
+	TimeRemaining = FMath::Min(TimeRemaining, RoundSeconds);
 }
 
 void UOpenStanceMatchModel::PopulateSample()
@@ -54,8 +71,14 @@ void UOpenStanceMatchModel::PopulateSample()
 	Score(EOpenStanceSide::Chung, 3, 2, TEXT("Roundhouse"), false);
 	Score(EOpenStanceSide::Hong, 3, 1, TEXT("Punch"), false);
 	AddGamJeom(EOpenStanceSide::Hong, TEXT("Grabbing"));
+	SetRoundResult(1, EOpenStanceSide::Chung, TEXT("Points"));
+	SetRoundResult(2, EOpenStanceSide::Hong, TEXT("Points"));
+	SetRoundResult(3, EOpenStanceSide::Chung, TEXT("Points"));
 	Round = RoundCount;
 	TimeRemaining = 0.0f;
+	bHasMatchResult = true;
+	MatchWinner = EOpenStanceSide::Chung;
+	MatchReason = TEXT("Points");
 	bFinished = true;
 }
 
@@ -67,35 +90,46 @@ bool UOpenStanceMatchModel::Advance(float DeltaSeconds)
 		return false;
 	}
 
+	const bool bWasFinished = bFinished;
 	TimeRemaining -= DeltaSeconds;
 	if (TimeRemaining <= 0.0f)
 	{
-		if (Round < RoundCount)
-		{
-			++Round;
-			TimeRemaining = RoundSeconds;
-			SetCall(TEXT("SHI-JAK"), TEXT("Begin"));
-		}
-		else
-		{
-			TimeRemaining = 0.0f;
-		}
+		// The demo's round goes to the higher score; a level one to Chung, standing in for the referee's decision.
+		TimeRemaining = 0.0f;
+		const int32 Chung = GetScore(EOpenStanceSide::Chung);
+		const int32 Hong = GetScore(EOpenStanceSide::Hong);
+		EndDemoRound(Hong > Chung ? EOpenStanceSide::Hong : EOpenStanceSide::Chung, Chung == Hong ? TEXT("Referee's decision") : TEXT("Points"));
 	}
-	const bool bWasFinished = bFinished;
-	CheckForEnd();
 	return bFinished && !bWasFinished;
 }
 
 void UOpenStanceMatchModel::CheckForEnd()
 {
-	const bool bGapReached = FMath::Abs(Sides[0].Score - Sides[1].Score) >= PointGapToEnd;
-	const bool bTimeUp = Round >= RoundCount && TimeRemaining <= 0.0f;
-	if (!bFinished && (bGapReached || bTimeUp))
+	// Gameplay decides rounds and the match itself and tells the model; only the demo decides here.
+	if (!bDemoMode || bFinished)
 	{
-		bFinished = true;
-		SetCall(TEXT("KEU-MAN"), TEXT("Stop"));
-		OnFinished.Broadcast();
+		return;
 	}
+	const int32 Chung = GetScore(EOpenStanceSide::Chung);
+	const int32 Hong = GetScore(EOpenStanceSide::Hong);
+	if (PointGap > 0 && FMath::Abs(Chung - Hong) >= PointGap)
+	{
+		EndDemoRound(Chung > Hong ? EOpenStanceSide::Chung : EOpenStanceSide::Hong, TEXT("Point gap"));
+	}
+}
+
+void UOpenStanceMatchModel::EndDemoRound(EOpenStanceSide Winner, const FString& Reason)
+{
+	SetRoundResult(Round, Winner, Reason);
+	const int32 ToWin = RoundCount / 2 + 1;
+	if (GetRoundWins(Winner) >= ToWin || Round >= RoundCount)
+	{
+		SetMatchResult(GetRoundWins(EOpenStanceSide::Hong) > GetRoundWins(EOpenStanceSide::Chung) ? EOpenStanceSide::Hong : EOpenStanceSide::Chung, Reason);
+		return;
+	}
+	++Round;
+	TimeRemaining = RoundSeconds;
+	SetCall(TEXT("SHI-JAK"), TEXT("Begin"));
 }
 
 void UOpenStanceMatchModel::AddPoints(EOpenStanceSide Side, int32 Points, const FString& Technique, bool bHead)
@@ -138,6 +172,7 @@ void UOpenStanceMatchModel::AddGamJeom(EOpenStanceSide Side, const FString& Reas
 	FSideState& State = GetSide(Side);
 	++State.GamJeom;
 	State.PenaltyReasons.Add(Reason);
+	State.PenaltyRounds.Add(Round);
 }
 
 void UOpenStanceMatchModel::SetCall(const FString& Term, const FString& Meaning, const FString& Separator)
@@ -159,8 +194,40 @@ void UOpenStanceMatchModel::ForceFinish()
 		return;
 	}
 	bFinished = true;
+	BreakSecondsLeft = 0.0f;
 	SetCall(TEXT("KEU-MAN"), TEXT("Stop"));
 	OnFinished.Broadcast();
+}
+
+void UOpenStanceMatchModel::SetRoundResult(int32 InRound, EOpenStanceSide Winner, const FString& Reason)
+{
+	for (FOpenStanceRoundOutcome& Outcome : RoundOutcomes)
+	{
+		if (Outcome.Round == InRound)
+		{
+			Outcome.Winner = Winner;
+			Outcome.Reason = Reason;
+			return;
+		}
+	}
+	FOpenStanceRoundOutcome& Outcome = RoundOutcomes.AddDefaulted_GetRef();
+	Outcome.Round = InRound;
+	Outcome.Winner = Winner;
+	Outcome.Reason = Reason;
+}
+
+void UOpenStanceMatchModel::SetMatchResult(EOpenStanceSide Winner, const FString& Reason)
+{
+	bHasMatchResult = true;
+	MatchWinner = Winner;
+	MatchReason = Reason;
+	ForceFinish();
+}
+
+void UOpenStanceMatchModel::SetBreak(float SecondsLeft, bool bInCeremony)
+{
+	BreakSecondsLeft = FMath::Max(0.0f, SecondsLeft);
+	bCeremony = bInCeremony && BreakSecondsLeft > 0.0f;
 }
 
 void UOpenStanceMatchModel::SetClock(int32 InRound, float SecondsRemaining)
@@ -176,7 +243,27 @@ const FString& UOpenStanceMatchModel::GetFighterName(EOpenStanceSide Side) const
 
 int32 UOpenStanceMatchModel::GetScore(EOpenStanceSide Side) const
 {
+	return GetRoundScore(Side, Round);
+}
+
+int32 UOpenStanceMatchModel::GetTotalScore(EOpenStanceSide Side) const
+{
 	return GetSide(Side).Score;
+}
+
+int32 UOpenStanceMatchModel::GetRoundWins(EOpenStanceSide Side) const
+{
+	int32 Wins = 0;
+	for (const FOpenStanceRoundOutcome& Outcome : RoundOutcomes)
+	{
+		Wins += Outcome.Winner == Side ? 1 : 0;
+	}
+	return Wins;
+}
+
+const FOpenStanceRoundOutcome* UOpenStanceMatchModel::GetRoundOutcome(int32 InRound) const
+{
+	return RoundOutcomes.FindByPredicate([InRound](const FOpenStanceRoundOutcome& Outcome) { return Outcome.Round == InRound; });
 }
 
 float UOpenStanceMatchModel::GetStamina(EOpenStanceSide Side) const
@@ -185,6 +272,16 @@ float UOpenStanceMatchModel::GetStamina(EOpenStanceSide Side) const
 }
 
 int32 UOpenStanceMatchModel::GetGamJeom(EOpenStanceSide Side) const
+{
+	int32 Count = 0;
+	for (const int32 PenaltyRound : GetSide(Side).PenaltyRounds)
+	{
+		Count += PenaltyRound == Round ? 1 : 0;
+	}
+	return Count;
+}
+
+int32 UOpenStanceMatchModel::GetMatchGamJeom(EOpenStanceSide Side) const
 {
 	return GetSide(Side).GamJeom;
 }
@@ -234,6 +331,17 @@ const TArray<FString>& UOpenStanceMatchModel::GetPenaltyReasons(EOpenStanceSide 
 
 EOpenStanceSide UOpenStanceMatchModel::GetWinner() const
 {
+	// Round wins decide a match, never total points (GDD 8.2); totals only stand in before any round has a result.
+	if (bHasMatchResult)
+	{
+		return MatchWinner;
+	}
+	const int32 ChungWins = GetRoundWins(EOpenStanceSide::Chung);
+	const int32 HongWins = GetRoundWins(EOpenStanceSide::Hong);
+	if (ChungWins != HongWins)
+	{
+		return ChungWins > HongWins ? EOpenStanceSide::Chung : EOpenStanceSide::Hong;
+	}
 	return Sides[0].Score >= Sides[1].Score ? EOpenStanceSide::Chung : EOpenStanceSide::Hong;
 }
 

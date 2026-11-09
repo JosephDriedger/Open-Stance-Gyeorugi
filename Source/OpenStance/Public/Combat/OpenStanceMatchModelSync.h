@@ -21,7 +21,10 @@ struct OPENSTANCE_API FOpenStanceMatchModelSync
 	 */
 	void Begin(const FOpenStanceMatchSim& Sim, UOpenStanceMatchModel& Model, const FString& ChungName, const FString& HongName, const UDataTable* MoveTable);
 
-	/** Sends what changed since the last call: new scores and penalties, stamina, the clock and round, referee calls, the end. */
+	/**
+	 * Sends what changed since the last call: new scores and penalties, stamina, the clock and round, the ceremony and the
+	 * break, referee calls, each round's result and the match's.
+	 */
 	void Update(const FOpenStanceMatchSim& Sim, UOpenStanceMatchModel& Model);
 
 private:
@@ -29,4 +32,5 @@ private:
 	int32 SeenContacts = 0;
 	int32 SeenLog = 0;
 	int32 SeenPenalties[2] = { 0, 0 };
+	int32 SeenRounds = 0;
 };

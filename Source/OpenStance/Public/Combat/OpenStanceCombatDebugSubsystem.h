@@ -78,6 +78,9 @@ public:
 	void SetInfiniteStamina(bool bOn);
 	void SetScoreCheat(int32 Chung, int32 Hong);
 	void SetClockCheat(float Seconds);
+
+	/** Ends the break between rounds now (local play may skip it, GDD 8.2): A in the break, or os.SkipBreak. */
+	bool SkipBreak() { return Sim.SkipBreak(); }
 	bool SetAIMode(const FString& Mode, FString& OutMessage);
 	/** Switches the match camera to a named preset (OpenStanceCameraPresets); not a cheat, the match is unchanged. */
 	bool SetCameraPreset(FName Name, FString& OutMessage);
@@ -203,6 +206,9 @@ private:
 	int32 PrintedInputEvents = 0;
 
 	bool bPrevInvertToggle = false;
+
+	/** A was down on the last tick, so one press skips one break. */
+	bool bPrevSkipBreak = false;
 	bool bAutoStartPending = false;
 	bool bShowInput = false;
 	bool bGreybox = false;

@@ -50,3 +50,31 @@ The machine records why a fighter went down and reports it in a `KnockedDown` ev
 | `FailedLanding` | Attack Recovery ends and the move's `SelfFallChance` roll fails | Falling (GDD 8.4); `bFoulFall` is true |
 
 The roll uses the machine's seedable `FRandomStream`. The chance is the row's alone; it does not yet depend on distance.
+
+## Rounds and the match
+
+Code: `Source/OpenStance/{Public,Private}/Combat/OpenStanceMatchRules` (the pure rules) and `FOpenStanceMatchSim::StepRules`
+(the flow). Tests: `OpenStance.Match.*` (GDD 8.2-8.4, issue 10).
+
+| Match state | What happens |
+| --- | --- |
+| Ready | Opening ceremony, `CeremonySeconds` (4 s): charyeot, kyeongrye, joon-bi, shi-jak. No attacks, the clock holds. |
+| Running | The clock runs. The round stops early on the gap or the round's gam-jeom limit. |
+| Stopped | A referee stop (a clinch). The clock holds; a round can still be lost on penalties. |
+| RoundBreak | `BreakSeconds` (1:00). `SkipBreak` (A in the break, or `os.SkipBreak`) ends it. |
+| Finished | A fighter has won enough rounds or reached the match gam-jeom limit: winner's call, then the final bow. |
+
+- `FOpenStanceRoundTuning` holds match setup's options: 1 or 3 rounds, 60/90/120 s rounds, point gap 0 (off), 12 or 20.
+- Each round is scored on its own: `State.Score` and `State.GamJeom` are the round's and reset when the next round
+  starts. Stamina refills and the fighters go back to their marks then too. Round wins, match gam-jeom, penalty reasons
+  and `RoundHistory` carry over.
+- A lead of the gap wins the round on the spot. Five gam-jeom in a round lose the round. Ten in the match lose the match.
+- At time the higher score wins the round, then WT Article 15: turning-kick points, head, trunk, punch, gam-jeom points,
+  then protector hits (scoring or under the impact threshold).
+- **Provisional:** the referee's decision, the last step, goes to the fighter who brought more real techniques to their
+  active phase in the round, then to a seeded coin. The GDD does not say how the game's referee decides.
+- Two round wins take a best of three; total points never decide a match. The HUD model gets each round's result
+  and the winner from the simulation (`FOpenStanceMatchModelSync`), and Results shows rounds won, each round and
+  the total points.
+- The greybox proof (`os.RunProof`, `os.PlayProof`) uses `FOpenStanceGreyboxProof::UseProofRules`: one round with no
+  ceremony, so it still ends 16 to 0 on the gap as recorded.

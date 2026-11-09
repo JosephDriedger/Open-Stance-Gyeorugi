@@ -36,6 +36,12 @@ struct OPENSTANCE_API FOpenStanceGreyboxProof
 	static constexpr float StartDistanceCm = 100.0f;
 	static constexpr int32 ExpectedChungScore = 16;
 
+	/**
+	 * The M1 proof's match rules: a single round with no opening ceremony, so play starts on the first step and the point
+	 * gap ends the match, as it did when the proof was recorded. Run sets them; a replay must set them before StartMatch.
+	 */
+	static void UseProofRules(FOpenStanceMatchSim& Sim);
+
 	/** Starts a match on Sim (whose move table must be set) and plays the script; OutTrack, if given, records it. */
 	static TArray<FStage> Run(FOpenStanceMatchSim& Sim, FTrack* OutTrack = nullptr);
 

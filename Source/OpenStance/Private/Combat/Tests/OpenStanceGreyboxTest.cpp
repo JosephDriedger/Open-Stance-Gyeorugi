@@ -19,6 +19,9 @@ namespace
 		FSimRig(float Distance = 100.0f)
 		{
 			Sim.SetMoveTable(FOpenStanceMoveData::CreateSeedTable(GetTransientPackage()));
+			// Play from the first step and a short break; the ceremony and the full break have their own tests.
+			Sim.RoundRules.CeremonySeconds = 0.0f;
+			Sim.RoundRules.BreakSeconds = 2.0f;
 			Sim.StartMatch(Distance);
 		}
 
@@ -71,6 +74,7 @@ bool FOpenStanceGreyboxProofReplayTest::RunTest(const FString& Parameters)
 
 	FOpenStanceMatchSim Live;
 	Live.SetMoveTable(FOpenStanceMoveData::CreateSeedTable(GetTransientPackage()));
+	FOpenStanceGreyboxProof::UseProofRules(Live);
 	Live.StartMatch(FOpenStanceGreyboxProof::StartDistanceCm);
 	const FOpenStanceFighterControls Idle;
 	for (const FOpenStanceFighterControls& Chung : Track.Chung)
@@ -375,7 +379,7 @@ bool FOpenStanceGreyboxClinchTest::RunTest(const FString& Parameters)
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FOpenStanceGreyboxRoundsTest, "OpenStance.Greybox.Rounds", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
 bool FOpenStanceGreyboxRoundsTest::RunTest(const FString& Parameters)
 {
-	// Three rounds: the clock running out ends a round, not the match, until the last one (WT rules, GDD 4.4).
+	// Three rounds: the clock running out ends a round, not the match, until a fighter has won two (WT rules, GDD 8.2).
 	{
 		FSimRig Rig;
 		Rig.Sim.SetScore(3, 1);
@@ -386,23 +390,26 @@ bool FOpenStanceGreyboxRoundsTest::RunTest(const FString& Parameters)
 		TestEqual(TEXT("round 2 starts"), Rig.Sim.Match.Round, 2);
 		TestEqual(TEXT("with play running"), Rig.Sim.Match.State, EOpenStanceMatchState::Running);
 		TestEqual(TEXT("and a full clock"), Rig.Sim.Match.ClockSeconds, Rig.Sim.RoundRules.RoundSeconds, 3.0f);
-		TestEqual(TEXT("the scores carry over"), Rig.Sim.Fighters[0].State.Score, 3);
+		TestEqual(TEXT("each round is scored on its own"), Rig.Sim.Fighters[0].State.Score, 0);
+		TestEqual(TEXT("Chung has won a round"), Rig.Sim.Fighters[0].RoundWins, 1);
 		TestEqual(TEXT("and the fighters are back on their marks"), static_cast<float>((Rig.Sim.Fighters[1].Motion.Position - Rig.Sim.Fighters[0].Motion.Position).Size()), 100.0f, 1.0f);
 
+		Rig.Sim.SetScore(0, 2);
 		Rig.Sim.SetClock(0.1f);
 		Rig.Run(2.8f);
-		TestEqual(TEXT("round 3 starts"), Rig.Sim.Match.Round, 3);
+		TestEqual(TEXT("one round each: round 3 starts"), Rig.Sim.Match.Round, 3);
 		Rig.Sim.SetClock(0.1f);
 		Rig.Run(0.5f);
 		TestEqual(TEXT("the third round's clock ends the match"), Rig.Sim.Match.State, EOpenStanceMatchState::Finished);
 	}
 
-	// A 12-point gap ends the match at once.
+	// A 12-point gap wins the round at once (the match has its own tests, OpenStance.Match).
 	{
 		FSimRig Rig;
 		Rig.Sim.SetScore(12, 0);
 		Rig.Run(0.1f);
-		TestEqual(TEXT("a 12-point gap finishes the match"), Rig.Sim.Match.State, EOpenStanceMatchState::Finished);
+		TestEqual(TEXT("a 12-point gap ends the round"), Rig.Sim.Match.State, EOpenStanceMatchState::RoundBreak);
+		TestEqual(TEXT("for the fighter ahead"), Rig.Sim.Fighters[0].RoundWins, 1);
 	}
 
 	// A penalty's reason is kept for the HUD and the results page.
