@@ -120,17 +120,38 @@ bool FOpenStanceMatchRulesTieBreakTest::RunTest(const FString& Parameters)
 		TestEqual(TEXT("protector hits next"), Decide(Chung, Hong, Reason), EOpenStanceSide::Hong);
 		TestEqual(TEXT("the protector tie-break"), Reason, EOpenStanceRoundEnd::TieBreakProtectorHits);
 	}
-	// Everything level: the referee decides, on techniques brought to their active phase, then the coin.
+	// Everything level: superiority (WT Article 15, Explanation 1), one vote per criterion, then the coin.
 	{
 		FOpenStanceRoundTally Chung, Hong;
 		Chung.ActiveAttacks = 4;
 		Hong.ActiveAttacks = 2;
-		TestEqual(TEXT("the referee favours the busier fighter"), Decide(Chung, Hong, Reason), EOpenStanceSide::Chung);
-		TestEqual(TEXT("the referee's decision"), Reason, EOpenStanceRoundEnd::RefereeDecision);
-		const FOpenStanceRoundTally Level[2] = { FOpenStanceRoundTally(), FOpenStanceRoundTally() };
+		TestEqual(TEXT("more techniques executed wins a lone vote"), Decide(Chung, Hong, Reason), EOpenStanceSide::Chung);
+		TestEqual(TEXT("as a superiority decision"), Reason, EOpenStanceRoundEnd::RefereeDecision);
+
+		// Hong throws fewer techniques but presses forward and throws the spinning kicks: two votes to one.
+		Hong.PressureCm = 400.0f;
+		Hong.AdvancedAttacks = 2;
+		int32 Votes[2];
 		EOpenStanceSide Winner;
-		FOpenStanceMatchRules::DecideAtTime(Level, EOpenStanceSide::Hong, Winner, Reason);
-		TestEqual(TEXT("and with nothing to go on, the coin"), Winner, EOpenStanceSide::Hong);
+		const FOpenStanceRoundTally Pair[2] = { Chung, Hong };
+		TestTrue(TEXT("the judges have a majority"), FOpenStanceMatchRules::JudgeSuperiority(Pair, Votes, Winner));
+		TestEqual(TEXT("pressure and advanced techniques beat volume"), Winner, EOpenStanceSide::Hong);
+		TestEqual(TEXT("two votes to one"), Votes[1] * 10 + Votes[0], 21);
+
+		// A gam-jeom costs the manner vote: 2-2, so the referee's coin decides.
+		Hong.GamJeom = 1;
+		Hong.GamJeomPoints = 0;
+		Chung.PressureCm = 0.0f;
+		const FOpenStanceRoundTally Split[2] = { Chung, Hong };
+		TestFalse(TEXT("better manner levels the vote"), FOpenStanceMatchRules::JudgeSuperiority(Split, Votes, Winner));
+		FOpenStanceMatchRules::DecideAtTime(Split, EOpenStanceSide::Chung, Winner, Reason);
+		TestEqual(TEXT("and a level vote goes to the coin"), Winner, EOpenStanceSide::Chung);
+
+		// Shuffling a little forward is not aggression.
+		FOpenStanceRoundTally Still, Shuffle;
+		Shuffle.PressureCm = FOpenStanceMatchRules::PressureMarginCm - 1.0f;
+		const FOpenStanceRoundTally Near[2] = { Still, Shuffle };
+		TestFalse(TEXT("under the margin, no aggression vote"), FOpenStanceMatchRules::JudgeSuperiority(Near, Votes, Winner));
 	}
 
 	// Stops before time: the gap, the gap turned off, and the round's gam-jeom limit before the score.
@@ -370,6 +391,45 @@ bool FOpenStanceMatchRulesModelTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Chung wins 2-1"), Model->GetWinner(), EOpenStanceSide::Chung);
 	TestEqual(TEXT("two rounds to one"), Model->GetRoundWins(EOpenStanceSide::Chung) * 10 + Model->GetRoundWins(EOpenStanceSide::Hong), 21);
 	TestEqual(TEXT("the referee names the winner"), Model->GetCallTerm(), FString(TEXT("CHUNG SEUNG")));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FOpenStanceMatchRulesJudgesTest, "OpenStance.Match.SuperiorityCounts", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FOpenStanceMatchRulesJudgesTest::RunTest(const FString& Parameters)
+{
+	// What the judges weigh is counted in play: pressing forward, techniques executed and the advanced ones among them.
+	FRulesRig Rig;
+	Rig.Chung.LeftStick = FVector2D(0.0, 1.0);
+	Rig.Run(0.5f);
+	Rig.Chung.LeftStick = FVector2D::ZeroVector;
+	Rig.Hong.LeftStick = FVector2D(0.0, -1.0);
+	Rig.Run(0.5f);
+	Rig.Hong.LeftStick = FVector2D::ZeroVector;
+	TestTrue(TEXT("stepping in is pressure"), Rig.Sim.Fighters[0].Round.PressureCm > 30.0f);
+	TestTrue(TEXT("backing off takes it away"), Rig.Sim.Fighters[1].Round.PressureCm < -30.0f);
+
+	Rig.Sim.ThrowMove(0, TEXT("Roundhouse_Trunk"), EOpenStanceLegSide::Right);
+	Rig.Run(1.5f);
+	Rig.Sim.ThrowMove(0, TEXT("SpinSide_Trunk"), EOpenStanceLegSide::Right);
+	Rig.Run(2.0f);
+	TestEqual(TEXT("two techniques executed"), Rig.Sim.Fighters[0].Round.ActiveAttacks, 2);
+	TestEqual(TEXT("one of them advanced"), Rig.Sim.Fighters[0].Round.AdvancedAttacks, 1);
+
+	// A tied round on the clock is a superiority decision, with the call and the votes in the log. Only the judges' counts
+	// are kept, in case a spinning kick's landing roll gave a foul.
+	for (FOpenStanceFighterSim& F : Rig.Sim.Fighters)
+	{
+		FOpenStanceRoundTally Kept;
+		Kept.PressureCm = F.Round.PressureCm;
+		Kept.ActiveAttacks = F.Round.ActiveAttacks;
+		Kept.AdvancedAttacks = F.Round.AdvancedAttacks;
+		F.Round = Kept;
+	}
+	Rig.Sim.SetScore(0, 0);
+	Rig.Sim.SetClock(0.05f);
+	Rig.Run(0.1f);
+	TestEqual(TEXT("the busier, pressing fighter wins on superiority"), Rig.Sim.RoundHistory.Num() ? Rig.Sim.RoundHistory[0].Winner : EOpenStanceSide::Hong, EOpenStanceSide::Chung);
+	TestTrue(TEXT("the referee calls woo-se-girok"), Rig.LogHas(TEXT("woo-se-girok")));
 	return true;
 }
 

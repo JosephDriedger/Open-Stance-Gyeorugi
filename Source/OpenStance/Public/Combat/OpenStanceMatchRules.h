@@ -65,8 +65,14 @@ struct OPENSTANCE_API FOpenStanceRoundTally
 	/** Hits the protector registered, scoring or under the impact threshold. */
 	int32 ProtectorHits = 0;
 
-	/** Real techniques that reached their active phase, for the referee's decision. */
+	/** Real techniques that reached their active phase: the judges' "greater number of techniques executed". */
 	int32 ActiveAttacks = 0;
+
+	/** Of those, spinning, jumping and tornado kicks: the judges' "more advanced techniques". */
+	int32 AdvancedAttacks = 0;
+
+	/** Net distance moved toward the opponent in live play, in cm; backing off takes it down. The judges' "aggressive match management". */
+	float PressureCm = 0.0f;
 
 	/** Gam-jeom against this fighter in the round. */
 	int32 GamJeom = 0;
@@ -98,10 +104,21 @@ struct OPENSTANCE_API FOpenStanceMatchRules
 
 	/**
 	 * The winner of a round the clock ended: more points, then WT Article 15 in order (turning kicks, head, trunk, punch,
-	 * gam-jeom, protector hits), then the referee's decision. The game's referee gives the round to the fighter who brought
-	 * more techniques to their active phase and, if that is level too, to RefereeCoin (provisional, GDD 8.3).
+	 * gam-jeom, protector hits), then the referee and judges' superiority decision (see JudgeSuperiority). Only a
+	 * superiority vote that is level goes to RefereeCoin.
 	 */
 	static void DecideAtTime(const FOpenStanceRoundTally Tally[2], EOpenStanceSide RefereeCoin, EOpenStanceSide& OutWinner, EOpenStanceRoundEnd& OutReason);
+
+	/**
+	 * Superiority (WT Article 15, Explanation 1): one vote per criterion the fighters differ on, for aggressive match
+	 * management (more PressureCm), the greater number of techniques executed (ActiveAttacks), more advanced techniques
+	 * (AdvancedAttacks) and better competition manner (fewer GamJeom). OutVotes gets each side's votes. Returns the side
+	 * with more votes, or false when they are level.
+	 */
+	static bool JudgeSuperiority(const FOpenStanceRoundTally Tally[2], int32 OutVotes[2], EOpenStanceSide& OutWinner);
+
+	/** Net forward movement under this much is a draw on aggression, so standing still does not win a vote. */
+	static constexpr float PressureMarginCm = 50.0f;
 
 	/** "Point gap", "Superiority: head" and so on, for the log and the results page. */
 	static FString Describe(EOpenStanceRoundEnd Reason);

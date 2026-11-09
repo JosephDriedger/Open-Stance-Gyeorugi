@@ -71,7 +71,6 @@ void FOpenStanceMatchRules::DecideAtTime(const FOpenStanceRoundTally Tally[2], E
 		{ &FOpenStanceRoundTally::PunchPoints, EOpenStanceRoundEnd::TieBreakPunch },
 		{ &FOpenStanceRoundTally::GamJeomPoints, EOpenStanceRoundEnd::TieBreakGamJeom },
 		{ &FOpenStanceRoundTally::ProtectorHits, EOpenStanceRoundEnd::TieBreakProtectorHits },
-		{ &FOpenStanceRoundTally::ActiveAttacks, EOpenStanceRoundEnd::RefereeDecision },
 	};
 	for (const FStep& Step : Order)
 	{
@@ -84,8 +83,35 @@ void FOpenStanceMatchRules::DecideAtTime(const FOpenStanceRoundTally Tally[2], E
 			return;
 		}
 	}
-	OutWinner = RefereeCoin;
+	// Woo-se-girok: the referee and judges decide superiority. A level vote is the referee's call, the coin here.
+	int32 Votes[2];
+	if (!JudgeSuperiority(Tally, Votes, OutWinner))
+	{
+		OutWinner = RefereeCoin;
+	}
 	OutReason = EOpenStanceRoundEnd::RefereeDecision;
+}
+
+bool FOpenStanceMatchRules::JudgeSuperiority(const FOpenStanceRoundTally Tally[2], int32 OutVotes[2], EOpenStanceSide& OutWinner)
+{
+	OutVotes[0] = OutVotes[1] = 0;
+	const auto Vote = [OutVotes](bool bChung, bool bHong)
+	{
+		OutVotes[0] += bChung ? 1 : 0;
+		OutVotes[1] += bHong ? 1 : 0;
+	};
+	const FOpenStanceRoundTally& A = Tally[0];
+	const FOpenStanceRoundTally& B = Tally[1];
+	Vote(A.PressureCm > B.PressureCm + PressureMarginCm, B.PressureCm > A.PressureCm + PressureMarginCm);
+	Vote(A.ActiveAttacks > B.ActiveAttacks, B.ActiveAttacks > A.ActiveAttacks);
+	Vote(A.AdvancedAttacks > B.AdvancedAttacks, B.AdvancedAttacks > A.AdvancedAttacks);
+	Vote(A.GamJeom < B.GamJeom, B.GamJeom < A.GamJeom);
+	if (OutVotes[0] == OutVotes[1])
+	{
+		return false;
+	}
+	OutWinner = OutVotes[0] > OutVotes[1] ? EOpenStanceSide::Chung : EOpenStanceSide::Hong;
+	return true;
 }
 
 FString FOpenStanceMatchRules::Describe(EOpenStanceRoundEnd Reason)
@@ -101,7 +127,7 @@ FString FOpenStanceMatchRules::Describe(EOpenStanceRoundEnd Reason)
 	case EOpenStanceRoundEnd::TieBreakPunch: return TEXT("Tie-break: punch points");
 	case EOpenStanceRoundEnd::TieBreakGamJeom: return TEXT("Tie-break: gam-jeom points");
 	case EOpenStanceRoundEnd::TieBreakProtectorHits: return TEXT("Tie-break: protector hits");
-	case EOpenStanceRoundEnd::RefereeDecision: return TEXT("Referee's decision");
+	case EOpenStanceRoundEnd::RefereeDecision: return TEXT("Superiority");
 	case EOpenStanceRoundEnd::MatchPenaltyLimit: return TEXT("Match gam-jeom limit");
 	default: return TEXT("-");
 	}

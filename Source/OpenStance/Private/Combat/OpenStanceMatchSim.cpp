@@ -303,6 +303,10 @@ void FOpenStanceMatchSim::RunTraces(int32 Index)
 		// One more technique brought to its active phase: what the referee weighs when every other count is level.
 		F.CountedActiveSerial = F.Machine.GetAttackSerial();
 		++F.Round.ActiveAttacks;
+		if (Attack->Row.bSpinning || Attack->bJump || Attack->Row.Technique == EOpenStanceTechnique::Tornado)
+		{
+			++F.Round.AdvancedAttacks;
+		}
 	}
 	const float Progress = bActive ? FMath::Clamp(F.Machine.GetStateElapsed() / FMath::Max(Attack->Row.ActiveSeconds, 0.001f), 0.0f, 1.0f) : 0.0f;
 	const FOpenStanceFighterBody Body = F.GetBody();
@@ -421,7 +425,15 @@ void FOpenStanceMatchSim::StepFighter(int32 Index, float DeltaSeconds, const FOp
 	Motion.bDash = Controls.bB && !IsInClinch();
 	Motion.bSwitch = Controls.bA && !IsInClinch();
 	Motion.DPad = Controls.DPad;
+	const FVector2D Before = F.Motion.Position;
 	FOpenStanceFootwork::Tick(DeltaSeconds, Motion, Other.Motion.Position, F.State, F.Motion, Movement);
+
+	// Pressure for the judges: net movement toward the opponent while play is live (WT Article 15, Explanation 1).
+	if (Match.IsPlayLive())
+	{
+		const FVector2D Toward = (Other.Motion.Position - Before).GetSafeNormal();
+		F.Round.PressureCm += static_cast<float>(FVector2D::DotProduct(F.Motion.Position - Before, Toward));
+	}
 
 	// Stamina comes back (15 per second at Recovery 70) after a second of not spending it (GDD 8.9).
 	if (F.State.Stamina < F.PreviousStamina - 0.001f)
@@ -623,6 +635,16 @@ void FOpenStanceMatchSim::EndRound(EOpenStanceSide Winner, EOpenStanceRoundEnd R
 	ClinchElapsed = 0.0f;
 
 	AddLog(EOpenStanceSide::Chung, TEXT("keu-man"));
+	if (Reason == EOpenStanceRoundEnd::RefereeDecision)
+	{
+		// Woo-se-girok: the referee records superiority, and the votes go in the log.
+		int32 Votes[2];
+		EOpenStanceSide Ignored;
+		const FOpenStanceRoundTally Tally[2] = { Fighters[0].Round, Fighters[1].Round };
+		FOpenStanceMatchRules::JudgeSuperiority(Tally, Votes, Ignored);
+		AddLog(EOpenStanceSide::Chung, TEXT("woo-se-girok"));
+		AddLog(Winner, FString::Printf(TEXT("superiority votes %d-%d"), Votes[0], Votes[1]));
+	}
 	AddLog(Winner, FString::Printf(TEXT("round %d: %s"), Match.Round, *FOpenStanceMatchRules::Describe(Reason).ToLower()));
 
 	// Two round wins take a best of three; a match gam-jeom limit ends it now; the last round always ends it.

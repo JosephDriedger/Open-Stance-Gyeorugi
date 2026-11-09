@@ -124,6 +124,7 @@ bool FOpenStanceMatchModelSyncTest::RunTest(const FString& Parameters)
 		Rig.Sim.SetClock(30.0f);
 		Rig.Run(0.05f);
 		TestEqual(TEXT("the HUD clock follows the simulation"), Rig.Model->GetTimeRemaining(), 30.0f, 0.5f);
+		Rig.Sim.SetScore(1, 0); // decided on points, so no superiority call follows keu-man
 		Rig.Sim.SetClock(0.1f);
 		Rig.Run(0.5f);
 		TestEqual(TEXT("keu-man at the end of the round"), Rig.Model->GetCallTerm(), FString(TEXT("KEU-MAN")));

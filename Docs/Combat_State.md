@@ -91,8 +91,12 @@ Code: `Source/OpenStance/{Public,Private}/Combat/OpenStanceMatchRules` (the pure
 - A lead of the gap wins the round on the spot. Five gam-jeom in a round lose the round. Ten in the match lose the match.
 - At time the higher score wins the round, then WT Article 15: turning-kick points, head, trunk, punch, gam-jeom points,
   then protector hits (scoring or under the impact threshold).
-- **Provisional:** the referee's decision, the last step, goes to the fighter who brought more real techniques to their
-  active phase in the round, then to a seeded coin. The GDD does not say how the game's referee decides.
+- Still level: superiority (woo-se-girok, WT Article 15 Explanation 1). One vote per criterion the fighters differ on:
+  aggressive match management (net distance moved toward the opponent in live play, `PressureCm`, with a 50 cm margin),
+  the greater number of techniques executed (real techniques reaching their active phase), more advanced techniques
+  (spinning, jumping and tornado kicks among them) and better competition manner (fewer gam-jeom). More votes win; a
+  level vote goes to a seeded coin, the referee's call. The log records the call and the votes. **Provisional:** how
+  each criterion is measured is the game's reading of the WT text; tune after playtests.
 - Two round wins take a best of three; total points never decide a match. The HUD model gets each round's result
   and the winner from the simulation (`FOpenStanceMatchModelSync`), and Results shows rounds won, each round and
   the total points.

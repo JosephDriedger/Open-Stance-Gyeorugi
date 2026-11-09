@@ -72,6 +72,10 @@ void FOpenStanceMatchModelSync::Update(const FOpenStanceMatchSim& Sim, UOpenStan
 		{
 			Model.SetCall(TEXT("JOON-BI"), TEXT("Ready"));
 		}
+		else if (Text == TEXT("woo-se-girok"))
+		{
+			Model.SetCall(TEXT("WOO-SE-GIROK"), TEXT("Record superiority"));
+		}
 		else if (Text == TEXT("chung seung"))
 		{
 			Model.SetCall(TEXT("CHUNG SEUNG"), TEXT("Chung wins"));

@@ -94,11 +94,11 @@ bool UOpenStanceMatchModel::Advance(float DeltaSeconds)
 	TimeRemaining -= DeltaSeconds;
 	if (TimeRemaining <= 0.0f)
 	{
-		// The demo's round goes to the higher score; a level one to Chung, standing in for the referee's decision.
+		// The demo's round goes to the higher score; a level one to Chung, standing in for the superiority decision.
 		TimeRemaining = 0.0f;
 		const int32 Chung = GetScore(EOpenStanceSide::Chung);
 		const int32 Hong = GetScore(EOpenStanceSide::Hong);
-		EndDemoRound(Hong > Chung ? EOpenStanceSide::Hong : EOpenStanceSide::Chung, Chung == Hong ? TEXT("Referee's decision") : TEXT("Points"));
+		EndDemoRound(Hong > Chung ? EOpenStanceSide::Hong : EOpenStanceSide::Chung, Chung == Hong ? TEXT("Superiority") : TEXT("Points"));
 	}
 	return bFinished && !bWasFinished;
 }
