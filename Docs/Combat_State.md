@@ -31,7 +31,7 @@ notifies are ignored, and the row's times still bound each phase at twice their 
 freeze a fighter. A technique's `CancelWindowSeconds` is the only way to start another inside its recovery.
 
 - A fake plays its startup and goes straight to a shorter recovery (40% of the technique's), never active, never
-  scores. It costs the same stamina as the real thing (the GDD gives no discount).
+  scores. Its stamina cost is the technique's times `FakeCostScale` (1.0: the GDD gives no discount).
 - Stamina is spent when a technique starts and never blocks it. Below 25, recovery is 30% longer and `GetImpactScale`
   is 0.8.
 - Hits: Minor is additive and changes no state; Normal is Hit Reaction (0.4 s), Heavy is Staggered (1.0 s),
@@ -39,6 +39,26 @@ freeze a fighter. A technique's `CancelWindowSeconds` is the only way to start a
   fighter who is down or getting up.
 - `CanScore` is true only in a real technique's active phase with play live: startup, recovery, fakes, stopped and
   finished matches never score.
+
+## Stamina
+
+Tuning: `FOpenStanceStaminaTuning` (Project Settings > Game > Open Stance Combat > Stamina; `Sim.StaminaRules`). Per-technique
+costs are MoveData's, the dash cost the footwork tuning's. Tests: `OpenStance.Stamina.*` (GDD 8.9, issue 12).
+
+| Rule | Starting value |
+| --- | --- |
+| Pool | 100 at attribute 70; the Stamina attribute scales it by a third of a percent per point (GDD 5.4) |
+| Regeneration | 15 per second after 1.0 s without spending; the Recovery attribute scales the rate |
+| Costs | punch 3, kick 8, dash 12, axe 12, jump kick 14, jump axe 18, spin 20, jump spin hook 26, tornado 30; footwork free |
+| Low stamina | below an absolute 25 (not a share of the pool): recovery 30% longer, impact 20% lower; the HUD bar turns amber |
+| Fake | `FakeCostScale` of the technique's cost, 1.0 (no discount in the GDD) |
+| Active Defense | **Provisional:** 3 to raise the guard (a punch's cost), then 0.2 s before a technique can start once LT is released |
+| Round break | refill to the fighter's own pool |
+
+Stamina never locks a control: techniques, defense and the dash all go on an empty pool, which stays at zero. Equal
+Terms (`Sim.bEqualTerms`, on by default) holds the attributes at 70. Career sets `StaminaAttribute` and
+`RecoveryAttribute` on each fighter before `StartMatch`. The values are starting values, to publish once the M2 playtests
+have tuned them.
 
 ## Knockdown cause
 

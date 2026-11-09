@@ -82,8 +82,13 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Open Stance|Match")
 	void AddPoints(EOpenStanceSide Side, int32 Points, const FString& Technique, bool bHead);
 
+	/** The stamina bar's fill. Also marks low stamina below a quarter, until gameplay says otherwise with SetLowStamina. */
 	UFUNCTION(BlueprintCallable, Category = "Open Stance|Match")
 	void SetStamina(EOpenStanceSide Side, float Fraction);
+
+	/** Low stamina (GDD 8.9): the bar's warning colour and heavier breathing. */
+	void SetLowStamina(EOpenStanceSide Side, bool bLow);
+	bool IsLowStamina(EOpenStanceSide Side) const;
 
 	UFUNCTION(BlueprintCallable, Category = "Open Stance|Match")
 	void AddGamJeom(EOpenStanceSide Side, const FString& Reason);
@@ -211,6 +216,7 @@ private:
 		FString Name;
 		int32 Score = 0;
 		float Stamina = 1.0f;
+		bool bLowStamina = false;
 		int32 GamJeom = 0;
 		int32 VideoReviewsLeft = 1;
 		TArray<FString> PenaltyReasons;

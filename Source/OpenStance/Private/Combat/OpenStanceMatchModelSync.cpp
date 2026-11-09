@@ -123,7 +123,10 @@ void FOpenStanceMatchModelSync::Update(const FOpenStanceMatchSim& Sim, UOpenStan
 
 	for (int32 Index = 0; Index < 2; ++Index)
 	{
-		Model.SetStamina(SideOf(Index), Sim.Fighters[Index].State.Stamina / FOpenStanceFighterState::FullStamina);
+		const FOpenStanceFighterState& State = Sim.Fighters[Index].State;
+		Model.SetStamina(SideOf(Index), State.Stamina / FMath::Max(1.0f, State.MaxStamina));
+		// Low stamina is an absolute amount (below 25), not a share of the bar, so the simulation says when it is.
+		Model.SetLowStamina(SideOf(Index), State.IsLowStamina());
 	}
 
 	// Each round's result, as the simulation decided it (WT rules, GDD 8.2-8.4).

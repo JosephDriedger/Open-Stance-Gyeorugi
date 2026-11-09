@@ -62,6 +62,12 @@ void FOpenStanceMatchSim::StartMatch(float DistanceCm)
 		F.Registry.Reset();
 		F.Machine = FOpenStanceCombatMachine();
 		F.Machine.Random.Initialize(Index + 1);
+		F.Machine.Tuning.ApplyStamina(StaminaRules);
+		// The pool and regeneration follow the Stamina and Recovery attributes in Career; Equal Terms holds them at 70.
+		F.State.MaxStamina = StaminaRules.GetPool(bEqualTerms ? 70 : F.StaminaAttribute);
+		F.State.Stamina = F.State.MaxStamina;
+		F.State.LowStaminaThreshold = StaminaRules.LowBelow;
+		F.RegenPerSecond = StaminaRules.GetRegenPerSecond(bEqualTerms ? 70 : F.RecoveryAttribute);
 		F.RecentInput.Reset();
 		F.InputEventCount = 0;
 		F.bPrevPunch = false;
@@ -417,7 +423,7 @@ void FOpenStanceMatchSim::StepFighter(int32 Index, float DeltaSeconds, const FOp
 	Motion.DPad = Controls.DPad;
 	FOpenStanceFootwork::Tick(DeltaSeconds, Motion, Other.Motion.Position, F.State, F.Motion, Movement);
 
-	// Stamina comes back at 15 per second after a second of not spending it (GDD 8.9).
+	// Stamina comes back (15 per second at Recovery 70) after a second of not spending it (GDD 8.9).
 	if (F.State.Stamina < F.PreviousStamina - 0.001f)
 	{
 		F.SinceSpend = 0.0f;
@@ -425,14 +431,14 @@ void FOpenStanceMatchSim::StepFighter(int32 Index, float DeltaSeconds, const FOp
 	else
 	{
 		F.SinceSpend += DeltaSeconds;
-		if (F.SinceSpend >= 1.0f)
+		if (F.SinceSpend >= StaminaRules.RegenDelaySeconds)
 		{
-			F.State.Stamina = FMath::Min(FOpenStanceFighterState::FullStamina, F.State.Stamina + 15.0f * DeltaSeconds);
+			F.State.Stamina = FMath::Min(F.State.MaxStamina, F.State.Stamina + F.RegenPerSecond * DeltaSeconds);
 		}
 	}
 	if (bInfiniteStamina)
 	{
-		F.State.Stamina = FOpenStanceFighterState::FullStamina;
+		F.State.Stamina = F.State.MaxStamina;
 	}
 	F.PreviousStamina = F.State.Stamina;
 }
@@ -655,7 +661,7 @@ void FOpenStanceMatchSim::StartRound()
 		FOpenStanceFighterSim& F = Fighters[Index];
 		const bool bChung = Index == 0;
 		F.Round = FOpenStanceRoundTally();
-		F.State.Stamina = FOpenStanceFighterState::FullStamina;
+		F.State.Stamina = F.State.MaxStamina;
 		F.PreviousStamina = F.State.Stamina;
 		F.SinceSpend = 0.0f;
 		F.Motion.Position = FVector2D(bChung ? -StartDistanceCm * 0.5 : StartDistanceCm * 0.5, 0.0);

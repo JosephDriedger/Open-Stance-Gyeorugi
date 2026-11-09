@@ -146,7 +146,8 @@ void FOpenStanceFootwork::Tick(float DeltaSeconds, const FOpenStanceMotionInput&
 	{
 		// Dash (B): a fixed distance over a fixed time, along the stick or toward the opponent.
 		const bool bDashPressed = Input.bDash && !Motion.bPrevDash;
-		if (bDashPressed && Motion.DashRemaining <= 0.0f && !Motion.bSwitching && State.Stamina > 0.0f)
+		// Stamina never locks out a control (GDD 8.9): an empty pool still dashes, and stays at zero.
+		if (bDashPressed && Motion.DashRemaining <= 0.0f && !Motion.bSwitching)
 		{
 			Motion.DashRemaining = Tuning.DashSeconds;
 			Motion.DashDirection = bStick ? ToWorld(Stick, Motion.Facing).GetSafeNormal() : Motion.Facing;

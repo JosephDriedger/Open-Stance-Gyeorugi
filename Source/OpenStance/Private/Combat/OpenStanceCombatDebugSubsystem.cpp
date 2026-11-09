@@ -6,6 +6,7 @@
 #include "Camera/CameraComponent.h"
 #include "Combat/OpenStanceCameraPresets.h"
 #include "Combat/OpenStanceCombatOverlay.h"
+#include "Combat/OpenStanceCombatSettings.h"
 #include "Combat/OpenStanceGreyboxProof.h"
 #include "DrawDebugHelpers.h"
 #include "Engine/Canvas.h"
@@ -261,6 +262,8 @@ void UOpenStanceCombatDebugSubsystem::SetGreyboxActive(bool bActive)
 	else
 	{
 		Sim.RoundRules = FOpenStanceRoundTuning();
+		Sim.StaminaRules = UOpenStanceCombatSettings::GetStamina();
+		Sim.bEqualTerms = true;
 	}
 	Sim.StartMatch(bPlayingProof ? FOpenStanceGreyboxProof::StartDistanceCm : 200.0f);
 

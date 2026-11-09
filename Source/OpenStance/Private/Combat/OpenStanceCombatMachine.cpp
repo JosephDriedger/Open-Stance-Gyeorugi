@@ -190,8 +190,9 @@ bool FOpenStanceCombatMachine::RequestAttack(const FOpenStanceAttackRequest& Req
 		return false;
 	}
 
-	// Stamina is spent when the technique starts and never locks the controls; a fake costs the same so it is not free.
-	State.Stamina = FMath::Max(0.0f, State.Stamina - Request.Row.StaminaCost);
+	// Stamina is spent when the technique starts and never locks the controls; a fake costs its share (all of it by default).
+	const float Cost = Request.Row.StaminaCost * (Request.bFake ? Tuning.FakeStaminaScale : 1.0f);
+	State.Stamina = FMath::Max(0.0f, State.Stamina - Cost);
 	Attack = Request;
 	bHasAttack = true;
 	AttackElapsed = 0.0f;
@@ -210,11 +211,17 @@ void FOpenStanceCombatMachine::SetDefense(bool bHeld, FOpenStanceFighterState& S
 {
 	if (bHeld && State.CombatState == S::IdleMovement && Match.IsPlayLive())
 	{
-		Enter(S::ActiveDefense, State, OutEvents);
+		// Defense costs stamina like an attack, never refused for the lack of it (GDD 8.8, 8.9).
+		if (Enter(S::ActiveDefense, State, OutEvents))
+		{
+			State.Stamina = FMath::Max(0.0f, State.Stamina - Tuning.DefenseStaminaCost);
+		}
 	}
 	else if (!bHeld && State.CombatState == S::ActiveDefense)
 	{
+		// Its own recovery: a technique cannot start straight out of a guard, longer on low stamina.
 		Enter(S::IdleMovement, State, OutEvents);
+		CooldownLeft = FMath::Max(CooldownLeft, Tuning.DefenseRecoverySeconds * (State.IsLowStamina() ? Tuning.LowStaminaRecoveryScale : 1.0f));
 	}
 }
 

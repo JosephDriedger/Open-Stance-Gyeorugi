@@ -84,6 +84,8 @@ void FOpenStanceGreyboxProof::UseProofRules(FOpenStanceMatchSim& Sim)
 	Sim.RoundRules = FOpenStanceRoundTuning();
 	Sim.RoundRules.RoundCount = 1;
 	Sim.RoundRules.CeremonySeconds = 0.0f;
+	Sim.StaminaRules = FOpenStanceStaminaTuning();
+	Sim.bEqualTerms = true;
 }
 
 TArray<FOpenStanceGreyboxProof::FStage> FOpenStanceGreyboxProof::Run(FOpenStanceMatchSim& Sim, FTrack* OutTrack)

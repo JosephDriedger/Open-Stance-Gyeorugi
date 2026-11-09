@@ -164,7 +164,19 @@ void UOpenStanceMatchModel::AddPoints(EOpenStanceSide Side, int32 Points, const 
 
 void UOpenStanceMatchModel::SetStamina(EOpenStanceSide Side, float Fraction)
 {
-	GetSide(Side).Stamina = FMath::Clamp(Fraction, 0.0f, 1.0f);
+	FSideState& State = GetSide(Side);
+	State.Stamina = FMath::Clamp(Fraction, 0.0f, 1.0f);
+	State.bLowStamina = State.Stamina < 0.25f;
+}
+
+void UOpenStanceMatchModel::SetLowStamina(EOpenStanceSide Side, bool bLow)
+{
+	GetSide(Side).bLowStamina = bLow;
+}
+
+bool UOpenStanceMatchModel::IsLowStamina(EOpenStanceSide Side) const
+{
+	return GetSide(Side).bLowStamina;
 }
 
 void UOpenStanceMatchModel::AddGamJeom(EOpenStanceSide Side, const FString& Reason)

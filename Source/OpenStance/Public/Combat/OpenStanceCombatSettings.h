@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Combat/OpenStanceFighterState.h"
 #include "Combat/OpenStanceFootwork.h"
 #include "Engine/DeveloperSettings.h"
 #include "OpenStanceCombatSettings.generated.h"
@@ -22,6 +23,14 @@ public:
 
 	UPROPERTY(Config, EditAnywhere, Category = "Footwork")
 	FOpenStanceMovementTuning Movement;
+
+	UPROPERTY(Config, EditAnywhere, Category = "Stamina")
+	FOpenStanceStaminaTuning Stamina;
+
+	static const FOpenStanceStaminaTuning& GetStamina()
+	{
+		return GetDefault<UOpenStanceCombatSettings>()->Stamina;
+	}
 
 	static const FOpenStanceMovementTuning& GetMovement()
 	{

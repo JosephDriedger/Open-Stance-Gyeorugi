@@ -100,7 +100,17 @@ struct OPENSTANCE_API FOpenStanceFighterSim
 	FString LastLeg = TEXT("-");
 	FString LastResult = TEXT("-");
 
-	/** Seconds since stamina was last spent; regeneration starts after one second (GDD 8.9). */
+	/**
+	 * Career attributes that change stamina (GDD 5.4): Stamina sizes the pool and Recovery the regeneration. Ignored under
+	 * Equal Terms, which holds every attribute at 70. Set before StartMatch.
+	 */
+	int32 StaminaAttribute = 70;
+	int32 RecoveryAttribute = 70;
+
+	/** This fighter's regeneration per second, from the rules and its Recovery attribute; set by StartMatch. */
+	float RegenPerSecond = 15.0f;
+
+	/** Seconds since stamina was last spent; regeneration starts after RegenDelaySeconds (GDD 8.9). */
 	float SinceSpend = 0.0f;
 	float PreviousStamina = FOpenStanceFighterState::FullStamina;
 
@@ -127,6 +137,10 @@ public:
 	FOpenStanceHitTuning Hits;
 	FOpenStanceClinchTuning ClinchRules;
 	FOpenStanceRoundTuning RoundRules;
+	FOpenStanceStaminaTuning StaminaRules;
+
+	/** Every attribute at 70, so only skill decides (GDD 5.6). The default in Sparring and Tournament. */
+	bool bEqualTerms = true;
 
 	/** Counts up with every log entry, so a reader can tell what is new when the log has dropped old ones. */
 	int32 LogEventCount = 0;

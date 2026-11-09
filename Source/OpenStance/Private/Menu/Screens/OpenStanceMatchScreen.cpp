@@ -257,7 +257,7 @@ TSharedRef<SWidget> UOpenStanceMatchScreen::BuildNameplate(const TWeakObjectPtr<
 				Bar(TAttribute<float>::CreateLambda([Model, Side]() { return Model.IsValid() ? Model->GetStamina(Side) : 0.0f; }),
 					TAttribute<FLinearColor>::CreateLambda([Model, Side]()
 					{
-						return Model.IsValid() && Model->GetStamina(Side) < 0.25f ? Palette::Warn : Palette::Ok;
+						return Model.IsValid() && Model->IsLowStamina(Side) ? Palette::Warn : Palette::Ok;
 					}))
 			]
 			+ SVerticalBox::Slot().AutoHeight().HAlign(Align).Padding(0.0f, U(0.5f), 0.0f, 0.0f)
