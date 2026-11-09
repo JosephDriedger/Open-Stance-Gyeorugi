@@ -1,5 +1,6 @@
 #include "Menu/Screens/OpenStanceMatchScreen.h"
 
+#include "Engine/World.h"
 #include "InputCoreTypes.h"
 #include "Menu/OpenStanceMatchModel.h"
 #include "Menu/OpenStanceMenuContent.h"
@@ -354,8 +355,11 @@ void UOpenStanceMatchScreen::NativeTick(const FGeometry& MyGeometry, float InDel
 		Model->Advance(InDeltaTime);
 	}
 	// The match ends on the frame the deciding point lands (the point gap or the clock); hold the arena a moment so the
-	// winning technique and its score call are seen before Results.
-	FinishedFor = Model->IsFinished() ? FinishedFor + InDeltaTime : 0.0f;
+	// winning technique and its score call are seen before Results. The world's real time steps with the game (also when
+	// a clip is recorded at a fixed frame rate), where Slate's delta follows the wall clock.
+	const UWorld* World = GetWorld();
+	const float HoldDelta = World ? World->DeltaRealTimeSeconds : InDeltaTime;
+	FinishedFor = Model->IsFinished() ? FinishedFor + HoldDelta : 0.0f;
 	if (Model->IsFinished() && (FinishedFor >= ResultsHoldSeconds || Model->bDemoMode))
 	{
 		bLeaving = true;

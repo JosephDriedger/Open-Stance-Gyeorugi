@@ -1095,14 +1095,15 @@ void UOpenStanceCombatDebugSubsystem::FinishProof()
 	ProofCaption.Reset();
 	const int32 Chung = Sim.Fighters[0].State.Score, Hong = Sim.Fighters[1].State.Score;
 	const bool bPassed = Chung == FOpenStanceGreyboxProof::ExpectedChungScore && Hong == 0;
-	ProofResult = FString::Printf(TEXT("Greybox proof %s: Chung %d, Hong %d"), bPassed ? TEXT("PASSED") : TEXT("FAILED"), Chung, Hong);
-	ProofResultUntil = FPlatformTime::Seconds() + 8.0;
+	ProofResult = FString::Printf(TEXT("Greybox Proof %s · Chung %d, Hong %d"), bPassed ? TEXT("Passed") : TEXT("Failed"), Chung, Hong);
+	// World real time: wall-clock in play, the fixed step when a clip is recorded with -benchmark -fps.
+	ProofResultUntil = (GetWorld() ? GetWorld()->GetRealTimeSeconds() : 0.0) + 8.0;
 	UE_LOG(LogOpenStanceCombat, Display, TEXT("%s (live playback)"), *ProofResult);
 }
 
 void UOpenStanceCombatDebugSubsystem::DrawProofCaption(UCanvas* Canvas) const
 {
-	const bool bResult = !ProofResult.IsEmpty() && FPlatformTime::Seconds() < ProofResultUntil;
+	const bool bResult = !ProofResult.IsEmpty() && GetWorld() && GetWorld()->GetRealTimeSeconds() < ProofResultUntil;
 	const FString& Text = bPlayingProof ? ProofCaption : (bResult ? ProofResult : ProofCaption);
 	if (Text.IsEmpty() || !GEngine)
 	{
@@ -1119,7 +1120,7 @@ void UOpenStanceCombatDebugSubsystem::DrawProofCaption(UCanvas* Canvas) const
 	FCanvasTileItem Back(At - FVector2D(14.0f, 8.0f), FVector2D(Width + 28.0f, Height + 16.0f), FLinearColor(0.0f, 0.0f, 0.0f, 0.55f));
 	Back.BlendMode = SE_BLEND_Translucent;
 	Canvas->DrawItem(Back);
-	const FColor Colour = bPlayingProof ? FColor::White : (ProofResult.Contains(TEXT("PASSED")) ? FColor(120, 230, 120) : FColor(255, 110, 110));
+	const FColor Colour = bPlayingProof ? FColor::White : (ProofResult.Contains(TEXT("Passed")) ? FColor(120, 230, 120) : FColor(255, 110, 110));
 	FCanvasTextItem Item(At, FText::FromString(Text), Font, Colour);
 	Item.Scale = FVector2D(Scale, Scale);
 	Item.EnableShadow(FLinearColor::Black);
@@ -1190,6 +1191,12 @@ void UOpenStanceCombatDebugSubsystem::Tick(float DeltaTime)
 	FOpenStanceFighterControls PlayerControls = PollController();
 	FOpenStanceFighterControls OpponentControls;
 	OpponentControls.bLT = AIMode == EOpenStanceAIMode::Block;
+	// The deciding kick ends the proof: the result replaces the last stage's caption through the hold and on Results,
+	// which can pause the simulation before the recorded track runs out.
+	if (bPlayingProof && Sim.Fighters[0].State.CombatState == EOpenStanceCombatState::MatchFinished)
+	{
+		FinishProof();
+	}
 	while (Accumulator >= CombatDebugFixedStepSeconds)
 	{
 		// os.PlayProof: the recorded script drives Chung, one entry per step, and Hong stands still.

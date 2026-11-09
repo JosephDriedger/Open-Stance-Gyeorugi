@@ -89,7 +89,7 @@ match on screen ends exactly as the checked run does (automation test `OpenStanc
 - the debug bars are on, under the HUD's name plates and stamina: stance, guard, state, held buttons, stick, the last
   inputs (rejected and expired gestures included), leg, move, target, stamina and the hit result;
 - the 12-point gap ends the match on the spinning head kick; the arena holds for 3 seconds (as every match now does) so
-  the kick and the referee's call are seen, then Results shows the match with "Greybox proof PASSED: Chung 16, Hong 0".
+  the kick and the referee's call are seen, then Results shows the match with "Greybox Proof Passed · Chung 16, Hong 0".
 
 The controller takes over again when it ends. To film it: press Play on `L_TrainingDojang` (or start a Sparring match from
 the menu), open the console and type `os.PlayProof`. Started from the command line:
