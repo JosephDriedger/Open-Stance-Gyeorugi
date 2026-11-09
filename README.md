@@ -10,10 +10,10 @@ Open Stance covers sparring only. Forms (poomsae) and breaking are out of scope.
 
 Milestone 1 (Skill Stick proof of concept, due 9 November 2026). The combat core is playable in a greybox match: two fighters throw techniques through the Skill Stick, animated with placeholder technique clips until motion capture starts at Milestone 2. What exists today:
 
-- The combat core in C++ (`Source/OpenStance/Public/Combat`): Skill Stick recognition and input buffering, footwork and lead/back-leg resolution, the combat state machine with committed startup, active and recovery phases, and limb-trace hit registration with WT scoring, gam-jeom, stamina and rounds. 52 automation tests cover it.
+- The combat core in C++ (`Source/OpenStance/Public/Combat`): Skill Stick recognition and input buffering, footwork and lead/back-leg resolution, the combat state machine with committed startup, active and recovery phases, and limb-trace hit registration with WT scoring, gam-jeom, stamina and rounds. 53 automation tests cover it.
 - A greybox match reached from Sparring in the menus (Setup, Side Select, Fighter Select), with a HUD, a debug and Training overlay and development console commands such as `os.RunProof` and `os.ShowHitboxes`. See [Docs/Combat_Debug.md](Docs/Combat_Debug.md).
 - 24 premade fighters on four body types in the layered traditional dobok and sparring gear, playing placeholder clips for every technique (Blender-keyed, mirrored for the left leg).
-- Game Design Document (v0.14 draft), controls layout, project plan, mocap shot list and art asset inventory in `Docs/`.
+- Game Design Document (v0.16 draft), controls layout, project plan, mocap shot list and art asset inventory in `Docs/`.
 - A base MetaHuman fighter with a seven-piece wardrobe (dobok jacket and pants, belt, chest protector, helmet, gloves, foot guards) and Chung/Hong materials. It passes a full-body range-of-motion test.
 - A roster of six MetaHuman referees in uniform, with Chaos cloth on ties and trousers.
 - Staging levels `L_CompetitionArena` (8 m octagon mat in a 12 m square) and `L_TrainingDojang`, plus arena and dojang props.

@@ -44,7 +44,7 @@ struct OPENSTANCE_API FOpenStanceClinchTuning
 	float StoppageSeconds = 0.8f;
 };
 
-/** Round and match length rules (WT rules, GDD 4.4). The same numbers the match HUD's model uses. */
+/** Round and match length rules (WT rules, GDD 8.2). The same numbers the match HUD's model uses. */
 struct OPENSTANCE_API FOpenStanceRoundTuning
 {
 	int32 RoundCount = 3;
