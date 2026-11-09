@@ -102,3 +102,62 @@ Code: `Source/OpenStance/{Public,Private}/Combat/OpenStanceMatchRules` (the pure
   the total points.
 - The greybox proof (`os.RunProof`, `os.PlayProof`) uses `FOpenStanceGreyboxProof::UseProofRules`: one round with no
   ceremony, so it still ends 16 to 0 on the gap as recorded.
+
+## Penalties the referee watches for
+
+Code: `Combat/OpenStancePenalties.h` (`FOpenStancePenaltyTuning`, `Sim.PenaltyRules`) and `FOpenStanceMatchSim::StepPenalties`.
+Tests: `OpenStance.Penalty.*` (GDD 8.4, issue 11). A time of 0 turns a check off.
+
+| Gam-jeom | Rule | Starting value |
+| --- | --- | --- |
+| Boundary | a whole foot past the 8 m octagon's edge; a foot on the line is safe | foot 30 cm from centre, 12 cm past the line |
+| Forced out | no penalty while clinched or just after the opponent's holding/pushing gam-jeom | 0.5 s grace |
+| Turning the back | body turned more than 90 degrees from the opponent, outside a technique | over 1.0 s |
+| Crouching | below Low Guard's posture without attacking; Low Guard never counts | over 1.0 s |
+| Leg lifting | a leg above the hip outside its own technique (a held leg check) | over 3.0 s |
+| Passivity | no technique of either fighter reaches its active phase: GONG-GYEOK, then a gam-jeom to the one who moved back (net 50 cm away), otherwise to both | call at 3 s, gam-jeom at 6 s |
+
+Already decided where they happen: punch to the head and kick below the belt (hit registration), Falling (a Knocked Down
+that no landed hit caused; a hit knockdown is never a penalty) and holding or pushing (the clinch).
+
+Each incident counts once: a counted turn, crouch or lift stays counted until the condition clears, and a fighter over the
+edge is brought back inside. Every gam-jeom outside a clinch is a referee's stop: kal-yeo, the gam-jeom, then kye-sok
+after 1 s, with the clock held.
+
+**Hooks:** footwork always faces the opponent and has no crouch, so turning the back and crouching watch
+`Motion.TurnedAwayDeg` and `Motion.CrouchCm`, which stay 0 until animation or the AI sets them. `Motion.bLegRaised` is
+set by the leg check below.
+
+**GDD note:** 6.3 still says "both feet" over the edge; 8.4 and the WT rules check say one foot. The code follows 8.4.
+
+## Blocking and scoring by collision
+
+Code: `FOpenStanceHitRegistry::BuildGuard` and `FindContact` (`Combat/OpenStanceHit`), `FOpenStanceMatchSim::StepGuard`.
+Tests: `OpenStance.Defense.*` (GDD 8.3, 8.7, 8.8).
+
+Each fighter in guard (idle, moving or in Active Defense) has arm capsules, and a leg capsule in a leg check, placed by
+its guard posture. Each frame the striking foot or glove sweeps its path, and the first thing it touches decides:
+an arm or leg is a block (no points, no protector hit, no hit reaction, the HUD calls "Blocked"); the head, the trunk
+protector or below the belt is a contact for that zone, scored by GDD 8.3 as before. The 8 cm alignment tolerance
+only nudges a near miss into a zone when no guard limb lies between the strike and the target. A fighter throwing a
+technique, reeling or down has no guard up.
+
+| Guard (D-pad) | Arms | Covers |
+| --- | --- | --- |
+| High (Up) | both hands beside the head | head kicks swinging in from either side |
+| Low (Down) | both forearms at the trunk's flanks | body kicks swinging in from either side |
+| Mixed (Right) | lead hand low at the flank, rear hand high beside the head | lead-side body, rear-side head |
+| Cross (Left) | rear forearm across the front of the trunk, lead hand beside the head | straight body kicks and punches, lead-side head |
+| LT alone | forearms closed in front of the trunk, elbows at the flanks | punches and body kicks from any side; the head is open |
+| LT + RS Up | forearms in front of the face, upper arms beside the head | head kicks; the trunk is open |
+| LT + RS Down | the lead knee lifted in front of the trunk, posture arms kept | straight body kicks; punches pass above the knee; over 3 s is leg lifting |
+| LT + RS Left/Right | sway: a 40 cm step off the line | anything in the first 0.35 s (a timing rule, not a collision) |
+
+The middle is open in every posture, so a straight side kick or spinning side kick gets between the hands. Until the
+captured animation drives the foot, the strike path is synthetic: roundhouse and tornado kicks swing in 70 degrees from
+the kicking leg's side, hook and spin hook kicks from the other side, and side, axe and spin side kicks and punches
+travel straight. Kicks aim at 0.70 of the height for the body and 0.90 for the head, punches at 0.76. **Provisional:**
+limb positions are starting values at a 175 cm fighter, scaled with height; check them against the MetaHuman bodies
+and the captured guards. `os.ShowHitboxes 1` draws the guard capsules in cyan.
+
+Still for issue 13: guard readiness and transition timing, defense animation, and hit severity from Composure.

@@ -5,6 +5,7 @@
 #include "Combat/OpenStanceFootwork.h"
 #include "Combat/OpenStanceHit.h"
 #include "Combat/OpenStanceMatchRules.h"
+#include "Combat/OpenStancePenalties.h"
 #include "Combat/OpenStanceSkillStick.h"
 #include "Menu/OpenStanceMenuTypes.h"
 
@@ -45,6 +46,35 @@ struct OPENSTANCE_API FOpenStanceClinchTuning
 	float StoppageSeconds = 0.8f;
 };
 
+/** What a fighter holding LT is doing with the Skill Stick (GDD 8.8). */
+enum class EOpenStanceGuarding : uint8
+{
+	/** LT alone: the hands and arms close the guard over the trunk, against punches and body kicks. */
+	ClosedGuard,
+
+	/** LT + RS Up: the high guard, against head kicks; the trunk is open. */
+	HighBlock,
+
+	/** LT + RS Down: a leg lifted to check a body kick; held over 3 s it is leg lifting (GDD 8.4). */
+	LegCheck,
+
+	/** LT + RS Left/Right: a sway or step off the line. In time it evades anything; late, it covers nothing. */
+	Sway
+};
+
+/** Active Defense answers (GDD 8.8). Starting values, tuned in playtests. */
+struct OPENSTANCE_API FOpenStanceDefenseTuning
+{
+	/** Right-stick travel that reads as a direction under LT. */
+	float StickThreshold = 0.5f;
+
+	/** A sway evades for this long after it starts; after that the fighter stands off line with no guard up. */
+	float SwayEvadeSeconds = 0.35f;
+
+	/** How far a sway steps the fighter sideways. */
+	float SwayStepCm = 40.0f;
+};
+
 /** Where a clinch is: none, held while the referee is on the way, or the referee separating the fighters. */
 enum class EOpenStanceClinchPhase : uint8
 {
@@ -82,6 +112,16 @@ struct OPENSTANCE_API FOpenStanceFighterSim
 
 	/** Why each of this fighter's gam-jeom was given across the match, oldest first, for the HUD and the results page. */
 	TArray<FString> PenaltyReasons;
+
+	/** Under LT: which defense is up, and how long a sway has run. */
+	EOpenStanceGuarding Guarding = EOpenStanceGuarding::ClosedGuard;
+	float SwayElapsed = 0.0f;
+
+	/** Attacks this fighter blocked or evaded this match, for the overlay and Results. */
+	int32 Blocks = 0;
+
+	/** Running timers for the penalties the referee watches for (GDD 8.4). */
+	FOpenStancePenaltyWatch Watch;
 
 	/** This round's points, penalties and tie-break counts; State.Score and State.GamJeom mirror its round numbers. */
 	FOpenStanceRoundTally Round;
@@ -138,6 +178,11 @@ public:
 	FOpenStanceClinchTuning ClinchRules;
 	FOpenStanceRoundTuning RoundRules;
 	FOpenStanceStaminaTuning StaminaRules;
+	FOpenStancePenaltyTuning PenaltyRules;
+	FOpenStanceDefenseTuning DefenseRules;
+
+	/** Seconds since a technique of either fighter last reached its active phase, while play runs (the passivity timer). */
+	float PassivityElapsed = 0.0f;
 
 	/** Every attribute at 70, so only skill decides (GDD 5.6). The default in Sparring and Tournament. */
 	bool bEqualTerms = true;
@@ -216,6 +261,19 @@ private:
 	void StartRound();
 	void SyncFighterNumbers();
 
+	/** The penalties found by watching the fighters: boundary, turning away, crouching, leg lifting, passivity (GDD 8.4). */
+	void StepPenalties(float DeltaSeconds);
+
+	/** The referee stops play to declare a gam-jeom, unless play is already stopped or in a clinch, which has its own stop. */
+	void StopForPenalty();
+	void RestartPassivity();
+
+	/** Reads the right stick under LT into a guard, and steps a sway sideways. */
+	void StepGuard(int32 Index, float DeltaSeconds, const FOpenStanceFighterControls& Controls);
+
+	/** True if the defender swayed out of line in time; sets OutType to Evaded. Blocks come from the guard's limbs. */
+	bool IsDefended(const FOpenStanceFighterSim& Defender, const FOpenStanceContact& Contact, EOpenStanceContactType& OutType) const;
+
 	const UDataTable* MoveTable = nullptr;
 
 	bool bClinchFouled = false;
@@ -228,6 +286,11 @@ private:
 
 	/** Seconds of play in the current round, for its result. */
 	float RoundPlayed = 0.0f;
+
+	/** Seconds left in a referee's stop to declare a gam-jeom; kye-sok when it runs out. */
+	float PenaltyStopLeft = 0.0f;
+	bool bPassivityCalled = false;
+	EOpenStanceClinchPhase PreviousClinchPhase = EOpenStanceClinchPhase::None;
 
 	/** Breaks the referee's decision when every count is level: a seeded coin, so a replay decides the same. */
 	FRandomStream RefereeCoin;

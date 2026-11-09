@@ -273,7 +273,7 @@ bool FOpenStanceMatchRulesPenaltyTest::RunTest(const FString& Parameters)
 			Rig.Sim.AddGamJeom(1, TEXT("Boundary"));
 		}
 		Rig.Run(0.05f);
-		TestEqual(TEXT("four do not"), Rig.Sim.Match.State, EOpenStanceMatchState::Running);
+		TestEqual(TEXT("four do not"), Rig.Sim.RoundHistory.Num(), 0);
 		Rig.Sim.AddGamJeom(1, TEXT("Boundary"));
 		Rig.Run(0.05f);
 		TestEqual(TEXT("the fifth loses Hong the round"), Rig.Sim.RoundHistory.Num() ? Rig.Sim.RoundHistory[0].Winner : EOpenStanceSide::Hong, EOpenStanceSide::Chung);
@@ -367,6 +367,7 @@ bool FOpenStanceMatchRulesModelTest::RunTest(const FString& Parameters)
 
 	// Round 1 to Chung on a gam-jeom point; round 2 to Hong by the gap.
 	Rig.Sim.AddGamJeom(1, TEXT("Boundary"));
+	Step(1.1f); // the referee's stop to declare it holds the clock
 	Rig.Sim.SetClock(0.05f);
 	Step(0.1f);
 	TestTrue(TEXT("the break shows on the HUD"), Model->IsInBreak());

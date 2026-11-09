@@ -35,6 +35,22 @@ FOpenStanceFighterBody FOpenStanceFighterSim::GetBody() const
 	Body.Root = FVector(Motion.Position.X, Motion.Position.Y, 0.0);
 	Body.HeightCm = Motion.HeightCm;
 	Body.Side = Side;
+	Body.Facing = Motion.Facing;
+
+	// The guard's limbs are only there while the fighter is in guard: throwing a technique, reeling or down leaves it open.
+	const EOpenStanceCombatState CombatState = State.CombatState;
+	if (CombatState == EOpenStanceCombatState::IdleMovement || CombatState == EOpenStanceCombatState::ActiveDefense)
+	{
+		EOpenStanceGuardCover Cover = EOpenStanceGuardCover::Posture;
+		if (CombatState == EOpenStanceCombatState::ActiveDefense)
+		{
+			Cover = Guarding == EOpenStanceGuarding::ClosedGuard ? EOpenStanceGuardCover::Closed
+				: Guarding == EOpenStanceGuarding::HighBlock ? EOpenStanceGuardCover::High
+				: Guarding == EOpenStanceGuarding::LegCheck ? EOpenStanceGuardCover::LegCheck
+				: EOpenStanceGuardCover::Posture;
+		}
+		FOpenStanceHitRegistry::BuildGuard(Body, State.Guard, Cover, State.Stance == EOpenStanceStance::RightLead);
+	}
 	return Body;
 }
 
@@ -78,6 +94,10 @@ void FOpenStanceMatchSim::StartMatch(float DistanceCm)
 		F.bContactThisAttack = false;
 		F.ResolvedSerial = 0;
 		F.Round = FOpenStanceRoundTally();
+		F.Watch = FOpenStancePenaltyWatch();
+		F.Guarding = EOpenStanceGuarding::ClosedGuard;
+		F.SwayElapsed = 0.0f;
+		F.Blocks = 0;
 		F.MatchGamJeom = 0;
 		F.RoundWins = 0;
 		F.CountedActiveSerial = 0;
@@ -88,6 +108,9 @@ void FOpenStanceMatchSim::StartMatch(float DistanceCm)
 	RefereeCoin.Initialize(7);
 	RoundPlayed = 0.0f;
 	CeremonyElapsed = 0.0f;
+	PenaltyStopLeft = 0.0f;
+	PreviousClinchPhase = EOpenStanceClinchPhase::None;
+	RestartPassivity();
 	Match = FOpenStanceMatchStatus();
 	Match.ClockSeconds = RoundRules.RoundSeconds;
 	if (RoundRules.CeremonySeconds > 0.0f)
@@ -113,7 +136,161 @@ void FOpenStanceMatchSim::AddGamJeom(int32 Index, const FString& Reason)
 	SyncFighterNumbers();
 	F.LastResult = TEXT("FOUL");
 	F.PenaltyReasons.Add(Reason);
+	if (Reason == TEXT("Holding or pushing"))
+	{
+		// A fighter pushed over the edge by this is not penalized for it (WT Article 14, Explanation 1).
+		Other.Watch.SinceForcedSeconds = 0.0f;
+	}
+	StopForPenalty();
 	AddLog(F.Side, FString::Printf(TEXT("gam-jeom: %s"), *Reason.ToLower()));
+}
+
+void FOpenStanceMatchSim::StopForPenalty()
+{
+	if (Match.State != EOpenStanceMatchState::Running || IsInClinch() || PenaltyRules.StopSeconds <= 0.0f)
+	{
+		return;
+	}
+	Match.State = EOpenStanceMatchState::Stopped;
+	PenaltyStopLeft = PenaltyRules.StopSeconds;
+	AddLog(EOpenStanceSide::Chung, TEXT("kal-yeo"));
+}
+
+void FOpenStanceMatchSim::RestartPassivity()
+{
+	PassivityElapsed = 0.0f;
+	bPassivityCalled = false;
+	for (FOpenStanceFighterSim& F : Fighters)
+	{
+		F.Watch.PassivityPressureCm = 0.0f;
+	}
+}
+
+void FOpenStanceMatchSim::StepPenalties(float DeltaSeconds)
+{
+	// A referee's stop for a gam-jeom: the clock holds, then kye-sok.
+	if (PenaltyStopLeft > 0.0f)
+	{
+		PenaltyStopLeft -= DeltaSeconds;
+		if (PenaltyStopLeft <= 0.0f && Match.State == EOpenStanceMatchState::Stopped && !IsInClinch())
+		{
+			PenaltyStopLeft = 0.0f;
+			Match.State = EOpenStanceMatchState::Running;
+			AddLog(EOpenStanceSide::Chung, TEXT("kye-sok"));
+		}
+	}
+
+	// The referee's separation leaves both fighters inside the mat: being parted over the edge is not a foul.
+	if (ClinchPhase == EOpenStanceClinchPhase::Separating || (PreviousClinchPhase != EOpenStanceClinchPhase::None && ClinchPhase == EOpenStanceClinchPhase::None))
+	{
+		for (FOpenStanceFighterSim& F : Fighters)
+		{
+			F.Motion.Position = PenaltyRules.KeepInside(F.Motion.Position, 10.0f);
+		}
+	}
+	PreviousClinchPhase = ClinchPhase;
+
+	for (FOpenStanceFighterSim& F : Fighters)
+	{
+		F.Watch.SinceForcedSeconds = IsInClinch() ? 0.0f : F.Watch.SinceForcedSeconds + DeltaSeconds;
+	}
+
+	if (Match.State != EOpenStanceMatchState::Running)
+	{
+		return;
+	}
+
+	for (int32 Index = 0; Index < 2 && Match.State == EOpenStanceMatchState::Running; ++Index)
+	{
+		FOpenStanceFighterSim& F = Fighters[Index];
+		const FOpenStanceFighterSim& Other = Fighters[1 - Index];
+		FOpenStancePenaltyWatch& W = F.Watch;
+		const EOpenStanceCombatState CombatState = F.State.CombatState;
+		const bool bInTechnique = F.State.IsAttacking();
+		const bool bOnFeet = CombatState != EOpenStanceCombatState::KnockedDown && CombatState != EOpenStanceCombatState::Recovering
+			&& CombatState != EOpenStanceCombatState::HitReaction && CombatState != EOpenStanceCombatState::Staggered;
+
+		// Boundary: a whole foot over the octagon's edge (GDD 8.4, 6.3). Then the referee brings the fighter back in.
+		if (PenaltyRules.MatApothemCm > 0.0f && PenaltyRules.IsFootOut(F.Motion.Position, F.Motion.Facing))
+		{
+			if (W.SinceForcedSeconds > PenaltyRules.ForcedOutGraceSeconds && bOnFeet)
+			{
+				AddGamJeom(Index, TEXT("Boundary"));
+			}
+			F.Motion.Position = PenaltyRules.KeepInside(F.Motion.Position, 30.0f);
+			F.Motion.DashRemaining = 0.0f;
+			F.Motion.StepRemainingCm = 0.0f;
+			continue;
+		}
+
+		// Turning the back: facing more than 90 degrees away from the opponent for over a second, outside a technique.
+		const FVector2D Toward = (Other.Motion.Position - F.Motion.Position).GetSafeNormal();
+		const FVector2D Body = F.Motion.Facing.GetSafeNormal().GetRotated(F.Motion.TurnedAwayDeg);
+		const float Cos = static_cast<float>(FVector2D::DotProduct(Body, Toward));
+		const bool bTurned = PenaltyRules.TurnAwaySeconds > 0.0f && !bInTechnique && bOnFeet && !F.Motion.bSwitching
+			&& Cos < FMath::Cos(FMath::DegreesToRadians(PenaltyRules.TurnAwayDegrees));
+		W.TurnedAwaySeconds = bTurned ? W.TurnedAwaySeconds + DeltaSeconds : 0.0f;
+		W.bTurnCounted = bTurned && W.bTurnCounted;
+		if (bTurned && !W.bTurnCounted && W.TurnedAwaySeconds > PenaltyRules.TurnAwaySeconds)
+		{
+			W.bTurnCounted = true;
+			AddGamJeom(Index, TEXT("Turning the back"));
+			continue;
+		}
+
+		// Crouching below Low Guard's posture without attacking; Low Guard itself never counts (GDD 8.4).
+		const bool bCrouched = PenaltyRules.CrouchSeconds > 0.0f && !bInTechnique && bOnFeet && F.Motion.CrouchCm > 0.0f;
+		W.CrouchedSeconds = bCrouched ? W.CrouchedSeconds + DeltaSeconds : 0.0f;
+		W.bCrouchCounted = bCrouched && W.bCrouchCounted;
+		if (bCrouched && !W.bCrouchCounted && W.CrouchedSeconds > PenaltyRules.CrouchSeconds)
+		{
+			W.bCrouchCounted = true;
+			AddGamJeom(Index, TEXT("Crouching"));
+			continue;
+		}
+
+		// Leg lifting: a leg above the hip for over 3 s outside its own technique (GDD 8.4, WT Article 14 4.1.5).
+		const bool bLifted = PenaltyRules.LegLiftSeconds > 0.0f && !bInTechnique && F.Motion.bLegRaised;
+		W.LegRaisedSeconds = bLifted ? W.LegRaisedSeconds + DeltaSeconds : 0.0f;
+		W.bLegCounted = bLifted && W.bLegCounted;
+		if (bLifted && !W.bLegCounted && W.LegRaisedSeconds > PenaltyRules.LegLiftSeconds)
+		{
+			W.bLegCounted = true;
+			AddGamJeom(Index, TEXT("Leg lifting"));
+			continue;
+		}
+	}
+
+	// Passivity: no technique of either fighter reaching its active phase. GONG-GYEOK at 3 s, a gam-jeom at 6 s to the
+	// fighter who moved back, or to both (GDD 8.4, 8.5; WT Article 14, Explanation 1).
+	if (PenaltyRules.PassivitySeconds <= 0.0f || Match.State != EOpenStanceMatchState::Running || IsInClinch())
+	{
+		return;
+	}
+	PassivityElapsed += DeltaSeconds;
+	if (!bPassivityCalled && PassivityElapsed >= PenaltyRules.PassivityCallSeconds)
+	{
+		bPassivityCalled = true;
+		AddLog(EOpenStanceSide::Chung, TEXT("gong-gyeok"));
+	}
+	if (PassivityElapsed >= PenaltyRules.PassivitySeconds)
+	{
+		const bool bBack[2] =
+		{
+			Fighters[0].Watch.PassivityPressureCm < -PenaltyRules.RetreatMarginCm,
+			Fighters[1].Watch.PassivityPressureCm < -PenaltyRules.RetreatMarginCm
+		};
+		RestartPassivity();
+		if (bBack[0] != bBack[1])
+		{
+			AddGamJeom(bBack[0] ? 0 : 1, TEXT("Moving back"));
+		}
+		else
+		{
+			AddGamJeom(0, TEXT("Not engaging"));
+			AddGamJeom(1, TEXT("Not engaging"));
+		}
+	}
 }
 
 void FOpenStanceMatchSim::SyncFighterNumbers()
@@ -256,8 +433,35 @@ void FOpenStanceMatchSim::ApplyContact(const FOpenStanceContact& Contact)
 	const int32 Defender = 1 - Attacker;
 	FOpenStanceFighterSim& A = Fighters[Attacker];
 	FOpenStanceFighterSim& D = Fighters[Defender];
-	Contacts.Add(Contact);
 	A.bContactThisAttack = true;
+
+	// The guard's arms or a leg check met it first: blocked, nothing registers and the defender is not hurt.
+	if (Contact.Type == EOpenStanceContactType::Blocked)
+	{
+		Contacts.Add(Contact);
+		++D.Blocks;
+		A.LastResult = TEXT("BLOCKED");
+		D.LastResult = TEXT("blocked");
+		AddLog(D.Side, FString::Printf(TEXT("blocked %s"), *Contact.Move.ToString()));
+		return;
+	}
+
+	// A sway in time: the technique passes by.
+	EOpenStanceContactType Defended;
+	if (IsDefended(D, Contact, Defended))
+	{
+		FOpenStanceContact Stopped = Contact;
+		Stopped.Type = Defended;
+		Stopped.Points = 0;
+		Contacts.Add(Stopped);
+		++D.Blocks;
+		const bool bEvaded = Defended == EOpenStanceContactType::Evaded;
+		A.LastResult = bEvaded ? TEXT("EVADED") : TEXT("BLOCKED");
+		D.LastResult = bEvaded ? TEXT("swayed clear") : TEXT("blocked");
+		AddLog(D.Side, FString::Printf(TEXT("%s %s"), bEvaded ? TEXT("evaded") : TEXT("blocked"), *Contact.Move.ToString()));
+		return;
+	}
+	Contacts.Add(Contact);
 
 	switch (Contact.Type)
 	{
@@ -283,7 +487,78 @@ void FOpenStanceMatchSim::ApplyContact(const FOpenStanceContact& Contact)
 		// A gam-jeom gives the opponent a point (GDD 8.3, 8.4).
 		AddGamJeom(Attacker, Contact.Type == EOpenStanceContactType::PunchToHead ? TEXT("Punch to the head") : TEXT("Kick below the belt"));
 		break;
+	default:
+		break;
 	}
+}
+
+void FOpenStanceMatchSim::StepGuard(int32 Index, float DeltaSeconds, const FOpenStanceFighterControls& Controls)
+{
+	FOpenStanceFighterSim& F = Fighters[Index];
+	const EOpenStanceGuarding Before = F.Guarding;
+	if (F.State.CombatState != EOpenStanceCombatState::ActiveDefense)
+	{
+		// Leaving defense (released, or hit) lowers a leg the leg check raised; a leg raised some other way stays up.
+		if (Before == EOpenStanceGuarding::LegCheck)
+		{
+			F.Motion.bLegRaised = false;
+		}
+		F.Guarding = EOpenStanceGuarding::ClosedGuard;
+		F.SwayElapsed = 0.0f;
+		return;
+	}
+
+	// The stick's main direction under LT picks the answer; neutral is the closed guard (GDD 8.8).
+	const FVector2D Stick = Controls.RightStick;
+	EOpenStanceGuarding Now = EOpenStanceGuarding::ClosedGuard;
+	if (Stick.Size() >= DefenseRules.StickThreshold)
+	{
+		if (FMath::Abs(Stick.Y) >= FMath::Abs(Stick.X))
+		{
+			Now = Stick.Y > 0.0 ? EOpenStanceGuarding::HighBlock : EOpenStanceGuarding::LegCheck;
+		}
+		else
+		{
+			Now = EOpenStanceGuarding::Sway;
+		}
+	}
+	F.Guarding = Now;
+	if (Now == EOpenStanceGuarding::LegCheck || Before == EOpenStanceGuarding::LegCheck)
+	{
+		F.Motion.bLegRaised = Now == EOpenStanceGuarding::LegCheck;
+	}
+
+	if (Now == EOpenStanceGuarding::Sway)
+	{
+		if (Before != EOpenStanceGuarding::Sway)
+		{
+			// A sway steps off the line toward the stick's side.
+			F.SwayElapsed = 0.0f;
+			F.Motion.StepDirection = FVector2D(Stick.X > 0.0 ? 1.0 : -1.0, 0.0);
+			F.Motion.StepRemainingCm = DefenseRules.SwayStepCm;
+		}
+		F.SwayElapsed += DeltaSeconds;
+	}
+	else
+	{
+		F.SwayElapsed = 0.0f;
+	}
+}
+
+bool FOpenStanceMatchSim::IsDefended(const FOpenStanceFighterSim& Defender, const FOpenStanceContact& Contact, EOpenStanceContactType& OutType) const
+{
+	if (Defender.State.CombatState != EOpenStanceCombatState::ActiveDefense)
+	{
+		return false;
+	}
+	// Only contacts that would register: fouls stay fouls whatever the guard.
+	if (Contact.Type != EOpenStanceContactType::Score && Contact.Type != EOpenStanceContactType::WeakImpact)
+	{
+		return false;
+	}
+	// Blocks come from the guard's limbs in hit registration; only the sway's timing is decided here.
+	OutType = EOpenStanceContactType::Evaded;
+	return Defender.Guarding == EOpenStanceGuarding::Sway && Defender.SwayElapsed <= DefenseRules.SwayEvadeSeconds;
 }
 
 void FOpenStanceMatchSim::RunTraces(int32 Index)
@@ -303,6 +578,7 @@ void FOpenStanceMatchSim::RunTraces(int32 Index)
 		// One more technique brought to its active phase: what the referee weighs when every other count is level.
 		F.CountedActiveSerial = F.Machine.GetAttackSerial();
 		++F.Round.ActiveAttacks;
+		RestartPassivity();
 		if (Attack->Row.bSpinning || Attack->bJump || Attack->Row.Technique == EOpenStanceTechnique::Tornado)
 		{
 			++F.Round.AdvancedAttacks;
@@ -310,7 +586,7 @@ void FOpenStanceMatchSim::RunTraces(int32 Index)
 	}
 	const float Progress = bActive ? FMath::Clamp(F.Machine.GetStateElapsed() / FMath::Max(Attack->Row.ActiveSeconds, 0.001f), 0.0f, 1.0f) : 0.0f;
 	const FOpenStanceFighterBody Body = F.GetBody();
-	const FVector Tip = FOpenStanceHitRegistry::SyntheticTip(Body, FVector(F.Motion.Facing.X, F.Motion.Facing.Y, 0.0), Attack->Row, Progress, Hits);
+	const FVector Tip = FOpenStanceHitRegistry::SyntheticTip(Body, FVector(F.Motion.Facing.X, F.Motion.Facing.Y, 0.0), Attack->Row, Progress, Hits, Attack->Leg);
 
 	// A new technique starts its sweep from its own first position, not from where the last one ended.
 	if (F.Machine.GetAttackSerial() != F.ResolvedSerial)
@@ -393,6 +669,7 @@ void FOpenStanceMatchSim::StepFighter(int32 Index, float DeltaSeconds, const FOp
 
 	TArray<FOpenStanceCombatEvent> Events;
 	F.Machine.SetDefense(Controls.bLT, F.State, Match, Events);
+	StepGuard(Index, DeltaSeconds, Controls);
 	F.Machine.Tick(DeltaSeconds, F.State, Match, Events);
 	for (const FOpenStanceCombatEvent& Event : Events)
 	{
@@ -432,7 +709,9 @@ void FOpenStanceMatchSim::StepFighter(int32 Index, float DeltaSeconds, const FOp
 	if (Match.IsPlayLive())
 	{
 		const FVector2D Toward = (Other.Motion.Position - Before).GetSafeNormal();
-		F.Round.PressureCm += static_cast<float>(FVector2D::DotProduct(F.Motion.Position - Before, Toward));
+		const float Forward = static_cast<float>(FVector2D::DotProduct(F.Motion.Position - Before, Toward));
+		F.Round.PressureCm += Forward;
+		F.Watch.PassivityPressureCm += Forward;
 	}
 
 	// Stamina comes back (15 per second at Recovery 70) after a second of not spending it (GDD 8.9).
@@ -543,6 +822,7 @@ void FOpenStanceMatchSim::Step(float DeltaSeconds, const FOpenStanceFighterContr
 	StepClinch(DeltaSeconds, Chung, Hong);
 	RunTraces(0);
 	RunTraces(1);
+	StepPenalties(DeltaSeconds);
 	StepRules(DeltaSeconds);
 }
 
@@ -630,9 +910,10 @@ void FOpenStanceMatchSim::EndRound(EOpenStanceSide Winner, EOpenStanceRoundEnd R
 	Result.PlayedSeconds = RoundPlayed;
 	++Fighters[WinnerIndex].RoundWins;
 
-	// A clinch the round ended in is over with it.
+	// A clinch or a penalty stop the round ended in is over with it.
 	ClinchPhase = EOpenStanceClinchPhase::None;
 	ClinchElapsed = 0.0f;
+	PenaltyStopLeft = 0.0f;
 
 	AddLog(EOpenStanceSide::Chung, TEXT("keu-man"));
 	if (Reason == EOpenStanceRoundEnd::RefereeDecision)
@@ -683,6 +964,7 @@ void FOpenStanceMatchSim::StartRound()
 		FOpenStanceFighterSim& F = Fighters[Index];
 		const bool bChung = Index == 0;
 		F.Round = FOpenStanceRoundTally();
+		F.Watch = FOpenStancePenaltyWatch();
 		F.State.Stamina = F.State.MaxStamina;
 		F.PreviousStamina = F.State.Stamina;
 		F.SinceSpend = 0.0f;
@@ -690,5 +972,6 @@ void FOpenStanceMatchSim::StartRound()
 		F.Motion.Facing = FVector2D(bChung ? 1.0 : -1.0, 0.0);
 	}
 	SyncFighterNumbers();
+	RestartPassivity();
 	AddLog(EOpenStanceSide::Chung, TEXT("shi-jak"));
 }

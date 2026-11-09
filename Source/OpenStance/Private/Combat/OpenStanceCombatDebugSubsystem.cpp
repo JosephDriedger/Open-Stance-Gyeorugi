@@ -653,7 +653,7 @@ void UOpenStanceCombatDebugSubsystem::UpdateBodies()
 		// The throwing limb reaches for the trace's tip.
 		if (Attack && Blend > 0.0f)
 		{
-			const FVector Tip = FOpenStanceHitRegistry::SyntheticTip(F.GetBody(), Facing0, Attack->Row, 1.0f, Sim.Hits) + Origin + Up * Lift;
+			const FVector Tip = FOpenStanceHitRegistry::SyntheticTip(F.GetBody(), Facing0, Attack->Row, 1.0f, Sim.Hits, Attack->Leg) + Origin + Up * Lift;
 			const bool bRightSide = Attack->Leg == EOpenStanceLegSide::Right;
 			if (Attack->Row.Limb == EOpenStanceStrikeLimb::Glove)
 			{
@@ -1296,6 +1296,16 @@ void UOpenStanceCombatDebugSubsystem::DrawWorld() const
 			float Bottom, Top, ZoneRadius;
 			FOpenStanceHitRegistry::GetZoneBounds(Body, Zones[Zone], Sim.Hits, Bottom, Top, ZoneRadius);
 			DrawDebugCylinder(World, ToWorld(F.Motion.Position, Bottom), ToWorld(F.Motion.Position, Top), ZoneRadius, 16, ZoneColours[Zone], false, 0.0f, 0, 1.0f);
+		}
+
+		// The guard's arms and a leg check: what blocks a strike (os.ShowHitboxes).
+		for (const FOpenStanceLimbCapsule& Limb : Body.Guard)
+		{
+			const FVector A = ToWorld(FVector2D(Limb.A.X, Limb.A.Y), static_cast<float>(Limb.A.Z));
+			const FVector B = ToWorld(FVector2D(Limb.B.X, Limb.B.Y), static_cast<float>(Limb.B.Z));
+			const FVector Axis = (B - A).GetSafeNormal();
+			const float Half = static_cast<float>(FVector::Dist(A, B)) * 0.5f + Limb.Radius;
+			DrawDebugCapsule(World, (A + B) * 0.5f, Half, Limb.Radius, FQuat::FindBetweenNormals(FVector::UpVector, Axis), FColor::Cyan, false, 0.0f, 0, 1.0f);
 		}
 		const FOpenStanceTraceDebug& Trace = F.Registry.GetLastTrace();
 		if (Trace.bEvaluated)

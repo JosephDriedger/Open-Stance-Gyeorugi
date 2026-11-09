@@ -118,6 +118,21 @@ struct OPENSTANCE_API FOpenStanceMotionState
 	bool bPrevDash = false;
 	bool bPrevSwitch = false;
 	float BouncePhase = 0.0f;
+
+	/**
+	 * How far the hips are below Low Guard's own posture, in cm; 0 in any of the four guards, which are never crouching
+	 * (GDD 7.3, 8.4). Set by whatever lowers the fighter (animation, the AI); the crouching penalty watches it.
+	 */
+	float CrouchCm = 0.0f;
+
+	/**
+	 * How far the body is turned from the opponent, in degrees. Footwork always faces the opponent, so this is 0 until
+	 * animation or the AI turns the body away; the turning-the-back penalty watches the body, not Facing.
+	 */
+	float TurnedAwayDeg = 0.0f;
+
+	/** A leg is held above hip height outside a technique, as in a held leg check (GDD 8.8); the leg-lifting penalty watches it. */
+	bool bLegRaised = false;
 };
 
 /**

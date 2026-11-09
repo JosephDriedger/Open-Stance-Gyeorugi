@@ -72,6 +72,10 @@ void FOpenStanceMatchModelSync::Update(const FOpenStanceMatchSim& Sim, UOpenStan
 		{
 			Model.SetCall(TEXT("JOON-BI"), TEXT("Ready"));
 		}
+		else if (Text == TEXT("gong-gyeok"))
+		{
+			Model.SetCall(TEXT("GONG-GYEOK"), TEXT("Attack"));
+		}
 		else if (Text == TEXT("woo-se-girok"))
 		{
 			Model.SetCall(TEXT("WOO-SE-GIROK"), TEXT("Record superiority"));
@@ -110,6 +114,10 @@ void FOpenStanceMatchModelSync::Update(const FOpenStanceMatchSim& Sim, UOpenStan
 		if (Contact.Type == EOpenStanceContactType::Score)
 		{
 			Model.AddPoints(Contact.Attacker, Contact.Points, MoveName(Moves, Contact.Move), Contact.Zone == EOpenStanceBodyZone::Head);
+		}
+		else if (Contact.Type == EOpenStanceContactType::Blocked || Contact.Type == EOpenStanceContactType::Evaded)
+		{
+			Model.SetCall(Contact.Type == EOpenStanceContactType::Blocked ? TEXT("Blocked") : TEXT("Evaded"), MoveName(Moves, Contact.Move), TEXT(" · "));
 		}
 	}
 
