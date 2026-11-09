@@ -123,6 +123,17 @@ struct OPENSTANCE_API FOpenStanceSeverityTuning
 	float StepUpFrom = 1.15f;
 };
 
+/** The referee's count over a fighter a landed hit knocked down (GDD 8.5, 8.10). Starting values. */
+struct OPENSTANCE_API FOpenStanceCountTuning
+{
+	/** One count each this many seconds, HANA to YEODEOL. */
+	float SecondsPerCount = 1.0f;
+	int32 CountTo = 8;
+
+	/** After YEODEOL, kye-sok this long later once the fighter is up. */
+	float ResumeAfterSeconds = 0.5f;
+};
+
 /** Where a clinch is: none, held while the referee is on the way, or the referee separating the fighters. */
 enum class EOpenStanceClinchPhase : uint8
 {
@@ -237,6 +248,14 @@ public:
 	FOpenStanceDefenseTuning DefenseRules;
 	FOpenStanceGuardTuning GuardRules;
 	FOpenStanceSeverityTuning SeverityRules;
+	FOpenStanceCountTuning CountRules;
+
+	/** The referee is counting over a knocked-down fighter: play is stopped and the clock holds. */
+	bool IsCounting() const { return bCounting; }
+
+	/** The count reached so far (0 before HANA), and over which fighter. */
+	int32 GetCount() const { return CountSaid; }
+	int32 GetCountedFighter() const { return CountFighter; }
 
 	/**
 	 * The reaction a landed hit causes (GDD 8.10): the authored one, a step lighter when the effective impact is well
@@ -333,6 +352,10 @@ private:
 	void StopForPenalty();
 	void RestartPassivity();
 
+	/** A landed hit knocked fighter Index down: kal-yeo, the clock stops, and the count runs to YEODEOL. */
+	void StartCount(int32 Index);
+	void StepCount(float DeltaSeconds);
+
 	/** Reads the right stick under LT into a guard, and steps a sway sideways. */
 	void StepGuard(int32 Index, float DeltaSeconds, const FOpenStanceFighterControls& Controls);
 
@@ -354,6 +377,10 @@ private:
 
 	/** Seconds left in a referee's stop to declare a gam-jeom; kye-sok when it runs out. */
 	float PenaltyStopLeft = 0.0f;
+	bool bCounting = false;
+	int32 CountFighter = 0;
+	int32 CountSaid = 0;
+	float CountElapsed = 0.0f;
 	bool bPassivityCalled = false;
 	EOpenStanceClinchPhase PreviousClinchPhase = EOpenStanceClinchPhase::None;
 

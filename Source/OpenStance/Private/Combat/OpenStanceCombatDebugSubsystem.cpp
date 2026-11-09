@@ -15,6 +15,7 @@
 #include "EngineUtils.h"
 #include "GameFramework/PlayerStart.h"
 #include "Components/SkeletalMeshComponent.h"
+#include "Sound/SoundBase.h"
 #include "Components/StaticMeshComponent.h"
 #include "Engine/SkeletalMesh.h"
 #include "Engine/DataTable.h"
@@ -267,6 +268,8 @@ void UOpenStanceCombatDebugSubsystem::SetGreyboxActive(bool bActive)
 	}
 	Sim.StartMatch(bPlayingProof ? FOpenStanceGreyboxProof::StartDistanceCm : 200.0f);
 	Director.Reset(Sim);
+	// A referee picked at random for each match (GDD 11.2).
+	Referee.Reset(Sim, PlayerIndex, FMath::Rand());
 
 	// The Skill Stick follows the Options screen: the dead zone and the input window, 0.20 to 0.40 s (GDD 7.8).
 	if (const UOpenStanceUserSettings* Settings = bPlayingProof ? nullptr : UOpenStanceUserSettings::Get())
@@ -292,6 +295,7 @@ void UOpenStanceCombatDebugSubsystem::SetGreyboxActive(bool bActive)
 	if (APlayerController* Controller = World->GetFirstPlayerController())
 	{
 		BuildBodies();
+		BuildReferee();
 		SetDefaultPawnHidden(true);
 		FVector Position;
 		FRotator Rotation;
@@ -563,6 +567,107 @@ void UOpenStanceCombatDebugSubsystem::DestroyBodies()
 	FighterPivots.Reset();
 	FighterBodies.Reset();
 	ShownAnimation[0] = ShownAnimation[1] = nullptr;
+	if (IsValid(RefereeActor))
+	{
+		RefereeActor->Destroy();
+	}
+	RefereeActor = nullptr;
+	RefereeBody = nullptr;
+	RefereeShownClip = nullptr;
+}
+
+void UOpenStanceCombatDebugSubsystem::BuildReferee()
+{
+	UWorld* World = GetWorld();
+	const FString Name = FOpenStanceReferee::GetRefereeName(Referee.GetRefereeIndex());
+	USkeletalMesh* Mesh = LoadObject<USkeletalMesh>(nullptr, *FString::Printf(TEXT("/Game/Characters/Officials/Export/MH_Referee_%s_FullBody.MH_Referee_%s_FullBody"), *Name, *Name),
+		nullptr, LOAD_NoWarn | LOAD_Quiet);
+	if (!World || !Mesh)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Greybox: referee %s unavailable; the match runs without one on the mat."), *Name);
+		return;
+	}
+	RefereeActor = World->SpawnActor<AActor>();
+	USceneComponent* Root = NewObject<USceneComponent>(RefereeActor, TEXT("Root"));
+	Root->SetMobility(EComponentMobility::Movable);
+	RefereeActor->SetRootComponent(Root);
+	Root->RegisterComponent();
+	RefereeBody = NewObject<USkeletalMeshComponent>(RefereeActor, TEXT("RefereeBody"));
+	RefereeBody->SetSkeletalMesh(Mesh);
+	RefereeBody->SetupAttachment(Root);
+	// The same skeleton and facing as the fighters: the mesh faces +Y, the actor's forward is +X.
+	RefereeBody->SetRelativeRotation(FRotator(0.0, -90.0, 0.0));
+	RefereeBody->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	RefereeBody->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::AlwaysTickPoseAndRefreshBones;
+	RefereeBody->SetAnimationMode(EAnimationMode::AnimationSingleNode);
+	RefereeBody->RegisterComponent();
+	// The referee's outfit, each piece following the body's pose.
+	for (const TCHAR* Piece : { TEXT("Shirt"), TEXT("Trousers"), TEXT("Shoes"), TEXT("Belt"), TEXT("Tie") })
+	{
+		USkeletalMesh* Garment = LoadObject<USkeletalMesh>(nullptr, *FString::Printf(TEXT("/Game/Characters/Officials/Outfits/%s/SK_Referee_%s.SK_Referee_%s"), *Name, Piece, Piece),
+			nullptr, LOAD_NoWarn | LOAD_Quiet);
+		if (!Garment)
+		{
+			continue;
+		}
+		USkeletalMeshComponent* Part = NewObject<USkeletalMeshComponent>(RefereeActor, FName(*FString::Printf(TEXT("Referee%s"), Piece)));
+		Part->SetSkeletalMesh(Garment);
+		Part->SetupAttachment(RefereeBody);
+		Part->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		Part->RegisterComponent();
+		Part->SetLeaderPoseComponent(RefereeBody);
+	}
+	RefereeShownClip = nullptr;
+	UE_LOG(LogTemp, Display, TEXT("Greybox: referee %s"), *Name);
+}
+
+void UOpenStanceCombatDebugSubsystem::UpdateReferee(float DeltaSeconds)
+{
+	Referee.Update(DeltaSeconds, Sim, PlayerIndex);
+	for (const FOpenStanceRefereeCall& Call : Referee.GetNewCalls())
+	{
+		PlayRefereeVoice(Call);
+	}
+	if (!IsValid(RefereeActor) || !RefereeBody)
+	{
+		return;
+	}
+	const FVector2D Facing = Referee.GetFacing();
+	RefereeActor->SetActorLocationAndRotation(ToWorld(Referee.GetPosition()), FRotator(0.0, FMath::RadiansToDegrees(FMath::Atan2(Facing.Y, Facing.X)), 0.0));
+
+	// The gesture's pose clip; the mirrored copy when the arm on the named fighter's side is the left.
+	static const TCHAR* PoseNames[] = { TEXT("Idle"), TEXT("Attention"), TEXT("Bow"), TEXT("Ready"), TEXT("Start"), TEXT("Separate"), TEXT("Stop"),
+		TEXT("Point"), TEXT("Count"), TEXT("RaiseWinner") };
+	const FString Clip = FString::Printf(TEXT("AS_Placeholder_Referee_%s%s"), PoseNames[static_cast<int32>(Referee.GetPose())], Referee.IsGestureRight() ? TEXT("") : TEXT("_Mirror"));
+	UAnimSequenceBase* Sequence = LoadObject<UAnimSequenceBase>(nullptr, *FString::Printf(TEXT("/Game/Animation/Referee/Placeholder/%s.%s"), *Clip, *Clip), nullptr,
+		LOAD_NoWarn | LOAD_Quiet);
+	if (Sequence && Sequence != RefereeShownClip)
+	{
+		RefereeBody->SetAnimation(Sequence);
+		RefereeBody->SetPlayRate(0.0f);
+		RefereeShownClip = Sequence;
+	}
+}
+
+void UOpenStanceCombatDebugSubsystem::PlayRefereeVoice(const FOpenStanceRefereeCall& Call)
+{
+	// The selected referee's voice set; temporary until the production recordings (GDD 11.2, Audio Recording List).
+	const FString Name = FOpenStanceReferee::GetRefereeName(Referee.GetRefereeIndex());
+	const FString Cue = Call.Cue.ToString();
+	const FString Path = FString::Printf(TEXT("/Game/Audio/Referee/%s/%s.%s"), *Name, *Cue, *Cue);
+	USoundBase* Sound = LoadObject<USoundBase>(nullptr, *Path, nullptr, LOAD_NoWarn | LOAD_Quiet);
+	if (!Sound)
+	{
+		if (!MissingRefereeVoice.Contains(Call.Cue))
+		{
+			MissingRefereeVoice.Add(Call.Cue);
+			UE_LOG(LogTemp, Verbose, TEXT("Greybox: no referee voice line %s yet; the subtitle carries the call."), *Path);
+		}
+		return;
+	}
+	const UOpenStanceUserSettings* Settings = UOpenStanceUserSettings::Get();
+	const float Volume = Settings ? Settings->RefereeVoiceVolume / 100.0f : 1.0f;
+	UGameplayStatics::PlaySound2D(this, Sound, Volume);
 }
 
 void UOpenStanceCombatDebugSubsystem::UpdateBodies()
@@ -1276,6 +1381,7 @@ void UOpenStanceCombatDebugSubsystem::Tick(float DeltaTime)
 	}
 	UpdateCamera(DeltaTime);
 	UpdateBodies();
+	UpdateReferee(bCameraHeld ? 0.0f : DeltaTime);
 	HandleInvertToggle();
 	// The proof's input is in the side bar; Unreal's on-screen lines would sit on top of the HUD's video review panel.
 	if (bPlayingProof || (!ProofResult.IsEmpty() && FPlatformTime::Seconds() < ProofResultUntil))

@@ -1,6 +1,7 @@
 #include "Combat/OpenStanceMatchModelSync.h"
 
 #include "Combat/OpenStanceMatchRules.h"
+#include "Combat/OpenStanceReferee.h"
 
 #include "Combat/OpenStanceMatchSim.h"
 #include "Combat/OpenStanceMoveData.h"
@@ -59,50 +60,11 @@ void FOpenStanceMatchModelSync::Update(const FOpenStanceMatchSim& Sim, UOpenStan
 	const int32 NewLog = FMath::Min(Sim.LogEventCount - SeenLog, Sim.Log.Num());
 	for (int32 Index = Sim.Log.Num() - NewLog; Index < Sim.Log.Num(); ++Index)
 	{
-		const FString& Text = Sim.Log[Index].Text;
-		if (Text == TEXT("charyeot"))
+		// The referee's call for the command, its English meaning as the subtitle (GDD 8.5, 11.2).
+		FOpenStanceRefereeCall Call;
+		if (FOpenStanceReferee::CallFor(Sim.Log[Index], Call))
 		{
-			Model.SetCall(TEXT("CHARYEOT"), TEXT("Attention"));
-		}
-		else if (Text == TEXT("kyeongrye"))
-		{
-			Model.SetCall(TEXT("KYEONGRYE"), TEXT("Bow"));
-		}
-		else if (Text == TEXT("joon-bi"))
-		{
-			Model.SetCall(TEXT("JOON-BI"), TEXT("Ready"));
-		}
-		else if (Text == TEXT("gong-gyeok"))
-		{
-			Model.SetCall(TEXT("GONG-GYEOK"), TEXT("Attack"));
-		}
-		else if (Text == TEXT("woo-se-girok"))
-		{
-			Model.SetCall(TEXT("WOO-SE-GIROK"), TEXT("Record superiority"));
-		}
-		else if (Text == TEXT("chung seung"))
-		{
-			Model.SetCall(TEXT("CHUNG SEUNG"), TEXT("Chung wins"));
-		}
-		else if (Text == TEXT("hong seung"))
-		{
-			Model.SetCall(TEXT("HONG SEUNG"), TEXT("Hong wins"));
-		}
-		else if (Text == TEXT("kal-yeo"))
-		{
-			Model.SetCall(TEXT("KAL-YEO"), TEXT("Break"));
-		}
-		else if (Text == TEXT("kye-sok"))
-		{
-			Model.SetCall(TEXT("KYE-SOK"), TEXT("Continue"));
-		}
-		else if (Text == TEXT("keu-man"))
-		{
-			Model.SetCall(TEXT("KEU-MAN"), TEXT("Stop"));
-		}
-		else if (Text == TEXT("shi-jak"))
-		{
-			Model.SetCall(TEXT("SHI-JAK"), TEXT("Begin"));
+			Model.SetCall(Call.Term, Call.Meaning);
 		}
 	}
 	SeenLog = Sim.LogEventCount;
@@ -129,7 +91,15 @@ void FOpenStanceMatchModelSync::Update(const FOpenStanceMatchSim& Sim, UOpenStan
 		{
 			Model.AddGamJeom(SideOf(Index), Reasons[SeenPenalties[Index]]);
 			Model.AddPoints(SideOf(1 - Index), 1, TEXT("Gam-jeom"), false);
-			Model.SetCall(TEXT("GAM-JEOM"), Reasons[SeenPenalties[Index]]);
+			// The point's own call would cover the referee's: the side-named GAM-JEOM is the one shown.
+			FOpenStanceMatchLogEntry Entry;
+			Entry.Side = SideOf(Index);
+			Entry.Text = TEXT("gam-jeom: ") + Reasons[SeenPenalties[Index]].ToLower();
+			FOpenStanceRefereeCall Call;
+			if (FOpenStanceReferee::CallFor(Entry, Call))
+			{
+				Model.SetCall(Call.Term, Call.Meaning);
+			}
 		}
 	}
 

@@ -204,4 +204,27 @@ and to the side of your fighter (stick up goes toward the opponent), not the GDD
   or feet would leave the frame it cranes up and widens (up to 80 degrees) until both fit.
 - Shots only read the match: cuts never touch the clock or the score, and the pause menu holds the shot where it is.
 - `os.CameraPreset <Name>` still previews any other preset as it is; `os.CameraPreset Match` returns to the director.
-- Not here yet: the final-second 6-point orbit (the easter egg task) and real ceremony staging with the referee (issue 15).
+- Not here yet: the final-second 6-point orbit (the easter egg task).
+
+## Referee
+
+Code: `Combat/OpenStanceReferee` (`FOpenStanceReferee`) and the greybox's `BuildReferee`/`UpdateReferee`. Tests:
+`OpenStance.Referee.*` (GDD 8.5, 11.2, issue 15). The simulation decides every stop and resume; the referee shows them.
+
+- One of the six referees (Bo, Jorge, Kelvin, Omari, Vivian, Walter) is picked at random each match and drawn from
+  `MH_Referee_<Name>_FullBody` with its outfit (shirt, trousers, shoes, belt, tie) following the body.
+- Every command in the match log becomes a call: the Korean term, its English meaning as the HUD subtitle, and a voice
+  cue played from `/Game/Audio/Referee/<Name>/<Cue>` at the Options referee volume. No recordings exist yet, so only the
+  subtitle shows until they are imported under those names (cues: Charyeot, Kyeongrye, JoonBi, ShiJak, KalYeo, KyeSok,
+  KeuMan, GongGyeok, WooSeGirok, ChungGamJeom, HongGamJeom, Count1-8, ChungSeung, HongSeung).
+- Penalties and the winner are side-named (`GAM-JEOM: Hong, Boundary`, `HONG SEUNG`). A penalty stop calls KAL-YEO first.
+- Gestures are placeholder pose clips (`Tools/Blender/build_placeholder_referee.py`, imported with
+  `import_placeholder_techniques.py referee` to `/Game/Animation/Referee/Placeholder`): Idle, Attention, Bow, Ready,
+  Start, Separate, Stop, Point, Count, RaiseWinner, each with a left-arm mirror. The arm used is the one on the named
+  fighter's side. A gesture shows at least 0.5 s; calls made together play in turn; the winner's hand stays up 2 s.
+- Position: 170 cm off the fighters' line on the side away from the combat camera, at least 120 cm from either fighter,
+  inside 360 cm of the mat centre; steps in between for a clinch; stands beside a knocked-down fighter for the count.
+- Knockdown count (`Sim.CountRules`): a landed hit that knocks a fighter down stops play (KAL-YEO), the clock holds, the
+  referee counts HANA to YEODEOL a second apart (to eight even once the fighter is up), then KYE-SOK 0.5 s later.
+  Nothing scores during the count. A fighter still down at eight (not possible yet: the get-up takes 3.6 s) is Future.
+- Referee Mode (playing as the referee) stays Future.

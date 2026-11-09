@@ -4,6 +4,7 @@
 #include "Combat/OpenStanceMatchModelSync.h"
 #include "Combat/OpenStanceGreyboxProof.h"
 #include "Combat/OpenStanceCameraDirector.h"
+#include "Combat/OpenStanceReferee.h"
 #include "Combat/OpenStanceMatchSim.h"
 #include "Menu/OpenStanceMenuTypes.h"
 #include "Subsystems/WorldSubsystem.h"
@@ -132,6 +133,11 @@ private:
 	void BuildBodies();
 	void DestroyBodies();
 	void UpdateBodies();
+
+	/** The match referee: one of the six, placed and posed from Referee each tick, the voice line played for each call. */
+	void BuildReferee();
+	void UpdateReferee(float DeltaSeconds);
+	void PlayRefereeVoice(const FOpenStanceRefereeCall& Call);
 	FOpenStanceFighterControls PollController() const;
 	FVector ToWorld(const FVector2D& Position, float Z = 0.0f) const;
 	const UDataTable* GetMoveTable();
@@ -165,6 +171,19 @@ private:
 
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<USkeletalMeshComponent>> FighterBodies;
+
+	/** The referee (GDD 8.5, 11.2): their character and the placeholder pose clip it shows. */
+	UPROPERTY(Transient)
+	TObjectPtr<AActor> RefereeActor;
+
+	UPROPERTY(Transient)
+	TObjectPtr<USkeletalMeshComponent> RefereeBody;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UAnimSequenceBase> RefereeShownClip;
+
+	/** Voice lines that are not recorded yet, so each missing one is reported once. */
+	TSet<FName> MissingRefereeVoice;
 
 	/** The idle fighting stance, looped while a fighter is not attacking. */
 	UPROPERTY(Transient)
@@ -210,6 +229,9 @@ private:
 
 	/** A was down on the last tick, so one press skips one break. */
 	bool bPrevSkipBreak = false;
+
+	/** Follows the match as the NPC referee: calls, gestures and where to stand. */
+	FOpenStanceReferee Referee;
 
 	/** Picks and frames the match camera's shot (GDD 13): combat, ceremony, break, spin-score cuts, results. */
 	FOpenStanceCameraDirector Director;

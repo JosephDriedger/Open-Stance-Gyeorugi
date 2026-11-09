@@ -118,6 +118,9 @@ void FOpenStanceMatchSim::StartMatch(float DistanceCm)
 	RoundPlayed = 0.0f;
 	CeremonyElapsed = 0.0f;
 	PenaltyStopLeft = 0.0f;
+	bCounting = false;
+	CountSaid = 0;
+	CountElapsed = 0.0f;
 	PreviousClinchPhase = EOpenStanceClinchPhase::None;
 	RestartPassivity();
 	Match = FOpenStanceMatchStatus();
@@ -165,6 +168,50 @@ void FOpenStanceMatchSim::StopForPenalty()
 	AddLog(EOpenStanceSide::Chung, TEXT("kal-yeo"));
 }
 
+void FOpenStanceMatchSim::StartCount(int32 Index)
+{
+	if (bCounting || (Match.State != EOpenStanceMatchState::Running && Match.State != EOpenStanceMatchState::Stopped))
+	{
+		return;
+	}
+	// The referee steps in: play stops, the clock holds, and any clinch or penalty stop gives way to the count.
+	bCounting = true;
+	CountFighter = Index;
+	CountSaid = 0;
+	CountElapsed = 0.0f;
+	PenaltyStopLeft = 0.0f;
+	ClinchPhase = EOpenStanceClinchPhase::None;
+	ClinchElapsed = 0.0f;
+	Match.State = EOpenStanceMatchState::Stopped;
+	AddLog(Fighters[Index].Side, TEXT("kal-yeo"));
+}
+
+void FOpenStanceMatchSim::StepCount(float DeltaSeconds)
+{
+	if (!bCounting)
+	{
+		return;
+	}
+	CountElapsed += DeltaSeconds;
+	const FOpenStanceFighterSim& Down = Fighters[CountFighter];
+	while (CountSaid < CountRules.CountTo && CountElapsed >= (CountSaid + 1) * CountRules.SecondsPerCount)
+	{
+		++CountSaid;
+		AddLog(Down.Side, FString::Printf(TEXT("count %d"), CountSaid));
+	}
+	// WT counts to eight even when the fighter is already up; play goes on once it has and the fighter is ready.
+	const bool bUp = Down.State.CombatState != EOpenStanceCombatState::KnockedDown && Down.State.CombatState != EOpenStanceCombatState::Recovering;
+	if (CountSaid >= CountRules.CountTo && CountElapsed >= CountRules.CountTo * CountRules.SecondsPerCount + CountRules.ResumeAfterSeconds && bUp)
+	{
+		bCounting = false;
+		if (Match.State == EOpenStanceMatchState::Stopped)
+		{
+			Match.State = EOpenStanceMatchState::Running;
+			AddLog(EOpenStanceSide::Chung, TEXT("kye-sok"));
+		}
+	}
+}
+
 void FOpenStanceMatchSim::RestartPassivity()
 {
 	PassivityElapsed = 0.0f;
@@ -177,11 +224,13 @@ void FOpenStanceMatchSim::RestartPassivity()
 
 void FOpenStanceMatchSim::StepPenalties(float DeltaSeconds)
 {
+	StepCount(DeltaSeconds);
+
 	// A referee's stop for a gam-jeom: the clock holds, then kye-sok.
 	if (PenaltyStopLeft > 0.0f)
 	{
 		PenaltyStopLeft -= DeltaSeconds;
-		if (PenaltyStopLeft <= 0.0f && Match.State == EOpenStanceMatchState::Stopped && !IsInClinch())
+		if (PenaltyStopLeft <= 0.0f && Match.State == EOpenStanceMatchState::Stopped && !IsInClinch() && !bCounting)
 		{
 			PenaltyStopLeft = 0.0f;
 			Match.State = EOpenStanceMatchState::Running;
@@ -495,6 +544,10 @@ void FOpenStanceMatchSim::ApplyContact(const FOpenStanceContact& Contact)
 		const EOpenStanceReactionSeverity Reaction = Contacts.Last().Reaction;
 		TArray<FOpenStanceCombatEvent> Events;
 		D.Machine.ApplyHit(Reaction, D.State, Events);
+		if (D.State.CombatState == EOpenStanceCombatState::KnockedDown)
+		{
+			StartCount(Defender);
+		}
 		A.LastResult = FString::Printf(TEXT("HIT +%d (%s)"), Contact.Points, *ZoneName(Contact.Zone));
 		D.LastResult = FString::Printf(TEXT("hit, %s reaction"), *UEnum::GetDisplayValueAsText(Reaction).ToString().ToLower());
 		AddLog(A.Side, FString::Printf(TEXT("score +%d %s to the %s"), Contact.Points, *Contact.Move.ToString(), *ZoneName(Contact.Zone)));
@@ -963,6 +1016,7 @@ void FOpenStanceMatchSim::EndRound(EOpenStanceSide Winner, EOpenStanceRoundEnd R
 	ClinchPhase = EOpenStanceClinchPhase::None;
 	ClinchElapsed = 0.0f;
 	PenaltyStopLeft = 0.0f;
+	bCounting = false;
 
 	AddLog(EOpenStanceSide::Chung, TEXT("keu-man"));
 	if (Reason == EOpenStanceRoundEnd::RefereeDecision)

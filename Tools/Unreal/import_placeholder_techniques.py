@@ -8,6 +8,10 @@ and creates, under /Game/Animation/Moves/Placeholder/:
     AS_Placeholder_<Name>     animation sequence on the production fighter skeleton (Stance and every technique)
     AM_Placeholder_<Name>     montage of it (techniques only; DT_MoveData's PlaceholderMontage column points here)
 Sequences of those names are re-imported in place; existing montages are kept (they play the re-imported clip). Log: Saved/Logs/import_placeholder_techniques.txt.
+
+With `referee` on the command line (py ...import_placeholder_techniques.py referee quit) it imports the referee's pose
+clips instead: Resources/Models/Animation/PlaceholderReferee/Placeholder_Referee_<Pose>[_Mirror].fbx
+(Tools/Blender/build_placeholder_referee.py) as /Game/Animation/Referee/Placeholder/AS_Placeholder_Referee_<Pose>, no montages.
 """
 import os
 import traceback
@@ -21,6 +25,11 @@ BODY = "/Game/Characters/Fighters/Export/MH_FighterBase_Body"
 TECHNIQUES = ["SideKick", "Roundhouse", "Hook", "Axe", "Punch", "SpinSide", "SpinHook", "Tornado"]
 # each clip and its mirror (left-leg / right-lead), which the greybox plays instead of scaling the fighter by -1
 NAMES = [n + s for n in ["Stance"] + TECHNIQUES for s in ("", "_Mirror")]
+REFEREE_POSES = ["Idle", "Attention", "Bow", "Ready", "Start", "Separate", "Stop", "Point", "Count", "RaiseWinner"]
+if "referee" in __import__("sys").argv[1:]:
+    SOURCE = f"{REPO}/Resources/Models/Animation/PlaceholderReferee"
+    DEST = "/Game/Animation/Referee/Placeholder"
+    NAMES = ["Referee_" + n + s for n in REFEREE_POSES for s in ("", "_Mirror")]
 EAL = unreal.EditorAssetLibrary
 LOG = open(f"{REPO}/Saved/Logs/import_placeholder_techniques.txt", "w", encoding="utf-8")
 
@@ -64,7 +73,7 @@ try:
             log("import failed", name, task.get_editor_property("imported_object_paths"))
             continue
         log("imported", name, f"{sequence.get_play_length():.3f}s")
-        if name.startswith("Stance") or name.endswith("_Mirror"):  # montages only for the techniques themselves
+        if name.startswith(("Stance", "Referee_")) or name.endswith("_Mirror"):  # montages only for the techniques themselves
             continue
         montage_path = f"{DEST}/AM_Placeholder_{name}"
         if EAL.does_asset_exist(montage_path):
