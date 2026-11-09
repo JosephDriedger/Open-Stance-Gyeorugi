@@ -136,20 +136,20 @@ bool FOpenStanceGuardReadinessTest::RunTest(const FString& Parameters)
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FOpenStanceSeverityTest, "OpenStance.Reactions.Severity", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
 bool FOpenStanceSeverityTest::RunTest(const FString& Parameters)
 {
-	using S = EOpenStanceReactionSeverity;
+	using Sev = EOpenStanceReactionSeverity;
 	const FOpenStanceSeverityTuning Tuning;
-	const auto Resolve = [&](S Authored, float Impact, int32 Composure, bool bTired)
+	const auto Resolve = [&](Sev Authored, float Impact, int32 Composure, bool bTired)
 	{
 		return FOpenStanceMatchSim::ResolveSeverity(Authored, Impact, 60.0f, Composure, bTired, Tuning);
 	};
-	TestEqual(TEXT("full impact on a fresh baseline defender: as authored"), Resolve(S::Heavy, 60.0f, 70, false), S::Heavy);
-	TestEqual(TEXT("a tired attacker's 20% weaker kick: a step lighter"), Resolve(S::Heavy, 48.0f, 70, false), S::Normal);
-	TestEqual(TEXT("a tired defender: a step heavier"), Resolve(S::Heavy, 60.0f, 70, true), S::Knockdown);
-	TestEqual(TEXT("both tired: about even"), Resolve(S::Heavy, 48.0f, 70, true), S::Heavy);
-	TestEqual(TEXT("high Composure keeps a tired defender standing"), Resolve(S::Heavy, 60.0f, 100, true), S::Heavy);
-	TestEqual(TEXT("low Composure on a fresh defender: still as authored"), Resolve(S::Normal, 60.0f, 40, false), S::Normal);
-	TestEqual(TEXT("never lighter than Minor"), Resolve(S::Minor, 30.0f, 70, false), S::Minor);
-	TestEqual(TEXT("never heavier than Knockdown"), Resolve(S::Knockdown, 60.0f, 40, true), S::Knockdown);
+	TestEqual(TEXT("full impact on a fresh baseline defender: as authored"), Resolve(Sev::Heavy, 60.0f, 70, false), Sev::Heavy);
+	TestEqual(TEXT("a tired attacker's 20% weaker kick: a step lighter"), Resolve(Sev::Heavy, 48.0f, 70, false), Sev::Normal);
+	TestEqual(TEXT("a tired defender: a step heavier"), Resolve(Sev::Heavy, 60.0f, 70, true), Sev::Knockdown);
+	TestEqual(TEXT("both tired: about even"), Resolve(Sev::Heavy, 48.0f, 70, true), Sev::Heavy);
+	TestEqual(TEXT("high Composure keeps a tired defender standing"), Resolve(Sev::Heavy, 60.0f, 100, true), Sev::Heavy);
+	TestEqual(TEXT("low Composure on a fresh defender: still as authored"), Resolve(Sev::Normal, 60.0f, 40, false), Sev::Normal);
+	TestEqual(TEXT("never lighter than Minor"), Resolve(Sev::Minor, 30.0f, 70, false), Sev::Minor);
+	TestEqual(TEXT("never heavier than Knockdown"), Resolve(Sev::Knockdown, 60.0f, 40, true), Sev::Knockdown);
 	return true;
 }
 

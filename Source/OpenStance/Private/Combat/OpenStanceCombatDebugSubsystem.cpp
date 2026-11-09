@@ -266,6 +266,7 @@ void UOpenStanceCombatDebugSubsystem::SetGreyboxActive(bool bActive)
 		Sim.bEqualTerms = true;
 	}
 	Sim.StartMatch(bPlayingProof ? FOpenStanceGreyboxProof::StartDistanceCm : 200.0f);
+	Director.Reset(Sim);
 
 	// The Skill Stick follows the Options screen: the dead zone and the input window, 0.20 to 0.40 s (GDD 7.8).
 	if (const UOpenStanceUserSettings* Settings = bPlayingProof ? nullptr : UOpenStanceUserSettings::Get())
@@ -918,12 +919,37 @@ void UOpenStanceCombatDebugSubsystem::UpdateCamera(float DeltaTime)
 	}
 	FVector Position;
 	FRotator Rotation;
-	GetFollowCameraPose(Position, Rotation);
+	float FieldOfView = GetCameraPreset().FieldOfViewDeg;
+	bool bCut = false;
+	if (&GetCameraPreset() == &OpenStanceCameraPresets::Match())
+	{
+		// The match camera: the director picks the shot (combat, ceremony, break, a spin-score cut, results) and frames it.
+		const FOpenStanceCameraFrame Frame = Director.Update(DeltaTime, Sim, PlayerIndex, bCameraHeld);
+		Position = Origin + Frame.Position;
+		Rotation = Frame.Rotation;
+		FieldOfView = Frame.FieldOfViewDeg;
+		bCut = Frame.bCut;
+	}
+	else
+	{
+		// os.CameraPreset previews another angle as it is.
+		GetFollowCameraPose(Position, Rotation);
+	}
+	UCameraComponent* Lens = Camera->FindComponentByClass<UCameraComponent>();
+	if (bCut)
+	{
+		Camera->SetActorLocationAndRotation(Position, Rotation);
+		if (Lens)
+		{
+			Lens->SetFieldOfView(FieldOfView);
+		}
+		return;
+	}
 	Camera->SetActorLocationAndRotation(FMath::VInterpTo(Camera->GetActorLocation(), Position, DeltaTime, FollowCameraSpeed),
 		FMath::RInterpTo(Camera->GetActorRotation(), Rotation, DeltaTime, FollowCameraSpeed));
-	if (UCameraComponent* Lens = Camera->FindComponentByClass<UCameraComponent>())
+	if (Lens)
 	{
-		Lens->SetFieldOfView(FMath::FInterpTo(Lens->FieldOfView, GetCameraPreset().FieldOfViewDeg, DeltaTime, FollowCameraSpeed));
+		Lens->SetFieldOfView(FMath::FInterpTo(Lens->FieldOfView, FieldOfView, DeltaTime, FollowCameraSpeed));
 	}
 }
 
@@ -1198,6 +1224,7 @@ void UOpenStanceCombatDebugSubsystem::Tick(float DeltaTime)
 		}
 	}
 	const bool bHeld = Model && Model->IsPaused();
+	bCameraHeld = bHeld;
 
 	// A fixed step keeps the simulation the same whatever the frame rate, and slomo scales DeltaTime for free.
 	Accumulator = bHeld ? 0.0f : Accumulator + FMath::Min(DeltaTime, 0.1f);

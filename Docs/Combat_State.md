@@ -184,3 +184,24 @@ failed landing is still the Falling gam-jeom. **Provisional:** all three numbers
 1.0 s Heavy, 3.0 s down plus 0.6 s getting up.
 
 Still for later: defense and reaction animation (placeholder clips first, then capture).
+
+## Match camera
+
+Code: `Combat/OpenStanceCameraDirector` (`FOpenStanceCameraDirector`, driven by the greybox each tick). Tests:
+`OpenStance.Camera.*` (GDD 13, issue 16). The combat camera stays the Match preset chosen on 4 November 2026: behind
+and to the side of your fighter (stick up goes toward the opponent), not the GDD's side-on view.
+
+| Match state | Shot |
+| --- | --- |
+| Ready (opening ceremony) | SideBroadcast: wide side view |
+| Running, Stopped | Combat: the Match preset, framed to the exchange |
+| A spinning kick scores | SideBroadcast for 1.5 s, cut in and cut back |
+| RoundBreak | SideHigh |
+| Finished | SideBroadcast while the winner is named and the fighters bow |
+
+- Combat framing: past 200 cm apart the camera backs off (0.8 cm per cm, up to 260 cm) and rises; it aims at the
+  fighters' own height and looks low when one is down. It stays within 580 cm of the mat centre, and if a fighter's head
+  or feet would leave the frame it cranes up and widens (up to 80 degrees) until both fit.
+- Shots only read the match: cuts never touch the clock or the score, and the pause menu holds the shot where it is.
+- `os.CameraPreset <Name>` still previews any other preset as it is; `os.CameraPreset Match` returns to the director.
+- Not here yet: the final-second 6-point orbit (the easter egg task) and real ceremony staging with the referee (issue 15).

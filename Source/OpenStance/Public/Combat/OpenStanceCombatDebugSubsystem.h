@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "Combat/OpenStanceMatchModelSync.h"
 #include "Combat/OpenStanceGreyboxProof.h"
+#include "Combat/OpenStanceCameraDirector.h"
 #include "Combat/OpenStanceMatchSim.h"
 #include "Menu/OpenStanceMenuTypes.h"
 #include "Subsystems/WorldSubsystem.h"
@@ -209,6 +210,12 @@ private:
 
 	/** A was down on the last tick, so one press skips one break. */
 	bool bPrevSkipBreak = false;
+
+	/** Picks and frames the match camera's shot (GDD 13): combat, ceremony, break, spin-score cuts, results. */
+	FOpenStanceCameraDirector Director;
+
+	/** The pause menu is holding the match: the camera holds too. */
+	bool bCameraHeld = false;
 	bool bAutoStartPending = false;
 	bool bShowInput = false;
 	bool bGreybox = false;
