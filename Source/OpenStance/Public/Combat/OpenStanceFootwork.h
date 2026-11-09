@@ -43,9 +43,17 @@ struct OPENSTANCE_API FOpenStanceMovementTuning
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement")
 	float StanceSwitchSeconds = 0.35f;
 
-	/** Time a guard change takes; the four guards differ in transition timing, not in stats (GDD 8.7). */
+	/** Time a guard change takes from Cross; the four guards differ in transition timing, not in stats (GDD 8.7). */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement")
 	float GuardTransitionSeconds = 0.2f;
+
+	/** Mixed is the quickest guard to change from. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement")
+	float GuardTransitionFromMixedSeconds = 0.15f;
+
+	/** High and Low are the furthest from the others: the slowest to change from. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement")
+	float GuardTransitionFromHighLowSeconds = 0.25f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement")
 	float BounceHz = 2.0f;

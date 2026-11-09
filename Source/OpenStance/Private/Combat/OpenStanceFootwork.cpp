@@ -90,7 +90,10 @@ void FOpenStanceFootwork::Tick(float DeltaSeconds, const FOpenStanceMotionInput&
 	{
 		Motion.PreviousGuard = State.Guard;
 		State.Guard = Guard;
-		Motion.GuardTransitionLeft = Tuning.GuardTransitionSeconds;
+		// The hands are moving for this long, and the new guard covers nothing until they arrive.
+		Motion.GuardTransitionLeft = Motion.PreviousGuard == EOpenStanceGuard::Mixed ? Tuning.GuardTransitionFromMixedSeconds
+			: Motion.PreviousGuard == EOpenStanceGuard::Cross ? Tuning.GuardTransitionSeconds
+			: Tuning.GuardTransitionFromHighLowSeconds;
 	}
 	Motion.GuardTransitionLeft = FMath::Max(0.0f, Motion.GuardTransitionLeft - DeltaSeconds);
 

@@ -48,8 +48,17 @@ FOpenStanceFighterBody FOpenStanceFighterSim::GetBody() const
 				: Guarding == EOpenStanceGuarding::HighBlock ? EOpenStanceGuardCover::High
 				: Guarding == EOpenStanceGuarding::LegCheck ? EOpenStanceGuardCover::LegCheck
 				: EOpenStanceGuardCover::Posture;
+			// The high block takes a moment to come up, longest from Low (GDD 8.7); until then the posture stands.
+			if (Cover == EOpenStanceGuardCover::High && GuardingElapsed < HighBlockRaiseSeconds)
+			{
+				Cover = EOpenStanceGuardCover::Posture;
+			}
 		}
-		FOpenStanceHitRegistry::BuildGuard(Body, State.Guard, Cover, State.Stance == EOpenStanceStance::RightLead);
+		// Hands moving between two guards cover nothing: changing guard is an opening (GDD 8.7).
+		if (!(Cover == EOpenStanceGuardCover::Posture && Motion.GuardTransitionLeft > 0.0f))
+		{
+			FOpenStanceHitRegistry::BuildGuard(Body, State.Guard, Cover, State.Stance == EOpenStanceStance::RightLead);
+		}
 	}
 	return Body;
 }
@@ -401,6 +410,13 @@ void FOpenStanceMatchSim::Start(int32 Index, const FOpenStanceInputEvent& Event)
 	FOpenStanceAttackRequest Request;
 	Request.MoveName = RowName;
 	Request.Row = *Row;
+	// Guard readiness: the guard the technique starts from makes its startup quicker or slower (GDD 8.7).
+	{
+		const float Scale = GuardRules.GetStartupScale(F.State.Guard, Target == EOpenStanceTarget::Head);
+		const float Extra = Request.Row.StartupSeconds * (Scale - 1.0f);
+		Request.Row.StartupSeconds += Extra;
+		Request.Row.AnimationSeconds += Extra;
+	}
 	Request.Leg = Event.Leg;
 	Request.LegRole = Event.LegRole;
 	Request.bFake = bFake;
@@ -469,10 +485,18 @@ void FOpenStanceMatchSim::ApplyContact(const FOpenStanceContact& Contact)
 	{
 		A.Round.AddScore(Contact.Points, Contact.Zone == EOpenStanceBodyZone::Head, Contact.Technique == EOpenStanceTechnique::Punch, Contact.bSpinning);
 		SyncFighterNumbers();
+		// The reaction: the technique's, weighed against the defender's Composure and stamina (GDD 8.10).
+		{
+			const FOpenStanceAttackRequest* Attack = A.Machine.GetCurrentAttack();
+			const float TechniqueImpact = Attack ? Attack->Row.Impact : Contact.Impact;
+			Contacts.Last().Reaction = ResolveSeverity(Contact.Reaction, Contact.Impact, TechniqueImpact, bEqualTerms ? 70 : D.ComposureAttribute,
+				D.State.IsLowStamina(), SeverityRules);
+		}
+		const EOpenStanceReactionSeverity Reaction = Contacts.Last().Reaction;
 		TArray<FOpenStanceCombatEvent> Events;
-		D.Machine.ApplyHit(Contact.Reaction, D.State, Events);
+		D.Machine.ApplyHit(Reaction, D.State, Events);
 		A.LastResult = FString::Printf(TEXT("HIT +%d (%s)"), Contact.Points, *ZoneName(Contact.Zone));
-		D.LastResult = FString::Printf(TEXT("hit, %s reaction"), *UEnum::GetDisplayValueAsText(Contact.Reaction).ToString().ToLower());
+		D.LastResult = FString::Printf(TEXT("hit, %s reaction"), *UEnum::GetDisplayValueAsText(Reaction).ToString().ToLower());
 		AddLog(A.Side, FString::Printf(TEXT("score +%d %s to the %s"), Contact.Points, *Contact.Move.ToString(), *ZoneName(Contact.Zone)));
 		break;
 	}
@@ -492,6 +516,28 @@ void FOpenStanceMatchSim::ApplyContact(const FOpenStanceContact& Contact)
 	}
 }
 
+EOpenStanceReactionSeverity FOpenStanceMatchSim::ResolveSeverity(EOpenStanceReactionSeverity Authored, float Impact, float TechniqueImpact, int32 Composure,
+	bool bDefenderLowStamina, const FOpenStanceSeverityTuning& Tuning)
+{
+	// Composure works like any attribute, a third of a percent per point from 70, here against the impact (GDD 5.4).
+	float Effective = Impact / FOpenStanceStaminaTuning::AttributeScale(Composure);
+	if (bDefenderLowStamina)
+	{
+		Effective *= Tuning.TiredDefenderScale;
+	}
+	const float Ratio = Effective / FMath::Max(TechniqueImpact, 1.0f);
+	int32 Step = static_cast<int32>(Authored);
+	if (Ratio < Tuning.StepDownBelow)
+	{
+		--Step;
+	}
+	else if (Ratio >= Tuning.StepUpFrom)
+	{
+		++Step;
+	}
+	return static_cast<EOpenStanceReactionSeverity>(FMath::Clamp(Step, static_cast<int32>(EOpenStanceReactionSeverity::Minor), static_cast<int32>(EOpenStanceReactionSeverity::Knockdown)));
+}
+
 void FOpenStanceMatchSim::StepGuard(int32 Index, float DeltaSeconds, const FOpenStanceFighterControls& Controls)
 {
 	FOpenStanceFighterSim& F = Fighters[Index];
@@ -504,6 +550,7 @@ void FOpenStanceMatchSim::StepGuard(int32 Index, float DeltaSeconds, const FOpen
 			F.Motion.bLegRaised = false;
 		}
 		F.Guarding = EOpenStanceGuarding::ClosedGuard;
+		F.GuardingElapsed = 0.0f;
 		F.SwayElapsed = 0.0f;
 		return;
 	}
@@ -523,6 +570,8 @@ void FOpenStanceMatchSim::StepGuard(int32 Index, float DeltaSeconds, const FOpen
 		}
 	}
 	F.Guarding = Now;
+	F.GuardingElapsed = Now == Before ? F.GuardingElapsed + DeltaSeconds : 0.0f;
+	F.HighBlockRaiseSeconds = F.State.Guard == EOpenStanceGuard::Low ? GuardRules.RaiseHighBlockFromLowSeconds : GuardRules.RaiseHighBlockSeconds;
 	if (Now == EOpenStanceGuarding::LegCheck || Before == EOpenStanceGuarding::LegCheck)
 	{
 		F.Motion.bLegRaised = Now == EOpenStanceGuarding::LegCheck;

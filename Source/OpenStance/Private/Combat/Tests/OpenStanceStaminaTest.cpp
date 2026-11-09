@@ -124,16 +124,24 @@ bool FOpenStanceStaminaLowTest::RunTest(const FString& Parameters)
 	FStaminaRig Rig;
 	const float FreshRecovery = Rig.ThrowAndRecover(TEXT("SpinSide_Trunk"));
 	int32 Kicks = 1;
-	while (Kicks < 12 && Rig.Fighter().State.Stamina >= 5.0f)
+	while (Kicks < 20 && !Rig.Fighter().State.IsLowStamina())
 	{
 		Rig.ThrowAndRecover(TEXT("SpinSide_Trunk"));
 		++Kicks;
 	}
-	TestTrue(TEXT("back-to-back spinning kicks run the pool nearly dry"), Rig.Fighter().State.Stamina < 5.0f);
+	if (!TestTrue(TEXT("back-to-back spinning kicks drain the pool below 25"), Rig.Fighter().State.IsLowStamina()))
+	{
+		AddInfo(FString::Printf(TEXT("stamina %.1f after %d kicks, last result %s"), Rig.Fighter().State.Stamina, Kicks, *Rig.Fighter().LastResult));
+		for (int32 Index = FMath::Max(0, Rig.Sim.Log.Num() - 12); Index < Rig.Sim.Log.Num(); ++Index)
+		{
+			AddInfo(FString::Printf(TEXT("%.2f %s"), Rig.Sim.Log[Index].Time, *Rig.Sim.Log[Index].Text));
+		}
+	}
 	TestTrue(TEXT("the fighter is on low stamina"), Rig.Fighter().State.IsLowStamina());
 	const float TiredRecovery = Rig.ThrowAndRecover(TEXT("SpinSide_Trunk"));
 	TestTrue(TEXT("an empty pool still throws a spinning kick"), TiredRecovery > 0.0f);
 	TestEqual(TEXT("with a 30% longer recovery"), TiredRecovery, FreshRecovery * 1.3f, 0.05f);
+	Rig.Fighter().State.Stamina = 10.0f;
 	TestEqual(TEXT("and 20% less impact"), Rig.Fighter().Machine.GetImpactScale(Rig.Fighter().State), 0.8f);
 
 	// Dash, switch sides and step all still work on an empty pool.

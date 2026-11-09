@@ -160,4 +160,27 @@ travel straight. Kicks aim at 0.70 of the height for the body and 0.90 for the h
 limb positions are starting values at a 175 cm fighter, scaled with height; check them against the MetaHuman bodies
 and the captured guards. `os.ShowHitboxes 1` draws the guard capsules in cyan.
 
-Still for issue 13: guard readiness and transition timing, defense animation, and hit severity from Composure.
+### Guard readiness (GDD 8.7)
+
+Guards change timing, never stats (`Sim.GuardRules`, footwork tuning). Tests: `OpenStance.Guards.Readiness`.
+
+| Guard | Startup to the head | Startup to the body | Changing from it | High block (LT + RS Up) comes up in |
+| --- | --- | --- | --- | --- |
+| High | x0.9 | x1.15 | 0.25 s | 0.05 s |
+| Low | x1.1 | x0.9 | 0.25 s | 0.2 s |
+| Mixed | x1.0 | x1.0 | 0.15 s | 0.05 s |
+| Cross | x1.0 | x0.95 | 0.2 s | 0.05 s |
+
+While the hands move between two guards they cover nothing, so changing guard is an opening.
+
+### Hit severity (GDD 8.10)
+
+`FOpenStanceMatchSim::ResolveSeverity`; tests `OpenStance.Reactions.*`. A landed hit starts from the technique's
+authored reaction. The impact (already cut 20% for a tired attacker) is divided by the defender's Composure effect
+(a third of a percent per point from 70; Equal Terms holds it at 70) and raised 20% for a defender on low stamina.
+Under 0.9 of the technique's own impact the reaction is a step lighter; at 1.15 or more, a step heavier. So a fresh
+fighter takes a head roundhouse as a stagger, a tired one goes down (cause Hit: the referee counts, no penalty). A
+failed landing is still the Falling gam-jeom. **Provisional:** all three numbers. Reaction times stay 0.4 s Normal,
+1.0 s Heavy, 3.0 s down plus 0.6 s getting up.
+
+Still for later: defense and reaction animation (placeholder clips first, then capture).

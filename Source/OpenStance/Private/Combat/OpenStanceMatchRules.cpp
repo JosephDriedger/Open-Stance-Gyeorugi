@@ -2,7 +2,7 @@
 
 namespace
 {
-	EOpenStanceSide SideOf(int32 Index)
+	EOpenStanceSide RuleSideOf(int32 Index)
 	{
 		return Index == 0 ? EOpenStanceSide::Chung : EOpenStanceSide::Hong;
 	}
@@ -40,7 +40,7 @@ bool FOpenStanceMatchRules::CheckRoundStop(const FOpenStanceRoundTuning& Rules, 
 		{
 			if (Tally[Index].GamJeom >= Rules.RoundGamJeomLimit)
 			{
-				OutWinner = SideOf(1 - Index);
+				OutWinner = RuleSideOf(1 - Index);
 				OutReason = EOpenStanceRoundEnd::PenaltyLimit;
 				return true;
 			}

@@ -75,6 +75,54 @@ struct OPENSTANCE_API FOpenStanceDefenseTuning
 	float SwayStepCm = 40.0f;
 };
 
+/**
+ * Guard readiness (GDD 8.7): a guard changes how quickly techniques start and defenses come up, never a stat. Startup
+ * scales multiply the technique's startup; 1 is Mixed, the balanced guard. Starting values, tuned in playtests.
+ */
+struct OPENSTANCE_API FOpenStanceGuardTuning
+{
+	/** High: the quickest guard to throw a head kick from and the slowest to start a body kick from. */
+	float HighHeadStartup = 0.9f;
+	float HighBodyStartup = 1.15f;
+
+	/** Low: the quickest to start a body kick from, and the slowest to throw to the head. */
+	float LowBodyStartup = 0.9f;
+	float LowHeadStartup = 1.1f;
+
+	/** Cross: a quick guard for the body. */
+	float CrossBodyStartup = 0.95f;
+
+	/** LT + RS Up raises the high block this fast, and slower from Low, the slowest guard to defend a head kick from. */
+	float RaiseHighBlockSeconds = 0.05f;
+	float RaiseHighBlockFromLowSeconds = 0.2f;
+
+	/** The startup multiplier for a technique thrown from Guard at Target (a punch counts as a body technique). */
+	float GetStartupScale(EOpenStanceGuard Guard, bool bHead) const
+	{
+		switch (Guard)
+		{
+		case EOpenStanceGuard::High: return bHead ? HighHeadStartup : HighBodyStartup;
+		case EOpenStanceGuard::Low: return bHead ? LowHeadStartup : LowBodyStartup;
+		case EOpenStanceGuard::Cross: return bHead ? 1.0f : CrossBodyStartup;
+		default: return 1.0f;
+		}
+	}
+};
+
+/**
+ * How hard a landed hit lands (GDD 8.10): the technique's authored reaction, moved a step by its impact against the
+ * defender's Composure and stamina. Starting values, tuned in playtests.
+ */
+struct OPENSTANCE_API FOpenStanceSeverityTuning
+{
+	/** A defender on low stamina takes hits this much harder. */
+	float TiredDefenderScale = 1.2f;
+
+	/** Effective impact under this share of the technique's own is a step lighter; at or over StepUpFrom a step heavier. */
+	float StepDownBelow = 0.9f;
+	float StepUpFrom = 1.15f;
+};
+
 /** Where a clinch is: none, held while the referee is on the way, or the referee separating the fighters. */
 enum class EOpenStanceClinchPhase : uint8
 {
@@ -113,9 +161,16 @@ struct OPENSTANCE_API FOpenStanceFighterSim
 	/** Why each of this fighter's gam-jeom was given across the match, oldest first, for the HUD and the results page. */
 	TArray<FString> PenaltyReasons;
 
-	/** Under LT: which defense is up, and how long a sway has run. */
+	/** Under LT: which defense is up, how long it has been up, and how long a sway has run. */
 	EOpenStanceGuarding Guarding = EOpenStanceGuarding::ClosedGuard;
+	float GuardingElapsed = 0.0f;
 	float SwayElapsed = 0.0f;
+
+	/** Seconds the high block takes to come up from this fighter's guard; set each step for GetBody. */
+	float HighBlockRaiseSeconds = 0.05f;
+
+	/** Career attribute that weighs against a hit's impact (GDD 5.4, 8.10); Equal Terms holds it at 70. */
+	int32 ComposureAttribute = 70;
 
 	/** Attacks this fighter blocked or evaded this match, for the overlay and Results. */
 	int32 Blocks = 0;
@@ -180,6 +235,16 @@ public:
 	FOpenStanceStaminaTuning StaminaRules;
 	FOpenStancePenaltyTuning PenaltyRules;
 	FOpenStanceDefenseTuning DefenseRules;
+	FOpenStanceGuardTuning GuardRules;
+	FOpenStanceSeverityTuning SeverityRules;
+
+	/**
+	 * The reaction a landed hit causes (GDD 8.10): the authored one, a step lighter when the effective impact is well
+	 * under the technique's own (a tired attacker, a composed defender), a step heavier when well over it (a tired or
+	 * rattled defender). Impact already carries the attacker's low-stamina cut.
+	 */
+	static EOpenStanceReactionSeverity ResolveSeverity(EOpenStanceReactionSeverity Authored, float Impact, float TechniqueImpact, int32 Composure,
+		bool bDefenderLowStamina, const FOpenStanceSeverityTuning& Tuning);
 
 	/** Seconds since a technique of either fighter last reached its active phase, while play runs (the passivity timer). */
 	float PassivityElapsed = 0.0f;
