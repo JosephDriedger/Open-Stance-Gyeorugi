@@ -1,0 +1,319 @@
+{
+  "fighter": "D:\\Open-Stance-Gyeorugi\\Resources\\Models\\Animation\\MotionBuilder\\Medium\\OpenStance_Medium_Sparring.fbx",
+  "fighter_sha256": "934f4aded2f25ed8d939cbdc2227d66b2db35d41d297665c7893c575a5c8a70e",
+  "calibration": "D:/Open-Stance-Gyeorugi/Resources/Mocap/TestSession_2026-11-10/Subject 1_calibrationpose.c3d",
+  "trial": "D:/Open-Stance-Gyeorugi/Resources/Mocap/TestSession_2026-11-10/Relabelled/Subject 1_testspinkick1.c3d",
+  "plot_fps": 60,
+  "passed": true,
+  "character": "OpenStance_Medium_Sparring",
+  "tpose_rotation_deg": {
+    "upperarm_l": 52.7,
+    "lowerarm_l": 36.6,
+    "hand_l": 8.1,
+    "upperarm_r": 52.7,
+    "lowerarm_r": 36.6,
+    "hand_r": 8.1
+  },
+  "tpose_residual": {
+    "l": [
+      0.9999999999999999,
+      -1.6134526302228595e-08,
+      -5.750407805630481e-09
+    ],
+    "r": [
+      -0.9999999999997319,
+      7.222826620933382e-07,
+      1.2107952586163386e-07
+    ]
+  },
+  "marker_labels": [
+    "C7",
+    "CLAV",
+    "LANK",
+    "LASI",
+    "LBHD",
+    "LELB",
+    "LFHD",
+    "LFIN",
+    "LFRM",
+    "LHEE",
+    "LHIP",
+    "LKNE",
+    "LMT5",
+    "LPSI",
+    "LSHO",
+    "LTHI",
+    "LTIB",
+    "LTOE",
+    "LUPA",
+    "LWRA",
+    "LWRB",
+    "RANK",
+    "RASI",
+    "RBHD",
+    "RELB",
+    "RFHD",
+    "RFIN",
+    "RFRM",
+    "RHEE",
+    "RHIP",
+    "RKNE",
+    "RMT5",
+    "RPSI",
+    "RSHO",
+    "RTHI",
+    "RTIB",
+    "RTOE",
+    "RUPA",
+    "RWRA",
+    "RWRB",
+    "STRN",
+    "T10"
+  ],
+  "calibration_frame_120hz": 193,
+  "optical_yaw_deg": -87.35614407871145,
+  "facing_check": {
+    "forward": [
+      -6.210343645988333e-08,
+      -0.2623276555235613,
+      0.9649788604666467
+    ],
+    "left": [
+      0.998383874480088,
+      0.003241114456551093,
+      -0.056737415831242734
+    ]
+  },
+  "joint_centres_cm": {
+    "LHip": [
+      9.02,
+      88.14,
+      2.84
+    ],
+    "LKnee": [
+      11.67,
+      46.8,
+      -6.92
+    ],
+    "LAnkle": [
+      13.86,
+      3.99,
+      -11.87
+    ],
+    "LFoot": [
+      17.31,
+      1.5,
+      5.79
+    ],
+    "LShoulder": [
+      15.43,
+      144.0,
+      -7.63
+    ],
+    "LElbow": [
+      44.23,
+      131.86,
+      -6.52
+    ],
+    "LWrist": [
+      73.37,
+      136.95,
+      -3.03
+    ],
+    "RHip": [
+      -10.06,
+      88.07,
+      3.92
+    ],
+    "RKnee": [
+      -16.57,
+      47.11,
+      -3.92
+    ],
+    "RAnkle": [
+      -21.84,
+      3.75,
+      -7.02
+    ],
+    "RFoot": [
+      -23.58,
+      1.5,
+      10.03
+    ],
+    "RShoulder": [
+      -17.29,
+      142.49,
+      -6.53
+    ],
+    "RElbow": [
+      -44.56,
+      130.26,
+      0.57
+    ],
+    "RWrist": [
+      -72.65,
+      137.82,
+      6.21
+    ],
+    "Hips": [
+      -0.52,
+      92.1,
+      3.38
+    ],
+    "Chest": [
+      0.05,
+      122.22,
+      -0.77
+    ],
+    "Waist": [
+      -0.23,
+      107.16,
+      1.3
+    ],
+    "Neck": [
+      -0.36,
+      147.97,
+      -2.28
+    ],
+    "Head": [
+      1.94,
+      159.26,
+      3.04
+    ],
+    "LCollar": [
+      3.96,
+      143.25,
+      -2.28
+    ],
+    "RCollar": [
+      -2.04,
+      143.25,
+      -2.28
+    ]
+  },
+  "performer_estimates_cm": {
+    "head_marker_height": 167.9,
+    "pelvis_width_asis": 26.8,
+    "left_leg": 85.7,
+    "right_leg": 86.0,
+    "left_arm": 61.1,
+    "right_arm": 60.3
+  },
+  "calibration_arm_droop_deg": {
+    "L": 6.9,
+    "R": 4.8
+  },
+  "segment_lengths_cm": {
+    "thigh": 42.4,
+    "shank": 43.5,
+    "upperarm": 31.0,
+    "forearm": 29.7,
+    "hip_half_width": 9.6,
+    "shoulder_half_width": 16.4
+  },
+  "actor_fit_error_cm": {
+    "Hips": 0.0,
+    "Waist": 0.0,
+    "Chest": 0.0,
+    "Neck": 0.0,
+    "Head": 0.0,
+    "LHip": 0.0,
+    "LKnee": 0.0,
+    "LAnkle": 0.0,
+    "LFoot": 0.0,
+    "LCollar": 0.0,
+    "LShoulder": 0.0,
+    "LElbow": 0.0,
+    "LWrist": 0.0,
+    "RHip": 0.0,
+    "RKnee": 0.0,
+    "RAnkle": 0.0,
+    "RFoot": 0.0,
+    "RCollar": 0.0,
+    "RShoulder": 0.0,
+    "RElbow": 0.0,
+    "RWrist": 0.0
+  },
+  "markers_assigned": 42,
+  "markers_unassigned": [],
+  "snap_returned": false,
+  "zero_marker_offsets": [],
+  "optical_roots_after_trial_import": 1,
+  "trial_frames_120hz": 711,
+  "bone_vs_marker_distance": {
+    "pelvis": {
+      "median_cm": 15.6,
+      "p95_cm": 17.8,
+      "max_cm": 17.8
+    },
+    "head": {
+      "median_cm": 13.6,
+      "p95_cm": 17.2,
+      "max_cm": 17.3
+    },
+    "foot_l": {
+      "median_cm": 16.6,
+      "p95_cm": 17.2,
+      "max_cm": 17.2
+    },
+    "foot_r": {
+      "median_cm": 19.8,
+      "p95_cm": 21.5,
+      "max_cm": 23.2
+    },
+    "hand_l": {
+      "median_cm": 6.4,
+      "p95_cm": 14.2,
+      "max_cm": 22.9
+    },
+    "hand_r": {
+      "median_cm": 10.5,
+      "p95_cm": 16.9,
+      "max_cm": 21.4
+    }
+  },
+  "left_right_swapped_samples": 0,
+  "samples_checked": 178,
+  "foot_bone_height_cm": {
+    "l": {
+      "min": 2.9,
+      "median": 3.8
+    },
+    "r": {
+      "min": 1.5,
+      "median": 3.7
+    }
+  },
+  "worst_foot_frame_120hz": 321,
+  "baked_root": {
+    "was": "RIG_Body_Medium",
+    "scaling": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "rotation": [
+      -90.00000762939453,
+      -0.0,
+      0.0
+    ]
+  },
+  "editable_fbx": "D:\\Open-Stance-Gyeorugi\\tmp\\mocap_retarget\\spinfix\\Subject_1_testspinkick1_Actor.fbx",
+  "baked_fbx": "D:\\Open-Stance-Gyeorugi\\tmp\\mocap_retarget\\spinfix\\Subject_1_testspinkick1_Baked.fbx",
+  "reopened": {
+    "take": "Subject_1_testspinkick1",
+    "seconds": 5.917,
+    "pelvis_rot_keys": 356,
+    "pelvis_start_cm": [
+      35.7,
+      82.6,
+      3.4
+    ],
+    "pelvis_end_cm": [
+      -30.7,
+      83.4,
+      5.8
+    ]
+  },
+  "fighter_unchanged": true
+}

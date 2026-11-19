@@ -255,6 +255,10 @@ namespace OpenStanceMenuContent
 			{
 				MakeRow(TEXT("Players"), TEXT("Players"), { TEXT("1P vs AI"), TEXT("1P vs 2P"), TEXT("Online [Future]") }),
 				MakeRow(TEXT("Ruleset"), TEXT("Ruleset"), RulesetValues()),
+				// GDD 8.2's match options
+				MakeRow(TEXT("Rounds"), TEXT("Rounds"), { TEXT("Best of 3"), TEXT("Single Round") }),
+				MakeRow(TEXT("RoundLength"), TEXT("Round Length"), { TEXT("2:00"), TEXT("1:30"), TEXT("1:00") }),
+				MakeRow(TEXT("PointGap"), TEXT("Point Gap"), { TEXT("12"), TEXT("20"), TEXT("Off") }),
 				MakeRow(TEXT("Difficulty"), TEXT("AI Difficulty"), DifficultyValues(), 1),
 				MakeRow(TEXT("Arena"), TEXT("Arena"), { TEXT("Training Dojang"), TEXT("Club Dojang"), TEXT("National Arena"), TEXT("Olympic Arena"), TEXT("World Games Stadium [Future]") })
 			};

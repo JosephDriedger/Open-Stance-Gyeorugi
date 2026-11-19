@@ -90,7 +90,10 @@ void FOpenStanceFootwork::Tick(float DeltaSeconds, const FOpenStanceMotionInput&
 	{
 		Motion.PreviousGuard = State.Guard;
 		State.Guard = Guard;
-		Motion.GuardTransitionLeft = Tuning.GuardTransitionSeconds;
+		// The hands are moving for this long, and the new guard covers nothing until they arrive.
+		Motion.GuardTransitionLeft = Motion.PreviousGuard == EOpenStanceGuard::Mixed ? Tuning.GuardTransitionFromMixedSeconds
+			: Motion.PreviousGuard == EOpenStanceGuard::Cross ? Tuning.GuardTransitionSeconds
+			: Tuning.GuardTransitionFromHighLowSeconds;
 	}
 	Motion.GuardTransitionLeft = FMath::Max(0.0f, Motion.GuardTransitionLeft - DeltaSeconds);
 
@@ -146,7 +149,8 @@ void FOpenStanceFootwork::Tick(float DeltaSeconds, const FOpenStanceMotionInput&
 	{
 		// Dash (B): a fixed distance over a fixed time, along the stick or toward the opponent.
 		const bool bDashPressed = Input.bDash && !Motion.bPrevDash;
-		if (bDashPressed && Motion.DashRemaining <= 0.0f && !Motion.bSwitching && State.Stamina > 0.0f)
+		// Stamina never locks out a control (GDD 8.9): an empty pool still dashes, and stays at zero.
+		if (bDashPressed && Motion.DashRemaining <= 0.0f && !Motion.bSwitching)
 		{
 			Motion.DashRemaining = Tuning.DashSeconds;
 			Motion.DashDirection = bStick ? ToWorld(Stick, Motion.Facing).GetSafeNormal() : Motion.Facing;

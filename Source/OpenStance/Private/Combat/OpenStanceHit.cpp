@@ -2,6 +2,29 @@
 
 #include "Combat/OpenStanceFootwork.h"
 
+namespace
+{
+	/** Closest distance between two segments. */
+	float SegmentDistance(const FVector& P1, const FVector& Q1, const FVector& P2, const FVector& Q2)
+	{
+		FVector A, B;
+		FMath::SegmentDistToSegmentSafe(P1, Q1, P2, Q2, A, B);
+		return static_cast<float>(FVector::Dist(A, B));
+	}
+
+	bool TouchesGuard(const FOpenStanceFighterBody& Body, const FVector& Start, const FVector& End, float LimbRadius)
+	{
+		for (const FOpenStanceLimbCapsule& Limb : Body.Guard)
+		{
+			if (SegmentDistance(Start, End, Limb.A, Limb.B) <= Limb.Radius + LimbRadius)
+			{
+				return true;
+			}
+		}
+		return false;
+	}
+}
+
 void FOpenStanceHitRegistry::Reset()
 {
 	Serial = -1;
@@ -29,6 +52,136 @@ void FOpenStanceHitRegistry::GetZoneBounds(const FOpenStanceFighterBody& Body, E
 		OutTop = Height * Tuning.BeltLineFraction;
 		OutRadius = Height * Tuning.BelowBeltRadiusFraction;
 		break;
+	}
+}
+
+EOpenStanceBodyZone FOpenStanceHitRegistry::FindContact(const FOpenStanceLimbTrace& Trace, const FOpenStanceFighterBody& Body, const FOpenStanceHitTuning& Tuning, FVector& OutPoint, bool& bOutBlocked)
+{
+	bOutBlocked = false;
+	const float LimbRadius = Trace.Limb == EOpenStanceStrikeLimb::Glove ? Tuning.GloveRadiusCm : Tuning.FootGuardRadiusCm;
+	const int32 Samples = FMath::Max(Tuning.SamplesPerTrace, 2);
+	const float BeltLine = Body.HeightCm * Tuning.BeltLineFraction;
+	const float HeadBottom = Body.HeightCm * Tuning.HeadBottomFraction;
+	const auto ZoneAt = [&](float Height)
+	{
+		return Height >= HeadBottom ? EOpenStanceBodyZone::Head : Height >= BeltLine ? EOpenStanceBodyZone::Trunk : EOpenStanceBodyZone::BelowBelt;
+	};
+
+	// Real contact first: walk the sweep and stop at the first thing the striking limb touches, a guard limb or the body.
+	FVector Previous = Trace.Start;
+	for (int32 Index = 0; Index < Samples; ++Index)
+	{
+		const float Alpha = static_cast<float>(Index) / static_cast<float>(Samples - 1);
+		const FVector Point = FMath::Lerp(Trace.Start, Trace.End, Alpha);
+		const float Height = Point.Z - Body.Root.Z;
+		if (TouchesGuard(Body, Previous, Point, LimbRadius))
+		{
+			OutPoint = Point;
+			bOutBlocked = true;
+			return ZoneAt(Height);
+		}
+		Previous = Point;
+		if (Height < 0.0f || Height > Body.HeightCm)
+		{
+			continue;
+		}
+		const EOpenStanceBodyZone Zone = ZoneAt(Height);
+		float Bottom, Top, Radius;
+		GetZoneBounds(Body, Zone, Tuning, Bottom, Top, Radius);
+		const float Horizontal = static_cast<float>(FVector2D::Distance(FVector2D(Point.X, Point.Y), FVector2D(Body.Root.X, Body.Root.Y)));
+		if (Horizontal <= Radius + LimbRadius)
+		{
+			OutPoint = Point;
+			return Zone;
+		}
+	}
+
+	// A near miss: the alignment tolerance may nudge it into the zone, but never through an arm or leg in the way.
+	const EOpenStanceBodyZone Nudged = FindContact(Trace, Body, Tuning, OutPoint);
+	if (Nudged != EOpenStanceBodyZone::None)
+	{
+		const FVector Target(Body.Root.X, Body.Root.Y, OutPoint.Z);
+		bOutBlocked = TouchesGuard(Body, OutPoint, Target, LimbRadius);
+	}
+	return Nudged;
+}
+
+void FOpenStanceHitRegistry::BuildGuard(FOpenStanceFighterBody& Body, EOpenStanceGuard Guard, EOpenStanceGuardCover Cover, bool bRightLead)
+{
+	Body.Guard.Reset();
+	const float H = Body.HeightCm;
+	const float Scale = H / 175.0f;
+	const FVector Forward = FVector(Body.Facing.X, Body.Facing.Y, 0.0).GetSafeNormal();
+	const FVector Right(-Forward.Y, Forward.X, 0.0);
+	// Lead and rear sides of the body, as signs along Right.
+	const float Lead = bRightLead ? 1.0f : -1.0f;
+	const float Rear = -Lead;
+
+	// A point in the fighter's frame: forward and sideways in cm at the reference height, up as a share of the height.
+	const auto At = [&](float ForwardCm, float SideCm, float UpFraction)
+	{
+		return Body.Root + Forward * (ForwardCm * Scale) + Right * (SideCm * Scale) + FVector(0.0, 0.0, H * UpFraction);
+	};
+	const auto Add = [&](const FVector& A, const FVector& B, float Radius = 6.0f)
+	{
+		FOpenStanceLimbCapsule& Limb = Body.Guard.AddDefaulted_GetRef();
+		Limb.A = A;
+		Limb.B = B;
+		Limb.Radius = Radius * Scale;
+	};
+
+	// Forearms stand outside the body's own zones (trunk radius 19 cm, head 12 cm at 175 cm), and in every posture they
+	// leave the centre line open: a straight kick passes between them, a kick swinging in from a side meets that arm.
+	const auto HeadSide = [&](float Side) { Add(At(10.0f, Side * 18.0f, 0.82f), At(12.0f, Side * 18.0f, 0.95f)); };
+	const auto TrunkFlank = [&](float Side) { Add(At(14.0f, Side * 22.0f, 0.58f), At(14.0f, Side * 22.0f, 0.72f)); };
+
+	switch (Cover)
+	{
+	case EOpenStanceGuardCover::Closed:
+		// The guard closed over the protector: forearms together in front, elbows tight at the flanks. The head is open.
+		Add(At(26.0f, -8.0f, 0.58f), At(26.0f, -8.0f, 0.80f));
+		Add(At(26.0f, 8.0f, 0.58f), At(26.0f, 8.0f, 0.80f));
+		Add(At(14.0f, -22.0f, 0.60f), At(14.0f, -22.0f, 0.78f));
+		Add(At(14.0f, 22.0f, 0.60f), At(14.0f, 22.0f, 0.78f));
+		return;
+	case EOpenStanceGuardCover::High:
+		// Forearms up in front of the face and the upper arms beside the head. The trunk is open.
+		Add(At(20.0f, -8.0f, 0.82f), At(20.0f, -8.0f, 0.98f));
+		Add(At(20.0f, 8.0f, 0.82f), At(20.0f, 8.0f, 0.98f));
+		HeadSide(-1.0f);
+		HeadSide(1.0f);
+		return;
+	default:
+		break;
+	}
+
+	switch (Guard)
+	{
+	case EOpenStanceGuard::High:
+		HeadSide(Lead);
+		HeadSide(Rear);
+		break;
+	case EOpenStanceGuard::Low:
+		TrunkFlank(Lead);
+		TrunkFlank(Rear);
+		break;
+	case EOpenStanceGuard::Mixed:
+		TrunkFlank(Lead);
+		HeadSide(Rear);
+		break;
+	case EOpenStanceGuard::Cross:
+		// The rear forearm across the front of the trunk covers body kicks on the open side; the lead hand guards the head.
+		Add(At(24.0f, Rear * 12.0f, 0.64f), At(26.0f, Lead * 14.0f, 0.72f));
+		HeadSide(Lead);
+		break;
+	}
+
+	if (Cover == EOpenStanceGuardCover::LegCheck)
+	{
+		// The lead knee lifted in front of the protector: thigh up to the knee, shin hanging from it.
+		const FVector Knee = At(32.0f, Lead * 6.0f, 0.64f);
+		Add(At(10.0f, Lead * 10.0f, 0.50f), Knee, 7.0f);
+		Add(Knee, At(30.0f, Lead * 6.0f, 0.38f), 7.0f);
 	}
 }
 
@@ -67,15 +220,38 @@ EOpenStanceBodyZone FOpenStanceHitRegistry::FindContact(const FOpenStanceLimbTra
 	return EOpenStanceBodyZone::None;
 }
 
-FVector FOpenStanceHitRegistry::SyntheticTip(const FOpenStanceFighterBody& Attacker, const FVector& FacingXY, const FOpenStanceMoveRow& Row, float Progress, const FOpenStanceHitTuning& Tuning)
+FVector FOpenStanceHitRegistry::SyntheticTip(const FOpenStanceFighterBody& Attacker, const FVector& FacingXY, const FOpenStanceMoveRow& Row, float Progress, const FOpenStanceHitTuning& Tuning,
+	EOpenStanceLegSide Leg)
 {
 	const float Alpha = FMath::Clamp(Progress, 0.0f, 1.0f);
 	const float Smooth = Alpha * Alpha * (3.0f - 2.0f * Alpha);
 	const FOpenStanceMovementTuning Movement;
 	const float Reach = FOpenStanceFootwork::ScaleReachCm(Row.ReachCm, Attacker.HeightCm, Movement);
 	const bool bHead = Row.Target == EOpenStanceTarget::Head;
-	const float Height = Attacker.HeightCm * (bHead ? 0.90f : 0.70f);
-	const FVector Direction = FVector(FacingXY.X, FacingXY.Y, 0.0).GetSafeNormal();
+	const bool bPunch = Row.Technique == EOpenStanceTechnique::Punch;
+	// Head kicks at the face, body kicks at the protector's middle, a punch at the chest.
+	const float Height = Attacker.HeightCm * (bHead ? 0.90f : bPunch ? 0.76f : 0.70f);
+	const FVector Forward = FVector(FacingXY.X, FacingXY.Y, 0.0).GetSafeNormal();
+	const FVector Right(-Forward.Y, Forward.X, 0.0);
+
+	// Turning kicks swing in from a side and straighten onto the target: the roundhouse and tornado from the kicking leg's
+	// side, the hook and spin hook from the other. Side, axe and spin side kicks and the punch travel straight.
+	float Side = 0.0f;
+	switch (Row.Technique)
+	{
+	case EOpenStanceTechnique::Roundhouse:
+	case EOpenStanceTechnique::Tornado:
+		Side = Leg == EOpenStanceLegSide::Right ? 1.0f : -1.0f;
+		break;
+	case EOpenStanceTechnique::Hook:
+	case EOpenStanceTechnique::SpinHook:
+		Side = Leg == EOpenStanceLegSide::Right ? -1.0f : 1.0f;
+		break;
+	default:
+		break;
+	}
+	const float Angle = FMath::DegreesToRadians(70.0f) * (1.0f - Smooth) * Side;
+	const FVector Direction = Forward * FMath::Cos(Angle) + Right * FMath::Sin(Angle);
 	return FVector(Attacker.Root.X, Attacker.Root.Y, Attacker.Root.Z + Height) + Direction * (Reach * Smooth);
 }
 
@@ -121,9 +297,10 @@ bool FOpenStanceHitRegistry::Trace(const FOpenStanceHitContext& Context, TArray<
 	}
 
 	FVector Point = FVector::ZeroVector;
-	const EOpenStanceBodyZone Zone = FindContact(Context.Trace, Context.Defender, Tuning, Point);
+	bool bBlocked = false;
+	const EOpenStanceBodyZone Zone = FindContact(Context.Trace, Context.Defender, Tuning, Point, bBlocked);
 	Debug.ZoneHit = Zone;
-	if (Zone == EOpenStanceBodyZone::None)
+	if (Zone == EOpenStanceBodyZone::None && !bBlocked)
 	{
 		return false;
 	}
@@ -139,6 +316,15 @@ bool FOpenStanceHitRegistry::Trace(const FOpenStanceHitContext& Context, TArray<
 	Contact.Impact = Row.Impact * Context.ImpactScale;
 	Contact.Reaction = Row.Reaction;
 	Contact.Point = Point;
+
+	// An arm or leg of the guard took it: the technique is spent and nothing registers on the protector.
+	if (bBlocked)
+	{
+		Contact.Type = EOpenStanceContactType::Blocked;
+		bConsumed = true;
+		OutContacts.Add(Contact);
+		return true;
+	}
 
 	if (Zone == EOpenStanceBodyZone::BelowBelt)
 	{

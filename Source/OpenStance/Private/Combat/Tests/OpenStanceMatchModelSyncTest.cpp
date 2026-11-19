@@ -22,6 +22,8 @@ namespace
 		{
 			const UDataTable* Table = FOpenStanceMoveData::CreateSeedTable(GetTransientPackage());
 			Sim.SetMoveTable(Table);
+			Sim.RoundRules.CeremonySeconds = 0.0f;
+			Sim.RoundRules.BreakSeconds = 2.0f;
 			Sim.StartMatch(Distance);
 			Model = NewObject<UOpenStanceMatchModel>(GetTransientPackage());
 			Sync.Begin(Sim, *Model, TEXT("Min-jun Park"), TEXT("Dae-ho Kim"), Table);
@@ -122,6 +124,7 @@ bool FOpenStanceMatchModelSyncTest::RunTest(const FString& Parameters)
 		Rig.Sim.SetClock(30.0f);
 		Rig.Run(0.05f);
 		TestEqual(TEXT("the HUD clock follows the simulation"), Rig.Model->GetTimeRemaining(), 30.0f, 0.5f);
+		Rig.Sim.SetScore(1, 0); // decided on points, so no superiority call follows keu-man
 		Rig.Sim.SetClock(0.1f);
 		Rig.Run(0.5f);
 		TestEqual(TEXT("keu-man at the end of the round"), Rig.Model->GetCallTerm(), FString(TEXT("KEU-MAN")));
@@ -131,12 +134,18 @@ bool FOpenStanceMatchModelSyncTest::RunTest(const FString& Parameters)
 		TestFalse(TEXT("the match is not over"), Rig.Model->IsFinished());
 	}
 
-	// The simulation ending the match ends the HUD's.
+	// The simulation ending the match ends the HUD's: two rounds won by the 12-point gap.
 	{
 		FSyncRig Rig;
 		Rig.Sim.SetScore(12, 0);
 		Rig.Run(0.2f);
-		TestTrue(TEXT("the 12-point gap finishes the HUD's match"), Rig.Model->IsFinished());
+		TestFalse(TEXT("one gap round does not finish the match"), Rig.Model->IsFinished());
+		Rig.Sim.SkipBreak();
+		Rig.Run(0.05f);
+		Rig.Sim.SetScore(12, 0);
+		Rig.Run(0.2f);
+		TestTrue(TEXT("two finish the HUD's match"), Rig.Model->IsFinished());
+		TestEqual(TEXT("for Chung"), Rig.Model->GetWinner(), EOpenStanceSide::Chung);
 	}
 	return true;
 }

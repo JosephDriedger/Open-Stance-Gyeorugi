@@ -429,8 +429,11 @@ bool FOpenStanceCombatDefenseTest::RunTest(const FString& Parameters)
 	TestFalse(TEXT("a technique cannot start from it"), Rig.Attack(Rig.Request(TEXT("SideKick_Trunk"))));
 	Rig.Machine.SetDefense(false, Rig.State, Rig.Match, Rig.Events);
 	TestEqual(TEXT("releasing LT returns to idle"), Rig.State.CombatState, S::IdleMovement);
+	TestEqual(TEXT("raising the guard cost stamina"), Rig.State.Stamina, FOpenStanceFighterState::FullStamina - Rig.Machine.Tuning.DefenseStaminaCost, 0.001f);
+	TestFalse(TEXT("the defense recovery leaves an opening"), Rig.Attack(Rig.Request(TEXT("SideKick_Trunk"))));
+	Rig.Run(Rig.Machine.Tuning.DefenseRecoverySeconds + 0.02f);
 
-	Rig.Attack(Rig.Request(TEXT("SideKick_Trunk")));
+	TestTrue(TEXT("then a technique starts"), Rig.Attack(Rig.Request(TEXT("SideKick_Trunk"))));
 	Rig.Machine.SetDefense(true, Rig.State, Rig.Match, Rig.Events);
 	TestEqual(TEXT("LT does not interrupt a technique"), Rig.State.CombatState, S::AttackStartup);
 	return true;

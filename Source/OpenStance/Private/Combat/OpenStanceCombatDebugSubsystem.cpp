@@ -6,6 +6,7 @@
 #include "Camera/CameraComponent.h"
 #include "Combat/OpenStanceCameraPresets.h"
 #include "Combat/OpenStanceCombatOverlay.h"
+#include "Combat/OpenStanceCombatSettings.h"
 #include "Combat/OpenStanceGreyboxProof.h"
 #include "DrawDebugHelpers.h"
 #include "Engine/Canvas.h"
@@ -14,6 +15,8 @@
 #include "EngineUtils.h"
 #include "GameFramework/PlayerStart.h"
 #include "Components/SkeletalMeshComponent.h"
+#include "Engine/GameViewportClient.h"
+#include "Sound/SoundBase.h"
 #include "Components/StaticMeshComponent.h"
 #include "Engine/SkeletalMesh.h"
 #include "Engine/DataTable.h"
@@ -162,6 +165,11 @@ void UOpenStanceCombatDebugSubsystem::Deinitialize()
 		Menu->OnMatchRequested.RemoveDynamic(this, &UOpenStanceCombatDebugSubsystem::HandleMatchRequested);
 		Menu->OnLeaveMatch.Remove(LeaveMatchHandle);
 	}
+	if (DeviceConnectionHandle.IsValid())
+	{
+		IPlatformInputDeviceMapper::Get().GetOnInputDeviceConnectionChange().Remove(DeviceConnectionHandle);
+		DeviceConnectionHandle.Reset();
+	}
 	DestroyBodies();
 	UDebugDrawService::Unregister(DebugDrawHandle);
 	Super::Deinitialize();
@@ -222,11 +230,18 @@ void UOpenStanceCombatDebugSubsystem::SetGreyboxActive(bool bActive)
 			Camera->Destroy();
 			Camera = nullptr;
 		}
+		if (CameraTwo)
+		{
+			CameraTwo->Destroy();
+			CameraTwo = nullptr;
+		}
 		DestroyBodies();
 		SetDefaultPawnHidden(false);
 		bModelLinked = false;
 		bPlayingProof = false;
 		ProofCaption.Reset();
+		RemovePlayerTwo();
+		bTwoPlayers = false;
 		return;
 	}
 
@@ -252,7 +267,34 @@ void UOpenStanceCombatDebugSubsystem::SetGreyboxActive(bool bActive)
 		PlayerIndex = 0;
 	}
 	Sim.SetMoveTable(GetMoveTable());
+	// A real match runs WT rules (GDD 8.2): opening ceremony, best of three, 1:00 breaks. The proof plays one round from
+	// the first step, as it was recorded.
+	if (bPlayingProof)
+	{
+		FOpenStanceGreyboxProof::UseProofRules(Sim);
+	}
+	else
+	{
+		// The setup screen's rules (GDD 8.2): ruleset, rounds, round length and point gap; Equal Terms is always on here.
+		const UOpenStanceMenuSubsystem* SetupMenu = GetMenu();
+		Sim.ApplyChoices(SetupMenu ? SetupMenu->BuildMatchSetup().Choices : TMap<FName, FString>());
+		Sim.StaminaRules = UOpenStanceCombatSettings::GetStamina();
+		Sim.bEqualTerms = true;
+	}
+	// 1P vs 2P: player 2's pad drives the other side; otherwise the AI stand-in does.
+	bTwoPlayers = !bPlayingProof && IsTwoPlayerMatch() && GetPlayerTwo(true) != nullptr;
+	if (!bTwoPlayers)
+	{
+		RemovePlayerTwo();
+	}
+	if (!DeviceConnectionHandle.IsValid())
+	{
+		DeviceConnectionHandle = IPlatformInputDeviceMapper::Get().GetOnInputDeviceConnectionChange().AddUObject(this, &UOpenStanceCombatDebugSubsystem::HandleInputDeviceConnection);
+	}
 	Sim.StartMatch(bPlayingProof ? FOpenStanceGreyboxProof::StartDistanceCm : 200.0f);
+	Director.Reset(Sim);
+	// A referee picked at random for each match (GDD 11.2).
+	Referee.Reset(Sim, PlayerIndex, FMath::Rand());
 
 	// The Skill Stick follows the Options screen: the dead zone and the input window, 0.20 to 0.40 s (GDD 7.8).
 	if (const UOpenStanceUserSettings* Settings = bPlayingProof ? nullptr : UOpenStanceUserSettings::Get())
@@ -278,6 +320,7 @@ void UOpenStanceCombatDebugSubsystem::SetGreyboxActive(bool bActive)
 	if (APlayerController* Controller = World->GetFirstPlayerController())
 	{
 		BuildBodies();
+		BuildReferee();
 		SetDefaultPawnHidden(true);
 		FVector Position;
 		FRotator Rotation;
@@ -285,6 +328,25 @@ void UOpenStanceCombatDebugSubsystem::SetGreyboxActive(bool bActive)
 		Camera = World->SpawnActor<ACameraActor>(Position, Rotation);
 		Camera->FindComponentByClass<UCameraComponent>()->SetFieldOfView(GetCameraPreset().FieldOfViewDeg);
 		Controller->SetViewTargetWithBlend(Camera);
+
+		// Split screen: each half is 8:9, and player 2 gets a camera of their own behind their fighter.
+		const float Aspect = bTwoPlayers ? 8.0f / 9.0f : 16.0f / 9.0f;
+		Director.Tuning.AspectRatio = DirectorTwo.Tuning.AspectRatio = Aspect;
+		Director.Tuning.MaxFieldOfViewDeg = DirectorTwo.Tuning.MaxFieldOfViewDeg = bTwoPlayers ? 95.0f : 80.0f;
+		if (CameraTwo)
+		{
+			CameraTwo->Destroy();
+			CameraTwo = nullptr;
+		}
+		if (bTwoPlayers)
+		{
+			DirectorTwo.Reset(Sim);
+			CameraTwo = World->SpawnActor<ACameraActor>(Position, Rotation);
+			if (APlayerController* Two = GetPlayerTwo(false))
+			{
+				Two->SetViewTarget(CameraTwo);
+			}
+		}
 		LinkMatchModel();
 
 		// With the match HUD showing the side bars sit lower, under its name plates and stamina; they stay off in a normal
@@ -549,6 +611,107 @@ void UOpenStanceCombatDebugSubsystem::DestroyBodies()
 	FighterPivots.Reset();
 	FighterBodies.Reset();
 	ShownAnimation[0] = ShownAnimation[1] = nullptr;
+	if (IsValid(RefereeActor))
+	{
+		RefereeActor->Destroy();
+	}
+	RefereeActor = nullptr;
+	RefereeBody = nullptr;
+	RefereeShownClip = nullptr;
+}
+
+void UOpenStanceCombatDebugSubsystem::BuildReferee()
+{
+	UWorld* World = GetWorld();
+	const FString Name = FOpenStanceReferee::GetRefereeName(Referee.GetRefereeIndex());
+	USkeletalMesh* Mesh = LoadObject<USkeletalMesh>(nullptr, *FString::Printf(TEXT("/Game/Characters/Officials/Export/MH_Referee_%s_FullBody.MH_Referee_%s_FullBody"), *Name, *Name),
+		nullptr, LOAD_NoWarn | LOAD_Quiet);
+	if (!World || !Mesh)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Greybox: referee %s unavailable; the match runs without one on the mat."), *Name);
+		return;
+	}
+	RefereeActor = World->SpawnActor<AActor>();
+	USceneComponent* Root = NewObject<USceneComponent>(RefereeActor, TEXT("Root"));
+	Root->SetMobility(EComponentMobility::Movable);
+	RefereeActor->SetRootComponent(Root);
+	Root->RegisterComponent();
+	RefereeBody = NewObject<USkeletalMeshComponent>(RefereeActor, TEXT("RefereeBody"));
+	RefereeBody->SetSkeletalMesh(Mesh);
+	RefereeBody->SetupAttachment(Root);
+	// The same skeleton and facing as the fighters: the mesh faces +Y, the actor's forward is +X.
+	RefereeBody->SetRelativeRotation(FRotator(0.0, -90.0, 0.0));
+	RefereeBody->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	RefereeBody->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::AlwaysTickPoseAndRefreshBones;
+	RefereeBody->SetAnimationMode(EAnimationMode::AnimationSingleNode);
+	RefereeBody->RegisterComponent();
+	// The referee's outfit, each piece following the body's pose.
+	for (const TCHAR* Piece : { TEXT("Shirt"), TEXT("Trousers"), TEXT("Shoes"), TEXT("Belt"), TEXT("Tie") })
+	{
+		USkeletalMesh* Garment = LoadObject<USkeletalMesh>(nullptr, *FString::Printf(TEXT("/Game/Characters/Officials/Outfits/%s/SK_Referee_%s.SK_Referee_%s"), *Name, Piece, Piece),
+			nullptr, LOAD_NoWarn | LOAD_Quiet);
+		if (!Garment)
+		{
+			continue;
+		}
+		USkeletalMeshComponent* Part = NewObject<USkeletalMeshComponent>(RefereeActor, FName(*FString::Printf(TEXT("Referee%s"), Piece)));
+		Part->SetSkeletalMesh(Garment);
+		Part->SetupAttachment(RefereeBody);
+		Part->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		Part->RegisterComponent();
+		Part->SetLeaderPoseComponent(RefereeBody);
+	}
+	RefereeShownClip = nullptr;
+	UE_LOG(LogTemp, Display, TEXT("Greybox: referee %s"), *Name);
+}
+
+void UOpenStanceCombatDebugSubsystem::UpdateReferee(float DeltaSeconds)
+{
+	Referee.Update(DeltaSeconds, Sim, PlayerIndex);
+	for (const FOpenStanceRefereeCall& Call : Referee.GetNewCalls())
+	{
+		PlayRefereeVoice(Call);
+	}
+	if (!IsValid(RefereeActor) || !RefereeBody)
+	{
+		return;
+	}
+	const FVector2D Facing = Referee.GetFacing();
+	RefereeActor->SetActorLocationAndRotation(ToWorld(Referee.GetPosition()), FRotator(0.0, FMath::RadiansToDegrees(FMath::Atan2(Facing.Y, Facing.X)), 0.0));
+
+	// The gesture's pose clip; the mirrored copy when the arm on the named fighter's side is the left.
+	static const TCHAR* PoseNames[] = { TEXT("Idle"), TEXT("Attention"), TEXT("Bow"), TEXT("Ready"), TEXT("Start"), TEXT("Separate"), TEXT("Stop"),
+		TEXT("Point"), TEXT("Count"), TEXT("RaiseWinner") };
+	const FString Clip = FString::Printf(TEXT("AS_Placeholder_Referee_%s%s"), PoseNames[static_cast<int32>(Referee.GetPose())], Referee.IsGestureRight() ? TEXT("") : TEXT("_Mirror"));
+	UAnimSequenceBase* Sequence = LoadObject<UAnimSequenceBase>(nullptr, *FString::Printf(TEXT("/Game/Animation/Referee/Placeholder/%s.%s"), *Clip, *Clip), nullptr,
+		LOAD_NoWarn | LOAD_Quiet);
+	if (Sequence && Sequence != RefereeShownClip)
+	{
+		RefereeBody->SetAnimation(Sequence);
+		RefereeBody->SetPlayRate(0.0f);
+		RefereeShownClip = Sequence;
+	}
+}
+
+void UOpenStanceCombatDebugSubsystem::PlayRefereeVoice(const FOpenStanceRefereeCall& Call)
+{
+	// The selected referee's voice set; temporary until the production recordings (GDD 11.2, Audio Recording List).
+	const FString Name = FOpenStanceReferee::GetRefereeName(Referee.GetRefereeIndex());
+	const FString Cue = Call.Cue.ToString();
+	const FString Path = FString::Printf(TEXT("/Game/Audio/Referee/%s/%s.%s"), *Name, *Cue, *Cue);
+	USoundBase* Sound = LoadObject<USoundBase>(nullptr, *Path, nullptr, LOAD_NoWarn | LOAD_Quiet);
+	if (!Sound)
+	{
+		if (!MissingRefereeVoice.Contains(Call.Cue))
+		{
+			MissingRefereeVoice.Add(Call.Cue);
+			UE_LOG(LogTemp, Verbose, TEXT("Greybox: no referee voice line %s yet; the subtitle carries the call."), *Path);
+		}
+		return;
+	}
+	const UOpenStanceUserSettings* Settings = UOpenStanceUserSettings::Get();
+	const float Volume = Settings ? Settings->RefereeVoiceVolume / 100.0f : 1.0f;
+	UGameplayStatics::PlaySound2D(this, Sound, Volume);
 }
 
 void UOpenStanceCombatDebugSubsystem::UpdateBodies()
@@ -640,7 +803,7 @@ void UOpenStanceCombatDebugSubsystem::UpdateBodies()
 		// The throwing limb reaches for the trace's tip.
 		if (Attack && Blend > 0.0f)
 		{
-			const FVector Tip = FOpenStanceHitRegistry::SyntheticTip(F.GetBody(), Facing0, Attack->Row, 1.0f, Sim.Hits) + Origin + Up * Lift;
+			const FVector Tip = FOpenStanceHitRegistry::SyntheticTip(F.GetBody(), Facing0, Attack->Row, 1.0f, Sim.Hits, Attack->Leg) + Origin + Up * Lift;
 			const bool bRightSide = Attack->Leg == EOpenStanceLegSide::Right;
 			if (Attack->Row.Limb == EOpenStanceStrikeLimb::Glove)
 			{
@@ -903,6 +1066,18 @@ void UOpenStanceCombatDebugSubsystem::UpdateCamera(float DeltaTime)
 	{
 		return;
 	}
+	if (CameraTwo)
+	{
+		// Player 2's half of the split screen: the same shots, framed from behind player 2's fighter.
+		DriveCamera(CameraTwo, DirectorTwo, 1 - PlayerIndex, DeltaTime);
+	}
+	if (&GetCameraPreset() == &OpenStanceCameraPresets::Match())
+	{
+		DriveCamera(Camera, Director, PlayerIndex, DeltaTime);
+		return;
+	}
+
+	// os.CameraPreset previews another angle as it is.
 	FVector Position;
 	FRotator Rotation;
 	GetFollowCameraPose(Position, Rotation);
@@ -911,6 +1086,29 @@ void UOpenStanceCombatDebugSubsystem::UpdateCamera(float DeltaTime)
 	if (UCameraComponent* Lens = Camera->FindComponentByClass<UCameraComponent>())
 	{
 		Lens->SetFieldOfView(FMath::FInterpTo(Lens->FieldOfView, GetCameraPreset().FieldOfViewDeg, DeltaTime, FollowCameraSpeed));
+	}
+}
+
+void UOpenStanceCombatDebugSubsystem::DriveCamera(AActor* CameraActor, FOpenStanceCameraDirector& CameraDirector, int32 FighterIndex, float DeltaTime)
+{
+	// The director picks the shot (combat, ceremony, break, a spin-score cut, results) and frames it.
+	const FOpenStanceCameraFrame Frame = CameraDirector.Update(DeltaTime, Sim, FighterIndex, bCameraHeld);
+	const FVector Position = Origin + Frame.Position;
+	UCameraComponent* Lens = CameraActor->FindComponentByClass<UCameraComponent>();
+	if (Frame.bCut)
+	{
+		CameraActor->SetActorLocationAndRotation(Position, Frame.Rotation);
+		if (Lens)
+		{
+			Lens->SetFieldOfView(Frame.FieldOfViewDeg);
+		}
+		return;
+	}
+	CameraActor->SetActorLocationAndRotation(FMath::VInterpTo(CameraActor->GetActorLocation(), Position, DeltaTime, FollowCameraSpeed),
+		FMath::RInterpTo(CameraActor->GetActorRotation(), Frame.Rotation, DeltaTime, FollowCameraSpeed));
+	if (Lens)
+	{
+		Lens->SetFieldOfView(FMath::FInterpTo(Lens->FieldOfView, Frame.FieldOfViewDeg, DeltaTime, FollowCameraSpeed));
 	}
 }
 
@@ -1129,8 +1327,72 @@ void UOpenStanceCombatDebugSubsystem::DrawProofCaption(UCanvas* Canvas) const
 
 FOpenStanceFighterControls UOpenStanceCombatDebugSubsystem::PollController() const
 {
+	return PollPad(GetWorld() ? GetWorld()->GetFirstPlayerController() : nullptr);
+}
+
+bool UOpenStanceCombatDebugSubsystem::IsTwoPlayerMatch() const
+{
+	const UOpenStanceMenuSubsystem* Menu = GetMenu();
+	return Menu && Menu->GetSession().Mode == EOpenStanceMatchMode::Sparring
+		&& Menu->GetChoiceIndex(EOpenStanceMenuScreen::Sparring, TEXT("Players"), 0) == 1;
+}
+
+APlayerController* UOpenStanceCombatDebugSubsystem::GetPlayerTwo(bool bCreate)
+{
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		return nullptr;
+	}
+	APlayerController* Two = UGameplayStatics::GetPlayerController(World, 1);
+	if (!Two && bCreate)
+	{
+		// The second local player takes the second pad. No split screen: one match camera for both (GDD 7.5).
+		if (UGameViewportClient* Viewport = World->GetGameViewport())
+		{
+			Viewport->SetForceDisableSplitscreen(false);
+		}
+		Two = UGameplayStatics::CreatePlayer(World, 1, true);
+		UE_LOG(LogOpenStanceCombat, Display, TEXT("Greybox: player 2 %s"), Two ? TEXT("joined on the second controller") : TEXT("could not be created"));
+	}
+	if (Two && CameraTwo)
+	{
+		Two->SetViewTarget(CameraTwo);
+	}
+	return Two;
+}
+
+void UOpenStanceCombatDebugSubsystem::RemovePlayerTwo()
+{
+	UWorld* World = GetWorld();
+	if (APlayerController* Two = World ? UGameplayStatics::GetPlayerController(World, 1) : nullptr)
+	{
+		UGameplayStatics::RemovePlayer(Two, true);
+	}
+	bPrevPlayerTwoMenu = false;
+}
+
+void UOpenStanceCombatDebugSubsystem::HandleInputDeviceConnection(EInputDeviceConnectionState NewState, FPlatformUserId User, FInputDeviceId Device)
+{
+	if (!bGreybox || NewState != EInputDeviceConnectionState::Disconnected)
+	{
+		return;
+	}
+	// A player lost their pad: hold the match on the pause menu; play resumes when they reconnect and choose Resume.
+	UE_LOG(LogOpenStanceCombat, Display, TEXT("Greybox: a controller disconnected (device %d); match paused"), Device.GetId());
+	if (UOpenStanceMenuSubsystem* Menu = GetMenu())
+	{
+		if (!Menu->GetMatchModel()->IsPaused())
+		{
+			Menu->ShowPauseMenu();
+		}
+		Menu->GetMatchModel()->SetCall(TEXT("CONTROLLER"), TEXT("Reconnect the controller, then Resume"));
+	}
+}
+
+FOpenStanceFighterControls UOpenStanceCombatDebugSubsystem::PollPad(const APlayerController* PC)
+{
 	FOpenStanceFighterControls C;
-	const APlayerController* PC = GetWorld() ? GetWorld()->GetFirstPlayerController() : nullptr;
 	if (!PC)
 	{
 		return C;
@@ -1185,12 +1447,39 @@ void UOpenStanceCombatDebugSubsystem::Tick(float DeltaTime)
 		}
 	}
 	const bool bHeld = Model && Model->IsPaused();
+	bCameraHeld = bHeld;
 
 	// A fixed step keeps the simulation the same whatever the frame rate, and slomo scales DeltaTime for free.
 	Accumulator = bHeld ? 0.0f : Accumulator + FMath::Min(DeltaTime, 0.1f);
 	FOpenStanceFighterControls PlayerControls = PollController();
 	FOpenStanceFighterControls OpponentControls;
-	OpponentControls.bLT = AIMode == EOpenStanceAIMode::Block;
+	if (bTwoPlayers)
+	{
+		// Player 2's own pad, through player 2's controller.
+		const APlayerController* Two = GetPlayerTwo(false);
+		OpponentControls = PollPad(Two);
+		// Either player can pause: player 2's Menu button opens the same pause menu (player 1's is the match screen's).
+		const bool bTwoMenu = Two && Two->IsInputKeyDown(EKeys::Gamepad_Special_Right);
+		if (bTwoMenu && !bPrevPlayerTwoMenu && !bHeld)
+		{
+			if (UOpenStanceMenuSubsystem* Menu = GetMenu())
+			{
+				Menu->ShowPauseMenu();
+			}
+		}
+		bPrevPlayerTwoMenu = bTwoMenu;
+	}
+	else
+	{
+		OpponentControls.bLT = AIMode == EOpenStanceAIMode::Block;
+	}
+	// A in the break between rounds skips it, once per press, from either player (GDD 8.2); in play A switches sides.
+	const bool bSkipPressed = PlayerControls.bA || (bTwoPlayers && OpponentControls.bA);
+	if (!bHeld && bSkipPressed && !bPrevSkipBreak)
+	{
+		Sim.SkipBreak();
+	}
+	bPrevSkipBreak = bSkipPressed;
 	// The deciding kick ends the proof: the result replaces the last stage's caption through the hold and on Results,
 	// which can pause the simulation before the recorded track runs out.
 	if (bPlayingProof && Sim.Fighters[0].State.CombatState == EOpenStanceCombatState::MatchFinished)
@@ -1230,6 +1519,7 @@ void UOpenStanceCombatDebugSubsystem::Tick(float DeltaTime)
 	}
 	UpdateCamera(DeltaTime);
 	UpdateBodies();
+	UpdateReferee(bCameraHeld ? 0.0f : DeltaTime);
 	HandleInvertToggle();
 	// The proof's input is in the side bar; Unreal's on-screen lines would sit on top of the HUD's video review panel.
 	if (bPlayingProof || (!ProofResult.IsEmpty() && FPlatformTime::Seconds() < ProofResultUntil))
@@ -1277,6 +1567,16 @@ void UOpenStanceCombatDebugSubsystem::DrawWorld() const
 			float Bottom, Top, ZoneRadius;
 			FOpenStanceHitRegistry::GetZoneBounds(Body, Zones[Zone], Sim.Hits, Bottom, Top, ZoneRadius);
 			DrawDebugCylinder(World, ToWorld(F.Motion.Position, Bottom), ToWorld(F.Motion.Position, Top), ZoneRadius, 16, ZoneColours[Zone], false, 0.0f, 0, 1.0f);
+		}
+
+		// The guard's arms and a leg check: what blocks a strike (os.ShowHitboxes).
+		for (const FOpenStanceLimbCapsule& Limb : Body.Guard)
+		{
+			const FVector A = ToWorld(FVector2D(Limb.A.X, Limb.A.Y), static_cast<float>(Limb.A.Z));
+			const FVector B = ToWorld(FVector2D(Limb.B.X, Limb.B.Y), static_cast<float>(Limb.B.Z));
+			const FVector Axis = (B - A).GetSafeNormal();
+			const float Half = static_cast<float>(FVector::Dist(A, B)) * 0.5f + Limb.Radius;
+			DrawDebugCapsule(World, (A + B) * 0.5f, Half, Limb.Radius, FQuat::FindBetweenNormals(FVector::UpVector, Axis), FColor::Cyan, false, 0.0f, 0, 1.0f);
 		}
 		const FOpenStanceTraceDebug& Trace = F.Registry.GetLastTrace();
 		if (Trace.bEvaluated)
@@ -1442,6 +1742,15 @@ namespace
 			if (UOpenStanceCombatDebugSubsystem* Subsystem = Find(World); Subsystem && Args.Num() >= 1)
 			{
 				Subsystem->SetClockCheat(FCString::Atof(*Args[0]));
+			}
+		}));
+
+	FAutoConsoleCommandWithWorld SkipBreakCommand(TEXT("os.SkipBreak"), TEXT("os.SkipBreak - ends the break between rounds now"),
+		FConsoleCommandWithWorldDelegate::CreateLambda([](UWorld* World)
+		{
+			if (UOpenStanceCombatDebugSubsystem* Subsystem = Find(World))
+			{
+				Subsystem->SkipBreak();
 			}
 		}));
 

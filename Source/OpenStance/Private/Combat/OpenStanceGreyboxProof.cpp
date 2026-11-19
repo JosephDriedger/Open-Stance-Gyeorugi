@@ -79,6 +79,15 @@ namespace
 	};
 }
 
+void FOpenStanceGreyboxProof::UseProofRules(FOpenStanceMatchSim& Sim)
+{
+	Sim.RoundRules = FOpenStanceRoundTuning();
+	Sim.RoundRules.RoundCount = 1;
+	Sim.RoundRules.CeremonySeconds = 0.0f;
+	Sim.StaminaRules = FOpenStanceStaminaTuning();
+	Sim.bEqualTerms = true;
+}
+
 TArray<FOpenStanceGreyboxProof::FStage> FOpenStanceGreyboxProof::Run(FOpenStanceMatchSim& Sim, FTrack* OutTrack)
 {
 	FProofRun Run(Sim);
@@ -87,6 +96,7 @@ TArray<FOpenStanceGreyboxProof::FStage> FOpenStanceGreyboxProof::Run(FOpenStance
 		*OutTrack = FTrack();
 		Run.Track = OutTrack;
 	}
+	UseProofRules(Sim);
 	Sim.StartMatch(StartDistanceCm);
 	Run.Caption(TEXT("Milestone 1 Greybox Proof · Chung on the Skill Stick, Hong Idle"));
 	Run.Hold(0.2f);

@@ -60,17 +60,18 @@ S = HIP_Z / .915
 
 
 def stance():
-    # Sparring stance (gyeorugi junbi): side-on with the left foot leading, feet a long step apart on the opponent line,
-    # knees soft and weight on the balls of the feet; fists closed, lead fist forward at shoulder height, rear fist by
-    # the chin, elbows down guarding the trunk. Between the user's two reference photos (WT upright, and a lower base).
+    # Sparring stance (gyeorugi junbi) as WT fighters stand in competition (studied in the Paris 2024 men's -58 kg final
+    # and Grand Prix footage): upright, about 45 degrees side-on with the left foot leading, feet a little wider than the
+    # shoulders on the opponent line, knees soft and weight on the balls of the feet. The hands sit LOW, not in a
+    # boxing guard: the lead fist forward at the belt, the rear fist at the chest, elbows in over the protector.
     return {
-        'pelvis': dict(drop=.085, yaw=-52, pitch=0, roll=0, shift=V(0, 0, 0)),
-        'chest': dict(yaw=14, pitch=5, roll=0),
+        'pelvis': dict(drop=.05, yaw=-45, pitch=0, roll=0, shift=V(0, 0, 0)),
+        'chest': dict(yaw=10, pitch=2, roll=0),
         'look': 0,
-        'foot_l': dict(at=V(.10, -.33, FOOT_Z), pole=V(.5, -1, .2), toe=V(-.25, -1, 0)),
-        'foot_r': dict(at=V(-.13, .30, FOOT_Z), pole=V(-.4, -1, .1), toe=V(-1, -.35, 0)),
-        'hand_l': dict(at=V(.07, -.40, 1.30), pole=V(.5, .1, -1)),
-        'hand_r': dict(at=V(-.05, -.26, 1.35), pole=V(-.5, .2, -1)),
+        'foot_l': dict(at=V(.10, -.34, FOOT_Z), pole=V(.5, -1, .2), toe=V(-.25, -1, 0)),
+        'foot_r': dict(at=V(-.14, .30, FOOT_Z), pole=V(-.4, -1, .1), toe=V(-1, -.35, 0)),
+        'hand_l': dict(at=V(.12, -.38, 1.02), pole=V(.6, .2, -1)),
+        'hand_r': dict(at=V(-.04, -.24, 1.20), pole=V(-.6, .2, -1)),
     }
 
 
@@ -320,7 +321,11 @@ def key_pose(p, frame):
 # Each: list of (phase, pose). Phases: 0 start, 'S' end of startup (strike fully out), 'A' end of active, 1 end of
 # recovery; numbers in between are fractions of the whole clip.
 STANCE = stance()
-CHAMBER_R = dict(at=V(-.04, -.12, .62), pole=V(0, -1, .6), toe=V(0, .3, -1))
+# The kicking knee comes up to chest height before the leg goes out (the WT chamber).
+CHAMBER_R = dict(at=V(-.04, -.14, .72), pole=V(0, -1, .7), toe=V(0, .3, -1))
+# On film the arms leave the guard as the leg goes out: flung wide and low for balance while the trunk leans back,
+# the lead arm forward-out toward the kick, the rear arm back. They come home as the leg re-chambers.
+ARMS_OUT = dict(hand_l=dict(at=V(.30, -.62, 1.12), pole=V(1, 0, -.4)), hand_r=dict(at=V(-.58, .18, 1.18), pole=V(-1, .3, -.4)))
 
 
 def roundhouse(height):
@@ -328,20 +333,21 @@ def roundhouse(height):
         (0, STANCE),
         ('S/2', pose(pelvis=dict(yaw=-90, roll=-8), chest=dict(yaw=40), foot_r=CHAMBER_R,
                      foot_l=dict(toe=V(.6, -.8, 0)))),
-        ('S', pose(pelvis=dict(yaw=-115, roll=-22, drop=.04), chest=dict(yaw=60, roll=8), look=0,
+        # the trunk leans well back off the kicking hip (about 30 degrees on film) and the arms swing out
+        ('S', pose(pelvis=dict(yaw=-115, roll=-32, drop=.04), chest=dict(yaw=55, roll=2), look=0,
                    foot_r=dict(at=V(.05, -.78, height), pole=V(0, 0, 1), toe=V(.9, -.2, -.2)),
-                   foot_l=dict(toe=V(.9, -.4, 0)), hand_r=dict(at=V(-.25, .05, 1.0), pole=V(-.4, .6, -1)))),
-        ('A', pose(pelvis=dict(yaw=-115, roll=-22, drop=.04), chest=dict(yaw=60, roll=8),
+                   foot_l=dict(toe=V(.9, -.4, 0)), **ARMS_OUT)),
+        ('A', pose(pelvis=dict(yaw=-115, roll=-32, drop=.04), chest=dict(yaw=55, roll=2),
                    foot_r=dict(at=V(.02, -.75, height), pole=V(0, 0, 1), toe=V(.9, -.2, -.2)),
-                   foot_l=dict(toe=V(.9, -.4, 0)), hand_r=dict(at=V(-.25, .05, 1.0), pole=V(-.4, .6, -1)))),
+                   foot_l=dict(toe=V(.9, -.4, 0)), **ARMS_OUT)),
         ('A+R/2', pose(pelvis=dict(yaw=-90, roll=-8), chest=dict(yaw=40), foot_r=CHAMBER_R)),
         (1, STANCE),
     ]
 
 
 def side_kick(height):
-    out = dict(pelvis=dict(yaw=-125, pitch=0, roll=-25, drop=.03), chest=dict(yaw=40, roll=10), look=-10,
-               foot_l=dict(toe=V(1, .3, 0)), hand_r=dict(at=V(-.30, .15, 1.0), pole=V(-.2, .6, -1)))
+    out = dict(pelvis=dict(yaw=-125, pitch=0, roll=-34, drop=.03), chest=dict(yaw=40, roll=4), look=-10,
+               foot_l=dict(toe=V(1, .3, 0)), **ARMS_OUT)
     return [
         (0, STANCE),
         ('S/2', pose(pelvis=dict(yaw=-100, roll=-6), chest=dict(yaw=30), foot_r=dict(at=V(.0, -.05, .66), pole=V(0, -1, 1), toe=V(1, 0, -.4)),
@@ -354,8 +360,9 @@ def side_kick(height):
 
 
 def hook(height):
-    out = dict(pelvis=dict(yaw=-125, roll=-25, drop=.03), chest=dict(yaw=40, roll=10), foot_l=dict(toe=V(1, .3, 0)),
-               hand_r=dict(at=V(-.30, .15, 1.0), pole=V(-.2, .6, -1)))
+    # a head kick leans further back still (the foot goes above the head on film)
+    out = dict(pelvis=dict(yaw=-125, roll=-38, drop=.03), chest=dict(yaw=40, roll=4), foot_l=dict(toe=V(1, .3, 0)),
+               **ARMS_OUT)
     return [
         (0, STANCE),
         ('S/2', pose(pelvis=dict(yaw=-100, roll=-6), chest=dict(yaw=30), foot_r=dict(at=V(.0, -.05, .7), pole=V(0, -1, 1), toe=V(1, 0, -.4)),
@@ -371,7 +378,8 @@ def axe():
     return [
         (0, STANCE),
         ('S/2', pose(pelvis=dict(yaw=-30, pitch=-6), foot_r=dict(at=V(-.02, -.55, 1.15), pole=V(0, -.3, 1), toe=V(0, -1, .5)))),
-        ('S', pose(pelvis=dict(yaw=-25, pitch=-12), chest=dict(pitch=-8), foot_r=dict(at=V(.0, -.40, 1.72), pole=V(0, -1, 0), toe=V(0, -.3, 1)))),
+        ('S', pose(pelvis=dict(yaw=-25, pitch=-20), chest=dict(pitch=-12), foot_r=dict(at=V(.0, -.40, 1.72), pole=V(0, -1, 0), toe=V(0, -.3, 1)),
+                   **ARMS_OUT)),
         ('A', pose(pelvis=dict(yaw=-25, pitch=4), chest=dict(pitch=10), foot_r=dict(at=V(.0, -.62, .95), pole=V(0, -1, 0), toe=V(0, -1, -.3)))),
         ('A+R/2', pose(pelvis=dict(yaw=-30), foot_r=dict(at=V(.0, -.45, .35), pole=V(0, -1, .3), toe=V(0, -1, -.2)))),
         (1, STANCE),
@@ -386,8 +394,11 @@ def punch():
 
 def back_kick(height):
     # in place: the greybox has turned the fighter half round by the end of startup, so the kick goes out the back (+Y)
-    out = dict(pelvis=dict(yaw=-40, pitch=-14, drop=.02), chest=dict(pitch=-12), look=180,
-               foot_r=dict(at=V(-.02, .82, height), pole=V(0, 0, 1), toe=V(0, .3, -1)))
+    # On film the trunk tips forward and low, away from the heel driving straight back, arms tucked in to the chest
+    # (it leaned back over the leg before, which tipped the head back).
+    out = dict(pelvis=dict(yaw=-40, pitch=24, drop=.06), chest=dict(pitch=10), look=180,
+               foot_r=dict(at=V(-.02, .82, height), pole=V(0, 0, 1), toe=V(0, .3, -1)),
+               hand_l=dict(at=V(.10, -.20, 1.15), pole=V(.6, .2, -1)), hand_r=dict(at=V(-.10, -.18, 1.18), pole=V(-.6, .2, -1)))
     return [
         (0, STANCE),
         ('S/2', pose(look=150, foot_r=dict(at=V(-.04, .10, .62), pole=V(0, -1, .3), toe=V(0, .2, -1)))),
@@ -399,7 +410,7 @@ def back_kick(height):
 
 def spin_hook(height):
     # straight leg out behind, sweeping round with the turn the greybox applies
-    sweep = lambda x, y: pose(pelvis=dict(yaw=-40, roll=18, drop=.02), chest=dict(roll=-10), look=170,
+    sweep = lambda x, y: pose(pelvis=dict(yaw=-40, pitch=18, roll=18, drop=.04), chest=dict(pitch=6, roll=-10), look=170,
                               foot_r=dict(at=V(x, y, height), pole=V(0, 0, 1), toe=V(0, 1, .2)))
     return [
         (0, STANCE),
@@ -416,12 +427,12 @@ def tornado(height):
     return [
         (0, STANCE),
         ('S/2', tuck),
-        ('S', pose(pelvis=dict(yaw=-115, roll=-22), chest=dict(yaw=60, roll=8),
+        ('S', pose(pelvis=dict(yaw=-115, roll=-30), chest=dict(yaw=55, roll=2),
                    foot_r=dict(at=V(.05, -.78, height), pole=V(0, 0, 1), toe=V(.9, -.2, -.2)),
-                   foot_l=dict(at=V(.10, .05, .40), pole=V(0, -1, .5), toe=V(0, -1, -.4)))),
-        ('A', pose(pelvis=dict(yaw=-115, roll=-22), chest=dict(yaw=60, roll=8),
+                   foot_l=dict(at=V(.10, .05, .40), pole=V(0, -1, .5), toe=V(0, -1, -.4)), **ARMS_OUT)),
+        ('A', pose(pelvis=dict(yaw=-115, roll=-30), chest=dict(yaw=55, roll=2),
                    foot_r=dict(at=V(.03, -.75, height), pole=V(0, 0, 1), toe=V(.9, -.2, -.2)),
-                   foot_l=dict(at=V(.10, .05, .40), pole=V(0, -1, .5), toe=V(0, -1, -.4)))),
+                   foot_l=dict(at=V(.10, .05, .40), pole=V(0, -1, .5), toe=V(0, -1, -.4)), **ARMS_OUT)),
         ('A+R/2', pose(foot_r=CHAMBER_R)),
         (1, STANCE),
     ]

@@ -134,7 +134,7 @@ TArray<FString> FOpenStanceCombatOverlay::BuildLines(const FOpenStanceMatchSim& 
 		return Lines;
 	}
 
-	Lines.Add(FString::Printf(TEXT("%s  score %d  gam-jeom %d"), Name, F.State.Score, F.State.GamJeom));
+	Lines.Add(FString::Printf(TEXT("%s  score %d  gam-jeom %d  rounds won %d"), Name, F.State.Score, F.State.GamJeom, F.RoundWins));
 	Lines.Add(FString::Printf(TEXT("%s | %s guard | %s%s"), F.State.Stance == EOpenStanceStance::LeftLead ? TEXT("Left Lead") : TEXT("Right Lead"),
 		GuardText(F.State.Guard), *StateName(F.State.CombatState), F.Motion.bSwitching ? TEXT(" | switching sides") : TEXT("")));
 	if (Sim.IsInClinch())

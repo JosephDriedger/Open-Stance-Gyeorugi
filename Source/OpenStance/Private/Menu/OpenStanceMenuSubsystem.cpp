@@ -158,6 +158,21 @@ void UOpenStanceMenuSubsystem::StartMatch(bool bRememberCurrent)
 	}
 }
 
+void UOpenStanceMenuSubsystem::AddToScreen(UUserWidget* Widget, int32 ZOrder) const
+{
+	// In a split-screen 1P vs 2P match the HUD, pause menu and dialogs span the whole window, over both halves; otherwise
+	// player 1's screen is the whole window anyway.
+	const UGameInstance* GameInstance = GetLocalPlayer() ? GetLocalPlayer()->GetGameInstance() : nullptr;
+	if (GameInstance && GameInstance->GetNumLocalPlayers() > 1)
+	{
+		Widget->AddToViewport(ZOrder);
+	}
+	else
+	{
+		Widget->AddToPlayerScreen(ZOrder);
+	}
+}
+
 void UOpenStanceMenuSubsystem::Present(EOpenStanceMenuScreen Screen)
 {
 	RemoveDialog();
@@ -184,7 +199,7 @@ void UOpenStanceMenuSubsystem::Present(EOpenStanceMenuScreen Screen)
 		return;
 	}
 	NewScreen->InitScreen(this, Screen);
-	NewScreen->AddToPlayerScreen(ScreenZOrder);
+	AddToScreen(NewScreen, ScreenZOrder);
 	NewScreen->FocusDefault();
 	ActiveScreen = NewScreen;
 	ApplyInputMode(Screen);
@@ -229,7 +244,7 @@ void UOpenStanceMenuSubsystem::ShowDialog(FOpenStanceDialogRequest Request)
 	UOpenStanceDialogScreen* Dialog = CreateWidget<UOpenStanceDialogScreen>(Controller, UOpenStanceDialogScreen::StaticClass());
 	Dialog->InitScreen(this, EOpenStanceMenuScreen::None);
 	Dialog->SetRequest(MoveTemp(Request));
-	Dialog->AddToPlayerScreen(DialogZOrder);
+	AddToScreen(Dialog, DialogZOrder);
 	Dialog->FocusDefault();
 	DialogScreen = Dialog;
 }

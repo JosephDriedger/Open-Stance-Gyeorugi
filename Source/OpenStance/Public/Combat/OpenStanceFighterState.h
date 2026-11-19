@@ -5,6 +5,58 @@
 #include "OpenStanceFighterState.generated.h"
 
 /**
+ * Stamina rules (GDD 8.9) that designers edit without code: Project Settings > Game > Open Stance Combat. Per-technique
+ * costs live in MoveData and the dash cost in the footwork tuning. Starting values, tuned after the M2 playtests.
+ */
+USTRUCT(BlueprintType)
+struct OPENSTANCE_API FOpenStanceStaminaTuning
+{
+	GENERATED_BODY()
+
+	/** The pool at attribute 70, the Equal Terms baseline. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Stamina")
+	float BasePool = 100.0f;
+
+	/** Regeneration at attribute 70, once the fighter has gone RegenDelaySeconds without spending. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Stamina")
+	float RegenPerSecond = 15.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Stamina")
+	float RegenDelaySeconds = 1.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Stamina")
+	float LowBelow = 25.0f;
+
+	/** Below LowBelow recovery phases are 30% longer and impact 20% lower. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Stamina")
+	float LowRecoveryScale = 1.3f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Stamina")
+	float LowImpactScale = 0.8f;
+
+	/** A fake's cost as a share of the technique's. 1: the GDD gives fakes no discount; tune after playtests. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Stamina")
+	float FakeCostScale = 1.0f;
+
+	/** Raising Active Defense costs stamina like an attack (GDD 8.8). Provisional: a punch's cost. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Stamina")
+	float DefenseCost = 3.0f;
+
+	/** After LT is released no technique starts for this long, so a mistimed block leaves an opening. Provisional. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Stamina")
+	float DefenseRecoverySeconds = 0.2f;
+
+	/** An attribute's effect: one third of a percent per point from 70, so 40 is 0.9 and 100 is 1.1 (GDD 5.4). */
+	static float AttributeScale(int32 Attribute) { return 1.0f + (static_cast<float>(Attribute) - 70.0f) / 300.0f; }
+
+	/** The pool for a Stamina attribute. */
+	float GetPool(int32 StaminaAttribute) const { return BasePool * AttributeScale(StaminaAttribute); }
+
+	/** Regeneration per second for a Recovery attribute. */
+	float GetRegenPerSecond(int32 RecoveryAttribute) const { return RegenPerSecond * AttributeScale(RecoveryAttribute); }
+};
+
+/**
  * Everything the combat rules need to know about one fighter (GDD 16.3).
  *
  * Gameplay owns this state. The HUD and the debug overlay read it and never write it back, so a screen can be
@@ -18,6 +70,14 @@ struct OPENSTANCE_API FOpenStanceFighterState
 	/** Stamina is out of 100 for Equal Terms; below 25 recovery runs longer and impact drops (GDD 8.9). */
 	static constexpr float FullStamina = 100.0f;
 	static constexpr float LowStaminaBelow = 25.0f;
+
+	/** This fighter's pool: 100 under Equal Terms, the Stamina attribute's in Career (GDD 5.4, 8.9). */
+	UPROPERTY(BlueprintReadOnly, Category = "Open Stance|Fighter")
+	float MaxStamina = FullStamina;
+
+	/** Below this, recovery runs longer and impact drops. An absolute amount, not a share of the pool (GDD 8.9). */
+	UPROPERTY(BlueprintReadOnly, Category = "Open Stance|Fighter")
+	float LowStaminaThreshold = LowStaminaBelow;
 
 	UPROPERTY(BlueprintReadOnly, Category = "Open Stance|Fighter")
 	EOpenStanceStance Stance = EOpenStanceStance::RightLead;
@@ -58,7 +118,7 @@ struct OPENSTANCE_API FOpenStanceFighterState
 	UPROPERTY(BlueprintReadOnly, Category = "Open Stance|Fighter")
 	int32 GamJeom = 0;
 
-	bool IsLowStamina() const { return Stamina < LowStaminaBelow; }
+	bool IsLowStamina() const { return Stamina < LowStaminaThreshold; }
 
 	/** The leg the fighter has forward, as a body side. */
 	EOpenStanceLegSide GetLeadLeg() const { return Stance == EOpenStanceStance::LeftLead ? EOpenStanceLegSide::Left : EOpenStanceLegSide::Right; }

@@ -136,3 +136,13 @@ Resources/Previews/
 tmp/
 Models and Rigs/
 *.slnx
+
+# Local-only: credentials, IDE settings, Perforce config
+.env
+.idea/
+*.DotSettings.user
+p4config.txt
+
+# Mocap retarget outputs are large; they live in Perforce only
+Resources/Mocap/**/*.fbx
+Resources/Mocap/**/*.fbm/

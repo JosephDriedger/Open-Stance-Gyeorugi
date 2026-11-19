@@ -169,12 +169,35 @@ TSharedRef<SWidget> UOpenStanceMatchScreen::BuildScoreboard(const TWeakObjectPtr
 						[
 							MakeLiveText([Model]()
 							{
-								return Model.IsValid() ? FString::Printf(TEXT("Round %d / %d"), Model->GetRound(), UOpenStanceMatchModel::RoundCount) : FString();
+								if (!Model.IsValid())
+								{
+									return FString();
+								}
+								// Rounds won sit beside the round in a best of three, as the scoreboard scores each round on its own.
+								const FString Wins = Model->GetRoundCount() > 1
+									? FString::Printf(TEXT(" · %d–%d"), Model->GetRoundWins(EOpenStanceSide::Chung), Model->GetRoundWins(EOpenStanceSide::Hong))
+									: FString();
+								if (Model->IsInCeremony())
+								{
+									return FString(TEXT("Opening"));
+								}
+								if (Model->IsInBreak())
+								{
+									return FString::Printf(TEXT("Break%s"), *Wins);
+								}
+								return FString::Printf(TEXT("Round %d / %d%s"), Model->GetRound(), Model->GetRoundCount(), *Wins);
 							}, { EFont::BodyBold, 1.1f, 0.2f, true }, Palette::Mute)
 						]
 						+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center)
 						[
-							MakeLiveText([Model]() { return Model.IsValid() ? FormatClock(Model->GetTimeRemaining()) : FString(); },
+							MakeLiveText([Model]()
+							{
+								if (!Model.IsValid())
+								{
+									return FString();
+								}
+								return FormatClock(Model->GetBreakSecondsLeft() > 0.0f ? Model->GetBreakSecondsLeft() : Model->GetTimeRemaining());
+							},
 								{ EFont::Display, 3.4f, 0.0f, false }, Palette::Bone)
 						]
 					]
@@ -234,7 +257,7 @@ TSharedRef<SWidget> UOpenStanceMatchScreen::BuildNameplate(const TWeakObjectPtr<
 				Bar(TAttribute<float>::CreateLambda([Model, Side]() { return Model.IsValid() ? Model->GetStamina(Side) : 0.0f; }),
 					TAttribute<FLinearColor>::CreateLambda([Model, Side]()
 					{
-						return Model.IsValid() && Model->GetStamina(Side) < 0.25f ? Palette::Warn : Palette::Ok;
+						return Model.IsValid() && Model->IsLowStamina(Side) ? Palette::Warn : Palette::Ok;
 					}))
 			]
 			+ SVerticalBox::Slot().AutoHeight().HAlign(Align).Padding(0.0f, U(0.5f), 0.0f, 0.0f)

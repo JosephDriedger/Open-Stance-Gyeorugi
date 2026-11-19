@@ -27,6 +27,16 @@ struct OPENSTANCE_API FOpenStanceScoreEvent
 	bool bHead = false;
 };
 
+/** How one round went, for the scoreboard's round markers and the results page. */
+struct OPENSTANCE_API FOpenStanceRoundOutcome
+{
+	int32 Round = 1;
+	EOpenStanceSide Winner = EOpenStanceSide::Chung;
+
+	/** "Point gap", "Tie-break: head points" and so on. */
+	FString Reason;
+};
+
 DECLARE_MULTICAST_DELEGATE(FOpenStanceMatchFinished);
 
 /**
@@ -42,13 +52,25 @@ class OPENSTANCE_API UOpenStanceMatchModel : public UObject
 	GENERATED_BODY()
 
 public:
-	/** The point gap that ends a match (WT rules, GDD 4.4). */
-	static constexpr int32 PointGapToEnd = 12;
-	static constexpr int32 RoundCount = 3;
-	static constexpr float RoundSeconds = 120.0f;
+	/** The WT defaults (GDD 8.2): best of three 2:00 rounds, and a 12-point lead wins a round. Match setup may change them. */
+	static constexpr int32 DefaultPointGap = 12;
+	static constexpr int32 DefaultRoundCount = 3;
+	static constexpr float DefaultRoundSeconds = 120.0f;
 
 	UFUNCTION(BlueprintCallable, Category = "Open Stance|Match")
 	void Reset(const FString& ChungName, const FString& HongName);
+
+	/** The match's rules: 1 or 3 rounds, the round length and the point gap (0 for off). Call after Reset. */
+	void SetRules(int32 InRoundCount, float InRoundSeconds, int32 InPointGap);
+
+	/** Gameplay records how a round ended; the demo records its own. */
+	void SetRoundResult(int32 InRound, EOpenStanceSide Winner, const FString& Reason);
+
+	/** Gameplay names the match's winner and ends the match (calls ForceFinish). */
+	void SetMatchResult(EOpenStanceSide Winner, const FString& Reason);
+
+	/** Seconds left in the break between rounds or the opening ceremony; 0 while a round is on. */
+	void SetBreak(float SecondsLeft, bool bCeremony);
 
 	/** Fills in a finished example match (14 to 7) for the results page and screenshots. */
 	UFUNCTION(BlueprintCallable, Category = "Open Stance|Match")
@@ -60,8 +82,13 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Open Stance|Match")
 	void AddPoints(EOpenStanceSide Side, int32 Points, const FString& Technique, bool bHead);
 
+	/** The stamina bar's fill. Also marks low stamina below a quarter, until gameplay says otherwise with SetLowStamina. */
 	UFUNCTION(BlueprintCallable, Category = "Open Stance|Match")
 	void SetStamina(EOpenStanceSide Side, float Fraction);
+
+	/** Low stamina (GDD 8.9): the bar's warning colour and heavier breathing. */
+	void SetLowStamina(EOpenStanceSide Side, bool bLow);
+	bool IsLowStamina(EOpenStanceSide Side) const;
 
 	UFUNCTION(BlueprintCallable, Category = "Open Stance|Match")
 	void AddGamJeom(EOpenStanceSide Side, const FString& Reason);
@@ -84,14 +111,35 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Open Stance|Match")
 	const FString& GetFighterName(EOpenStanceSide Side) const;
 
+	/** The current round's score: WT scores each round on its own (GDD 8.2). */
 	UFUNCTION(BlueprintPure, Category = "Open Stance|Match")
 	int32 GetScore(EOpenStanceSide Side) const;
+
+	/** Every point across the match. */
+	int32 GetTotalScore(EOpenStanceSide Side) const;
+
+	UFUNCTION(BlueprintPure, Category = "Open Stance|Match")
+	int32 GetRoundWins(EOpenStanceSide Side) const;
+
+	/** How a round ended, or null if it has not. */
+	const FOpenStanceRoundOutcome* GetRoundOutcome(int32 InRound) const;
+
+	int32 GetRoundCount() const { return RoundCount; }
+	int32 GetPointGap() const { return PointGap; }
+	const FString& GetMatchReason() const { return MatchReason; }
+	bool IsInBreak() const { return BreakSecondsLeft > 0.0f && !bCeremony; }
+	bool IsInCeremony() const { return BreakSecondsLeft > 0.0f && bCeremony; }
+	float GetBreakSecondsLeft() const { return BreakSecondsLeft; }
 
 	UFUNCTION(BlueprintPure, Category = "Open Stance|Match")
 	float GetStamina(EOpenStanceSide Side) const;
 
+	/** Gam-jeom in the current round, where the limit counts (GDD 8.4). */
 	UFUNCTION(BlueprintPure, Category = "Open Stance|Match")
 	int32 GetGamJeom(EOpenStanceSide Side) const;
+
+	/** Gam-jeom across the match. */
+	int32 GetMatchGamJeom(EOpenStanceSide Side) const;
 
 	UFUNCTION(BlueprintPure, Category = "Open Stance|Match")
 	int32 GetVideoReviewsLeft(EOpenStanceSide Side) const;
@@ -168,9 +216,13 @@ private:
 		FString Name;
 		int32 Score = 0;
 		float Stamina = 1.0f;
+		bool bLowStamina = false;
 		int32 GamJeom = 0;
 		int32 VideoReviewsLeft = 1;
 		TArray<FString> PenaltyReasons;
+
+		/** The round of each penalty, matching PenaltyReasons. */
+		TArray<int32> PenaltyRounds;
 		int32 LastScorePoints = 0;
 		double LastScoreTime = -1000.0;
 	};
@@ -178,13 +230,25 @@ private:
 	FSideState& GetSide(EOpenStanceSide Side);
 	const FSideState& GetSide(EOpenStanceSide Side) const;
 
-	/** Ends the match once the gap is reached or the last round runs out. */
+	/** Demo only: ends the round once the gap is reached; gameplay decides rounds itself. */
 	void CheckForEnd();
+
+	/** Demo only: records the round and starts the next, or finishes the match. */
+	void EndDemoRound(EOpenStanceSide Winner, const FString& Reason);
 
 	FSideState Sides[2];
 	TArray<FOpenStanceScoreEvent> Events;
+	TArray<FOpenStanceRoundOutcome> RoundOutcomes;
+	int32 RoundCount = DefaultRoundCount;
+	float RoundSeconds = DefaultRoundSeconds;
+	int32 PointGap = DefaultPointGap;
+	bool bHasMatchResult = false;
+	EOpenStanceSide MatchWinner = EOpenStanceSide::Chung;
+	FString MatchReason;
+	float BreakSecondsLeft = 0.0f;
+	bool bCeremony = false;
 	int32 Round = 1;
-	float TimeRemaining = RoundSeconds;
+	float TimeRemaining = DefaultRoundSeconds;
 	bool bPaused = false;
 	bool bFinished = false;
 	FString CallTerm;

@@ -16,7 +16,7 @@ namespace
 	/** "Chung 0 · Hong 1 (Gam-jeom: grabbing)" */
 	FString DescribePenalties(const UOpenStanceMatchModel& Model)
 	{
-		FString Text = FString::Printf(TEXT("Chung %d · Hong %d"), Model.GetGamJeom(EOpenStanceSide::Chung), Model.GetGamJeom(EOpenStanceSide::Hong));
+		FString Text = FString::Printf(TEXT("Chung %d · Hong %d"), Model.GetMatchGamJeom(EOpenStanceSide::Chung), Model.GetMatchGamJeom(EOpenStanceSide::Hong));
 		TArray<FString> Reasons = Model.GetPenaltyReasons(EOpenStanceSide::Chung);
 		Reasons.Append(Model.GetPenaltyReasons(EOpenStanceSide::Hong));
 		if (!Reasons.IsEmpty())
@@ -41,16 +41,36 @@ TSharedRef<SWidget> UOpenStanceResultsScreen::BuildContent()
 	const FLinearColor WinnerColour = bChungWon ? Palette::Chung : Palette::Hong;
 	const FTextSpec BigSpec{ EFont::Display, 3.0f, 0.03f, false };
 
-	// Left: winner and round scores
+	// Left: winner, rounds won and each round's score, winner and how it was decided. Only rounds that were played: a
+	// best of three can end 2-0.
 	TSharedRef<SVerticalBox> RoundRows = SNew(SVerticalBox);
-	for (int32 Round = 1; Round <= UOpenStanceMatchModel::RoundCount; ++Round)
+	for (int32 Round = 1; Round <= Model.GetRoundCount(); ++Round)
 	{
+		const FOpenStanceRoundOutcome* Outcome = Model.GetRoundOutcome(Round);
+		if (!Outcome && Round > Model.GetRound())
+		{
+			break;
+		}
+		FString Label = FString::Printf(TEXT("Round %d"), Round);
+		FString Value = FString::Printf(TEXT("%d–%d"), Model.GetRoundScore(EOpenStanceSide::Chung, Round), Model.GetRoundScore(EOpenStanceSide::Hong, Round));
+		if (Outcome)
+		{
+			Value += Outcome->Winner == EOpenStanceSide::Chung ? TEXT(" Chung") : TEXT(" Hong");
+			if (Outcome->Reason != TEXT("Points"))
+			{
+				Label += FString::Printf(TEXT(" (%s)"), *Outcome->Reason.ToLower());
+			}
+		}
 		RoundRows->AddSlot().AutoHeight().Padding(0.0f, Round == 1 ? 0.0f : U(0.7f), 0.0f, 0.0f)
 		[
-			StatRow(FString::Printf(TEXT("Round %d"), Round), SNullWidget::NullWidget,
-				FString::Printf(TEXT("%d–%d"), Model.GetRoundScore(EOpenStanceSide::Chung, Round), Model.GetRoundScore(EOpenStanceSide::Hong, Round)))
+			StatRow(Label, SNullWidget::NullWidget, Value)
 		];
 	}
+	RoundRows->AddSlot().AutoHeight().Padding(0.0f, U(0.7f), 0.0f, 0.0f)
+	[
+		StatRow(TEXT("Total points"), SNullWidget::NullWidget,
+			FString::Printf(TEXT("%d–%d"), Model.GetTotalScore(EOpenStanceSide::Chung), Model.GetTotalScore(EOpenStanceSide::Hong)))
+	];
 
 	const TSharedRef<SWidget> WinnerCard = Card(TEXT("Winner"),
 		SNew(SVerticalBox)
@@ -63,7 +83,7 @@ TSharedRef<SWidget> UOpenStanceResultsScreen::BuildContent()
 			SNew(SHorizontalBox)
 			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
 			[
-				MakeText(FString::FromInt(Model.GetScore(EOpenStanceSide::Chung)), BigSpec, Palette::Chung)
+				MakeText(FString::FromInt(Model.GetRoundWins(EOpenStanceSide::Chung)), BigSpec, Palette::Chung)
 			]
 			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(U(1.6f), 0.0f)
 			[
@@ -71,7 +91,7 @@ TSharedRef<SWidget> UOpenStanceResultsScreen::BuildContent()
 			]
 			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
 			[
-				MakeText(FString::FromInt(Model.GetScore(EOpenStanceSide::Hong)), BigSpec, Palette::Hong)
+				MakeText(FString::FromInt(Model.GetRoundWins(EOpenStanceSide::Hong)), BigSpec, Palette::Hong)
 			]
 		],
 		WinnerColour);

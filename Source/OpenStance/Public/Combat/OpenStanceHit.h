@@ -41,12 +41,42 @@ struct OPENSTANCE_API FOpenStanceHitTuning
 	int32 SamplesPerTrace = 16;
 };
 
-/** A fighter's body for hit tests: the floor point under the centre, and the height. Centimetres, Z up. */
+/** One arm or leg segment of a fighter's guard, as a capsule in world space: a strike that meets it is blocked. */
+struct OPENSTANCE_API FOpenStanceLimbCapsule
+{
+	FVector A = FVector::ZeroVector;
+	FVector B = FVector::ZeroVector;
+	float Radius = 6.0f;
+};
+
+/** What the guard's limbs are doing beyond the posture itself: Active Defense moves them (GDD 8.8). */
+enum class EOpenStanceGuardCover : uint8
+{
+	/** Only the guard posture's arms (GDD 8.7). */
+	Posture,
+
+	/** LT alone: both forearms closed in front of the trunk, elbows at the flanks. */
+	Closed,
+
+	/** LT + RS Up: forearms in front of the face, upper arms beside the head. */
+	High,
+
+	/** LT + RS Down: the lead leg lifted in front of the trunk, the posture's arms kept. */
+	LegCheck
+};
+
+/** A fighter's body for hit tests: the floor point under the centre, the height, and the guard's limbs. Centimetres, Z up. */
 struct OPENSTANCE_API FOpenStanceFighterBody
 {
 	FVector Root = FVector::ZeroVector;
 	float HeightCm = 175.0f;
 	EOpenStanceSide Side = EOpenStanceSide::Chung;
+
+	/** Toward the opponent; the guard's limbs are placed from it. */
+	FVector2D Facing = FVector2D(1.0, 0.0);
+
+	/** Arms and legs in the way of a strike. Empty while the fighter is not in guard: attacking, hit or down. */
+	TArray<FOpenStanceLimbCapsule> Guard;
 };
 
 /** The path a striking limb swept this frame, in world space. */
@@ -69,7 +99,13 @@ enum class EOpenStanceContactType : uint8
 	KickBelowBelt,
 
 	/** A kick touched the trunk protector below the impact threshold: contact, but no score. */
-	WeakImpact
+	WeakImpact,
+
+	/** The strike met an arm or a leg of the defender's guard before the target: nothing registers (GDD 8.7, 8.8). */
+	Blocked,
+
+	/** The defender swayed out of line in time: the technique passed by (GDD 8.8). */
+	Evaded
 };
 
 /** One registered contact, once per technique; the match, the referee and the debug overlay all read it. */
@@ -148,11 +184,27 @@ public:
 	static EOpenStanceBodyZone FindContact(const FOpenStanceLimbTrace& Trace, const FOpenStanceFighterBody& Body, const FOpenStanceHitTuning& Tuning, FVector& OutPoint);
 
 	/**
+	 * The same, with the body's guard limbs: the first thing the sweep touches decides. An arm or leg first sets
+	 * bOutBlocked (the zone returned is the one behind it); a zone first is a hit. The alignment tolerance only nudges a
+	 * near miss into a zone when no guard limb lies between the strike and the target.
+	 */
+	static EOpenStanceBodyZone FindContact(const FOpenStanceLimbTrace& Trace, const FOpenStanceFighterBody& Body, const FOpenStanceHitTuning& Tuning, FVector& OutPoint, bool& bOutBlocked);
+
+	/**
+	 * Places a guard's arms (and a leg check's leg) on Body from its Root, Facing and HeightCm (GDD 8.7, 8.8): High has both
+	 * hands beside the head, Low both forearms at the trunk's flanks, Mixed the lead hand low and the rear hand high, Cross
+	 * the rear forearm across the front of the trunk. The middle stays open in every posture, so a straight kick gets
+	 * through; kicks that swing in from the side meet the arm on that side. bRightLead says which side is the lead.
+	 */
+	static void BuildGuard(FOpenStanceFighterBody& Body, EOpenStanceGuard Guard, EOpenStanceGuardCover Cover, bool bRightLead);
+
+	/**
 	 * The foot or glove position of a technique that is not driven by a skeleton yet (greybox, placeholder
 	 * animation): it travels along the attacker's facing out to the move's scaled reach, at the height of its target.
 	 * Progress is 0 to 1 through the active phase.
 	 */
-	static FVector SyntheticTip(const FOpenStanceFighterBody& Attacker, const FVector& FacingXY, const FOpenStanceMoveRow& Row, float Progress, const FOpenStanceHitTuning& Tuning);
+	static FVector SyntheticTip(const FOpenStanceFighterBody& Attacker, const FVector& FacingXY, const FOpenStanceMoveRow& Row, float Progress, const FOpenStanceHitTuning& Tuning,
+		EOpenStanceLegSide Leg = EOpenStanceLegSide::Right);
 
 private:
 	int32 Serial = -1;

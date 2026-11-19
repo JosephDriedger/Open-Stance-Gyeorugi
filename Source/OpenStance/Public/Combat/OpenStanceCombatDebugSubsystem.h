@@ -3,6 +3,9 @@
 #include "CoreMinimal.h"
 #include "Combat/OpenStanceMatchModelSync.h"
 #include "Combat/OpenStanceGreyboxProof.h"
+#include "Combat/OpenStanceCameraDirector.h"
+#include "Combat/OpenStanceReferee.h"
+#include "GenericPlatform/GenericPlatformInputDeviceMapper.h"
 #include "Combat/OpenStanceMatchSim.h"
 #include "Menu/OpenStanceMenuTypes.h"
 #include "Subsystems/WorldSubsystem.h"
@@ -78,6 +81,9 @@ public:
 	void SetInfiniteStamina(bool bOn);
 	void SetScoreCheat(int32 Chung, int32 Hong);
 	void SetClockCheat(float Seconds);
+
+	/** Ends the break between rounds now (local play may skip it, GDD 8.2): A in the break, or os.SkipBreak. */
+	bool SkipBreak() { return Sim.SkipBreak(); }
 	bool SetAIMode(const FString& Mode, FString& OutMessage);
 	/** Switches the match camera to a named preset (OpenStanceCameraPresets); not a cheat, the match is unchanged. */
 	bool SetCameraPreset(FName Name, FString& OutMessage);
@@ -128,7 +134,25 @@ private:
 	void BuildBodies();
 	void DestroyBodies();
 	void UpdateBodies();
+
+	/** The match referee: one of the six, placed and posed from Referee each tick, the voice line played for each call. */
+	void BuildReferee();
+	void UpdateReferee(float DeltaSeconds);
+	void PlayRefereeVoice(const FOpenStanceRefereeCall& Call);
 	FOpenStanceFighterControls PollController() const;
+
+	/** One player's pad, read through that local player's controller only, so neither player's input reaches the other. */
+	static FOpenStanceFighterControls PollPad(const APlayerController* PC);
+
+	/** 1P vs 2P on the Sparring setup (Side Select gives player 1 a side, player 2 the other). */
+	bool IsTwoPlayerMatch() const;
+
+	/** Player 2's controller, made when a 1P vs 2P match starts (no split screen: both share the match camera). */
+	APlayerController* GetPlayerTwo(bool bCreate);
+	void RemovePlayerTwo();
+
+	/** A pad dropped out mid-match: the match pauses until the player resumes it (GDD 7.10). */
+	void HandleInputDeviceConnection(EInputDeviceConnectionState NewState, FPlatformUserId User, FInputDeviceId Device);
 	FVector ToWorld(const FVector2D& Position, float Z = 0.0f) const;
 	const UDataTable* GetMoveTable();
 
@@ -139,6 +163,10 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<AActor> Camera;
+
+	/** Player 2's camera in a split-screen 1P vs 2P match: behind player 2's fighter, framed by DirectorTwo. */
+	UPROPERTY(Transient)
+	TObjectPtr<AActor> CameraTwo;
 
 	/** The solid greybox fighters: one actor each, built from the engine's basic shapes (see BuildBodies for the part order). */
 	UPROPERTY(Transient)
@@ -161,6 +189,19 @@ private:
 
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<USkeletalMeshComponent>> FighterBodies;
+
+	/** The referee (GDD 8.5, 11.2): their character and the placeholder pose clip it shows. */
+	UPROPERTY(Transient)
+	TObjectPtr<AActor> RefereeActor;
+
+	UPROPERTY(Transient)
+	TObjectPtr<USkeletalMeshComponent> RefereeBody;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UAnimSequenceBase> RefereeShownClip;
+
+	/** Voice lines that are not recorded yet, so each missing one is reported once. */
+	TSet<FName> MissingRefereeVoice;
 
 	/** The idle fighting stance, looped while a fighter is not attacking. */
 	UPROPERTY(Transient)
@@ -203,6 +244,32 @@ private:
 	int32 PrintedInputEvents = 0;
 
 	bool bPrevInvertToggle = false;
+
+	/** A was down on the last tick, so one press skips one break. */
+	bool bPrevSkipBreak = false;
+
+	/** Player 2's Menu button was down on the last tick. */
+	bool bPrevPlayerTwoMenu = false;
+
+	/** This match is 1P vs 2P: the other fighter reads player 2's pad instead of the AI. */
+	bool bTwoPlayers = false;
+
+	FDelegateHandle DeviceConnectionHandle;
+
+	/** Follows the match as the NPC referee: calls, gestures and where to stand. */
+	FOpenStanceReferee Referee;
+
+	/** Player 2's half of the split screen. */
+	FOpenStanceCameraDirector DirectorTwo;
+
+	/** Moves one match camera to its director's frame for FighterIndex: eased, or straight there on a cut. */
+	void DriveCamera(AActor* CameraActor, FOpenStanceCameraDirector& CameraDirector, int32 FighterIndex, float DeltaTime);
+
+	/** Picks and frames the match camera's shot (GDD 13): combat, ceremony, break, spin-score cuts, results. */
+	FOpenStanceCameraDirector Director;
+
+	/** The pause menu is holding the match: the camera holds too. */
+	bool bCameraHeld = false;
 	bool bAutoStartPending = false;
 	bool bShowInput = false;
 	bool bGreybox = false;

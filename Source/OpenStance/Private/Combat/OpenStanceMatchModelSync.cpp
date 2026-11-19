@@ -1,5 +1,8 @@
 #include "Combat/OpenStanceMatchModelSync.h"
 
+#include "Combat/OpenStanceMatchRules.h"
+#include "Combat/OpenStanceReferee.h"
+
 #include "Combat/OpenStanceMatchSim.h"
 #include "Combat/OpenStanceMoveData.h"
 #include "Engine/DataTable.h"
@@ -33,7 +36,14 @@ void FOpenStanceMatchModelSync::Begin(const FOpenStanceMatchSim& Sim, UOpenStanc
 	Moves = MoveTable;
 	Model.bDemoMode = false;
 	Model.Reset(ChungName, HongName);
+	Model.SetRules(Sim.RoundRules.RoundCount, Sim.RoundRules.RoundSeconds, Sim.RoundRules.GapToEnd);
 	Model.SetClock(Sim.Match.Round, Sim.Match.ClockSeconds);
+	Model.SetBreak(Sim.GetPauseSecondsLeft(), Sim.Match.State == EOpenStanceMatchState::Ready);
+	if (Sim.Match.State == EOpenStanceMatchState::Ready)
+	{
+		Model.SetCall(TEXT("CHARYEOT"), TEXT("Attention"));
+	}
+	SeenRounds = Sim.RoundHistory.Num();
 	SeenContacts = Sim.Contacts.Num();
 	SeenLog = Sim.LogEventCount;
 	SeenPenalties[0] = Sim.Fighters[0].PenaltyReasons.Num();
@@ -44,27 +54,17 @@ void FOpenStanceMatchModelSync::Update(const FOpenStanceMatchSim& Sim, UOpenStan
 {
 	// The clock and round first, so a score or penalty is filed under the round it happened in.
 	Model.SetClock(Sim.Match.Round, Sim.Match.ClockSeconds);
+	Model.SetBreak(Sim.GetPauseSecondsLeft(), Sim.Match.State == EOpenStanceMatchState::Ready);
 
 	// Referee calls, in the order they happened. The log keeps the last 200 entries, so count from the running total.
 	const int32 NewLog = FMath::Min(Sim.LogEventCount - SeenLog, Sim.Log.Num());
 	for (int32 Index = Sim.Log.Num() - NewLog; Index < Sim.Log.Num(); ++Index)
 	{
-		const FString& Text = Sim.Log[Index].Text;
-		if (Text == TEXT("kal-yeo"))
+		// The referee's call for the command, its English meaning as the subtitle (GDD 8.5, 11.2).
+		FOpenStanceRefereeCall Call;
+		if (FOpenStanceReferee::CallFor(Sim.Log[Index], Call))
 		{
-			Model.SetCall(TEXT("KAL-YEO"), TEXT("Break"));
-		}
-		else if (Text == TEXT("kye-sok"))
-		{
-			Model.SetCall(TEXT("KYE-SOK"), TEXT("Continue"));
-		}
-		else if (Text == TEXT("keu-man"))
-		{
-			Model.SetCall(TEXT("KEU-MAN"), TEXT("Stop"));
-		}
-		else if (Text == TEXT("shi-jak"))
-		{
-			Model.SetCall(TEXT("SHI-JAK"), TEXT("Begin"));
+			Model.SetCall(Call.Term, Call.Meaning);
 		}
 	}
 	SeenLog = Sim.LogEventCount;
@@ -77,6 +77,10 @@ void FOpenStanceMatchModelSync::Update(const FOpenStanceMatchSim& Sim, UOpenStan
 		{
 			Model.AddPoints(Contact.Attacker, Contact.Points, MoveName(Moves, Contact.Move), Contact.Zone == EOpenStanceBodyZone::Head);
 		}
+		else if (Contact.Type == EOpenStanceContactType::Blocked || Contact.Type == EOpenStanceContactType::Evaded)
+		{
+			Model.SetCall(Contact.Type == EOpenStanceContactType::Blocked ? TEXT("Blocked") : TEXT("Evaded"), MoveName(Moves, Contact.Move), TEXT(" · "));
+		}
 	}
 
 	// Penalties: a gam-jeom for the fighter, a point for the other (GDD 8.3, 8.4), and the referee's call.
@@ -87,18 +91,39 @@ void FOpenStanceMatchModelSync::Update(const FOpenStanceMatchSim& Sim, UOpenStan
 		{
 			Model.AddGamJeom(SideOf(Index), Reasons[SeenPenalties[Index]]);
 			Model.AddPoints(SideOf(1 - Index), 1, TEXT("Gam-jeom"), false);
-			Model.SetCall(TEXT("GAM-JEOM"), Reasons[SeenPenalties[Index]]);
+			// The point's own call would cover the referee's: the side-named GAM-JEOM is the one shown.
+			FOpenStanceMatchLogEntry Entry;
+			Entry.Side = SideOf(Index);
+			Entry.Text = TEXT("gam-jeom: ") + Reasons[SeenPenalties[Index]].ToLower();
+			FOpenStanceRefereeCall Call;
+			if (FOpenStanceReferee::CallFor(Entry, Call))
+			{
+				Model.SetCall(Call.Term, Call.Meaning);
+			}
 		}
 	}
 
 	for (int32 Index = 0; Index < 2; ++Index)
 	{
-		Model.SetStamina(SideOf(Index), Sim.Fighters[Index].State.Stamina / FOpenStanceFighterState::FullStamina);
+		const FOpenStanceFighterState& State = Sim.Fighters[Index].State;
+		Model.SetStamina(SideOf(Index), State.Stamina / FMath::Max(1.0f, State.MaxStamina));
+		// Low stamina is an absolute amount (below 25), not a share of the bar, so the simulation says when it is.
+		Model.SetLowStamina(SideOf(Index), State.IsLowStamina());
 	}
 
-	// The simulation decides when the match is over (the clock in the last round, or the 12-point gap); the HUD follows.
-	if (Sim.Match.State == EOpenStanceMatchState::Finished)
+	// Each round's result, as the simulation decided it (WT rules, GDD 8.2-8.4).
+	for (; SeenRounds < Sim.RoundHistory.Num(); ++SeenRounds)
 	{
-		Model.ForceFinish();
+		const FOpenStanceRoundResult& Result = Sim.RoundHistory[SeenRounds];
+		Model.SetRoundResult(Result.Round, Result.Winner, FOpenStanceMatchRules::Describe(Result.Reason));
+	}
+
+	// The simulation decides when the match is over and who won it; the HUD follows. ForceFinish calls keu-man, so the
+	// winner's call goes on after it.
+	if (Sim.Match.State == EOpenStanceMatchState::Finished && !Model.IsFinished())
+	{
+		Model.SetMatchResult(Sim.MatchWinner, FOpenStanceMatchRules::Describe(Sim.MatchEnd));
+		Model.SetCall(Sim.MatchWinner == EOpenStanceSide::Chung ? TEXT("CHUNG SEUNG") : TEXT("HONG SEUNG"),
+			Sim.MatchWinner == EOpenStanceSide::Chung ? TEXT("Chung wins") : TEXT("Hong wins"));
 	}
 }

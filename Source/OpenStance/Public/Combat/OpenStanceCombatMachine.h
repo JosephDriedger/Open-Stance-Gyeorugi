@@ -82,6 +82,23 @@ struct OPENSTANCE_API FOpenStanceCombatTuning
 	float LowStaminaRecoveryScale = 1.3f;
 	float LowStaminaImpactScale = 0.8f;
 
+	/** A fake costs its technique's stamina times this (FOpenStanceStaminaTuning::FakeCostScale). */
+	float FakeStaminaScale = 1.0f;
+
+	/** Raising Active Defense costs this; releasing it blocks a new technique for DefenseRecoverySeconds (GDD 8.8). */
+	float DefenseStaminaCost = 3.0f;
+	float DefenseRecoverySeconds = 0.2f;
+
+	/** Copies the stamina rules the machine applies: low-stamina scales, the fake share and the defense cost/recovery. */
+	void ApplyStamina(const FOpenStanceStaminaTuning& Stamina)
+	{
+		LowStaminaRecoveryScale = Stamina.LowRecoveryScale;
+		LowStaminaImpactScale = Stamina.LowImpactScale;
+		FakeStaminaScale = Stamina.FakeCostScale;
+		DefenseStaminaCost = Stamina.DefenseCost;
+		DefenseRecoverySeconds = Stamina.DefenseRecoverySeconds;
+	}
+
 	/**
 	 * Phases follow the montage's notifies (NotifyActiveBegin and NotifyActiveEnd) instead of MoveData's times. The
 	 * times still bound each phase at twice their length, so a missing notify cannot freeze a fighter.
