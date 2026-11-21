@@ -6,6 +6,30 @@ namespace
 {
 	constexpr int32 MaxRecentInput = 12;
 
+	/** The presses a fighter must release after play resumes before they count again (FOpenStanceFighterSim::HeldThroughLock). */
+	enum EOpenStanceHeldControl : uint8
+	{
+		HeldA = 1 << 0,
+		HeldB = 1 << 1,
+		HeldX = 1 << 2,
+		HeldY = 1 << 3,
+		HeldRightStick = 1 << 4,
+		HeldDPad = 1 << 5
+	};
+
+	/** Which edge-triggered presses are down: buttons that switch, dash, punch or prime a jump, and a Skill Stick gesture. */
+	uint8 HeldControls(const FOpenStanceFighterControls& C, float StickRelease)
+	{
+		uint8 Held = 0;
+		Held |= C.bA ? HeldA : 0;
+		Held |= C.bB ? HeldB : 0;
+		Held |= C.bX ? HeldX : 0;
+		Held |= C.bY ? HeldY : 0;
+		Held |= C.RightStick.Size() >= StickRelease ? HeldRightStick : 0;
+		Held |= C.DPad != EOpenStanceDPad::None ? HeldDPad : 0;
+		return Held;
+	}
+
 	FString ZoneName(EOpenStanceBodyZone Zone)
 	{
 		switch (Zone)
@@ -96,6 +120,8 @@ void FOpenStanceMatchSim::StartMatch(float DistanceCm)
 		F.RecentInput.Reset();
 		F.InputEventCount = 0;
 		F.bPrevPunch = false;
+		F.bInputLocked = false;
+		F.HeldThroughLock = 0;
 		F.PenaltyReasons.Reset();
 		F.LastMove = F.LastTarget = F.LastLeg = F.LastResult = TEXT("-");
 		F.PreviousStamina = F.State.Stamina;
@@ -945,8 +971,64 @@ void FOpenStanceMatchSim::StepClinch(float DeltaSeconds, const FOpenStanceFighte
 	}
 }
 
-void FOpenStanceMatchSim::Step(float DeltaSeconds, const FOpenStanceFighterControls& Chung, const FOpenStanceFighterControls& Hong)
+void FOpenStanceMatchSim::LockInput()
 {
+	for (FOpenStanceFighterSim& F : Fighters)
+	{
+		F.bInputLocked = true;
+	}
+}
+
+FOpenStanceFighterControls FOpenStanceMatchSim::GateControls(int32 Index, const FOpenStanceFighterControls& Raw)
+{
+	FOpenStanceFighterSim& F = Fighters[Index];
+	if (!Match.IsPlayLive())
+	{
+		if (!F.bInputLocked)
+		{
+			// Play has stopped: a dash or tapped step under way ends where it is, not carried through the stop.
+			F.bInputLocked = true;
+			F.Motion.DashRemaining = 0.0f;
+			F.Motion.StepRemainingCm = 0.0f;
+			F.Motion.bMoveHeld = false;
+		}
+		return FOpenStanceFighterControls();
+	}
+
+	const float StickRelease = F.Recognizer.Config.GetRelease();
+	if (F.bInputLocked)
+	{
+		// Shi-jak or kye-sok: whatever is already pressed waits for its release.
+		F.bInputLocked = false;
+		F.HeldThroughLock = HeldControls(Raw, StickRelease);
+	}
+	if (F.HeldThroughLock == 0)
+	{
+		return Raw;
+	}
+
+	F.HeldThroughLock &= HeldControls(Raw, StickRelease);
+	FOpenStanceFighterControls Gated = Raw;
+	const uint8 Held = F.HeldThroughLock;
+	Gated.bA = Raw.bA && !(Held & HeldA);
+	Gated.bB = Raw.bB && !(Held & HeldB);
+	Gated.bX = Raw.bX && !(Held & HeldX);
+	Gated.bY = Raw.bY && !(Held & HeldY);
+	if (Held & HeldRightStick)
+	{
+		Gated.RightStick = FVector2D::ZeroVector;
+	}
+	if (Held & HeldDPad)
+	{
+		Gated.DPad = EOpenStanceDPad::None;
+	}
+	return Gated;
+}
+
+void FOpenStanceMatchSim::Step(float DeltaSeconds, const FOpenStanceFighterControls& ChungRaw, const FOpenStanceFighterControls& HongRaw)
+{
+	const FOpenStanceFighterControls Chung = GateControls(0, ChungRaw);
+	const FOpenStanceFighterControls Hong = GateControls(1, HongRaw);
 	Time += DeltaSeconds;
 	StepFighter(0, DeltaSeconds, Chung);
 	StepFighter(1, DeltaSeconds, Hong);
@@ -1084,6 +1166,37 @@ void FOpenStanceMatchSim::FinishMatch(EOpenStanceSide Winner, EOpenStanceRoundEn
 	AddLog(EOpenStanceSide::Chung, TEXT("kyeongrye"));
 }
 
+void FOpenStanceMatchSim::ResetFighterForRound(int32 Index)
+{
+	FOpenStanceFighterSim& F = Fighters[Index];
+
+	// A kick, reaction or knockdown the last round ended in does not carry into this one: the fighter starts standing in guard.
+	TArray<FOpenStanceCombatEvent> Ignored;
+	F.Machine.ResetForRound(F.State, Ignored);
+	F.Recognizer.Reset(F.State);
+	F.bContactThisAttack = false;
+	F.bPrevPunch = false;
+
+	// The feet start still on the mark: no dash, step, sway or side switch half done, and no leg left raised.
+	FOpenStanceMotionState& M = F.Motion;
+	M.Velocity = FVector2D::ZeroVector;
+	M.DashRemaining = 0.0f;
+	M.StepRemainingCm = 0.0f;
+	M.bMoveHeld = false;
+	if (M.bSwitching)
+	{
+		// A switch ends where it is: past halfway the stance has already swapped, before it the fighter keeps the old one.
+		M.bSwitching = false;
+		M.SwitchElapsed = 0.0f;
+		M.SwitchBlend = 1.0f;
+	}
+	M.GuardTransitionLeft = 0.0f;
+	M.bLegRaised = false;
+	F.Guarding = EOpenStanceGuarding::ClosedGuard;
+	F.GuardingElapsed = 0.0f;
+	F.SwayElapsed = 0.0f;
+}
+
 void FOpenStanceMatchSim::StartRound()
 {
 	// The next round: a full clock, the round's score and gam-jeom back to zero, stamina refilled and the fighters on their
@@ -1103,6 +1216,7 @@ void FOpenStanceMatchSim::StartRound()
 		F.SinceSpend = 0.0f;
 		F.Motion.Position = FVector2D(bChung ? -StartDistanceCm * 0.5 : StartDistanceCm * 0.5, 0.0);
 		F.Motion.Facing = FVector2D(bChung ? 1.0 : -1.0, 0.0);
+		ResetFighterForRound(Index);
 	}
 	SyncFighterNumbers();
 	RestartPassivity();

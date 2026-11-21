@@ -345,6 +345,97 @@ bool FOpenStanceMatchRulesClockTest::RunTest(const FString& Parameters)
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FOpenStanceMatchRulesInputGateTest, "OpenStance.Match.InputOnlyInPlay", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FOpenStanceMatchRulesInputGateTest::RunTest(const FString& Parameters)
+{
+	// The ceremony: walking, dashing, switching and guard changes do nothing, and A held through shi-jak does not switch.
+	{
+		FRulesRig Rig([](FOpenStanceRoundTuning& Rules) { Rules = FOpenStanceRoundTuning(); });
+		const EOpenStanceStance Stance = Rig.Sim.Fighters[0].State.Stance;
+		const EOpenStanceGuard Guard = Rig.Sim.Fighters[0].State.Guard;
+		Rig.Chung.LeftStick = FVector2D(0.0, 1.0);
+		Rig.Chung.bB = true;
+		Rig.Chung.bA = true;
+		Rig.Chung.DPad = EOpenStanceDPad::Down;
+		Rig.Run(1.0f);
+		Rig.Chung.LeftStick = FVector2D::ZeroVector;
+		Rig.Chung.bB = false;
+		Rig.Chung.DPad = EOpenStanceDPad::None;
+		TestEqual(TEXT("no step in the ceremony"), static_cast<float>(Rig.Sim.Fighters[0].Motion.Position.X), -100.0f, 0.5f);
+		TestEqual(TEXT("no dash stamina in the ceremony"), Rig.Sim.Fighters[0].State.Stamina, FOpenStanceFighterState::FullStamina);
+		TestEqual(TEXT("no guard change in the ceremony"), Rig.Sim.Fighters[0].State.Guard, Guard);
+		Rig.Run(4.0f);
+		TestEqual(TEXT("play is running"), Rig.Sim.Match.State, EOpenStanceMatchState::Running);
+		TestFalse(TEXT("A held through shi-jak does not switch"), Rig.Sim.Fighters[0].Motion.bSwitching);
+		TestEqual(TEXT("the stance holds"), Rig.Sim.Fighters[0].State.Stance, Stance);
+		Rig.Chung.bA = false;
+		Rig.Run(0.1f);
+		Rig.Chung.bA = true;
+		Rig.Run(0.05f);
+		TestTrue(TEXT("a fresh A press switches in play"), Rig.Sim.Fighters[0].Motion.bSwitching);
+	}
+
+	// A referee stop: a dash under way stops where it is and the stick moves no one; play back, the stick works again.
+	{
+		FRulesRig Rig;
+		Rig.Chung.bB = true;
+		Rig.Run(1.0f / 60.0f);
+		Rig.Chung.bB = false;
+		Rig.Sim.Match.State = EOpenStanceMatchState::Stopped;
+		Rig.Run(1.0f / 60.0f);
+		const double Stopped = Rig.Sim.Fighters[0].Motion.Position.X;
+		Rig.Chung.LeftStick = FVector2D(0.0, -1.0);
+		Rig.Run(1.0f);
+		TestEqual(TEXT("nobody moves in a stop"), static_cast<float>(Rig.Sim.Fighters[0].Motion.Position.X), static_cast<float>(Stopped), 0.5f);
+		Rig.Sim.Match.State = EOpenStanceMatchState::Running;
+		Rig.Run(0.5f);
+		TestTrue(TEXT("the stick held through kye-sok moves the fighter"), Rig.Sim.Fighters[0].Motion.Position.X < Stopped - 10.0);
+	}
+
+	// The pause menu: A on Resume and a stick flick to move through the menu do not switch or kick when play comes back.
+	{
+		FRulesRig Rig;
+		const EOpenStanceStance Stance = Rig.Sim.Fighters[0].State.Stance;
+		Rig.Sim.LockInput();
+		Rig.Chung.bA = true;
+		Rig.Chung.RightStick = FVector2D(0.0, 1.0);
+		Rig.Run(0.3f);
+		TestFalse(TEXT("A from Resume does not switch"), Rig.Sim.Fighters[0].Motion.bSwitching);
+		TestEqual(TEXT("the stance holds after the pause"), Rig.Sim.Fighters[0].State.Stance, Stance);
+		TestEqual(TEXT("the menu's stick throws nothing"), Rig.Sim.Fighters[0].State.CombatState, EOpenStanceCombatState::IdleMovement);
+		Rig.Chung.bA = false;
+		Rig.Chung.RightStick = FVector2D::ZeroVector;
+		Rig.Run(0.1f);
+		Rig.Chung.bA = true;
+		Rig.Run(0.05f);
+		TestTrue(TEXT("a fresh A press switches after the pause"), Rig.Sim.Fighters[0].Motion.bSwitching);
+	}
+
+	// The break: no input reaches the fighters, and a kick the round ended in does not carry into the next.
+	{
+		FRulesRig Rig([](FOpenStanceRoundTuning& Rules) { Rules.BreakSeconds = 60.0f; });
+		Rig.Sim.SetScore(2, 0);
+		Rig.Sim.ThrowMove(1, TEXT("Roundhouse_Head"), EOpenStanceLegSide::Right);
+		Rig.Sim.SetClock(0.05f);
+		Rig.Run(0.1f);
+		TestEqual(TEXT("in the break"), Rig.Sim.Match.State, EOpenStanceMatchState::RoundBreak);
+		Rig.Hong.LeftStick = FVector2D(1.0, 0.0);
+		Rig.Hong.bX = true;
+		Rig.Run(1.0f);
+		TestEqual(TEXT("no punch in the break"), Rig.Sim.Fighters[1].State.CombatState, EOpenStanceCombatState::IdleMovement);
+		TestEqual(TEXT("no circling in the break"), static_cast<float>(Rig.Sim.Fighters[1].Motion.Position.Y), 0.0f, 0.5f);
+		Rig.Hong.LeftStick = FVector2D::ZeroVector;
+		Rig.Sim.SkipBreak();
+		Rig.Run(1.0f / 60.0f);
+		TestEqual(TEXT("round 2"), Rig.Sim.Match.Round, 2);
+		TestEqual(TEXT("starts standing in guard"), Rig.Sim.Fighters[1].State.CombatState, EOpenStanceCombatState::IdleMovement);
+		TestTrue(TEXT("with no technique left over"), Rig.Sim.Fighters[1].Machine.GetCurrentAttack() == nullptr);
+		Rig.Run(0.5f);
+		TestEqual(TEXT("X held through shi-jak throws nothing"), Rig.Sim.Fighters[1].State.CombatState, EOpenStanceCombatState::IdleMovement);
+	}
+	return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FOpenStanceMatchRulesModelTest, "OpenStance.Match.ModelFollowsRounds", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
 bool FOpenStanceMatchRulesModelTest::RunTest(const FString& Parameters)
 {
