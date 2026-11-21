@@ -169,6 +169,15 @@ struct OPENSTANCE_API FOpenStanceFighterSim
 	/** X was down on the last step, so a held button throws one punch. */
 	bool bPrevPunch = false;
 
+	/** Play was not live on the last step (ceremony, referee stop, break, finished), so the controls were ignored. */
+	bool bInputLocked = false;
+
+	/**
+	 * Presses (EOpenStanceHeldControl bits) still down from before play went live again. Each is ignored until released,
+	 * so a button or stick held through kye-sok or the break skip cannot fire on the first frame of play.
+	 */
+	uint8 HeldThroughLock = 0;
+
 	/** Why each of this fighter's gam-jeom was given across the match, oldest first, for the HUD and the results page. */
 	TArray<FString> PenaltyReasons;
 
@@ -318,7 +327,21 @@ public:
 	 */
 	void StartMatch(float DistanceCm = 200.0f);
 
+	/**
+	 * One fixed step. The controls only reach the fighters while play is live (Running): through the opening ceremony,
+	 * a referee stop, the break and after the match they are ignored, and a press held over the moment play resumes
+	 * counts only once it has been released.
+	 */
 	void Step(float DeltaSeconds, const FOpenStanceFighterControls& Chung, const FOpenStanceFighterControls& Hong);
+
+	/** The controls fighter Index acts on this step: Raw while play is live, nothing otherwise (see Step). */
+	FOpenStanceFighterControls GateControls(int32 Index, const FOpenStanceFighterControls& Raw);
+
+	/**
+	 * The pause menu is open: the presses that work the menu (A on Resume, the stick and D-pad) must not reach the
+	 * fighters when play comes back, so each counts again only once released, as after a referee stop.
+	 */
+	void LockInput();
 
 	/** Local play may skip the break between rounds (GDD 8.2): the next round starts on the next step. */
 	bool SkipBreak();
@@ -354,6 +377,9 @@ private:
 	void FinishMatch(EOpenStanceSide Winner, EOpenStanceRoundEnd Reason);
 	void StartRound();
 	void SyncFighterNumbers();
+
+	/** Clears what fighter Index was doing when the last round ended: technique, reaction, dash, step, switch, guard. */
+	void ResetFighterForRound(int32 Index);
 
 	/** The penalties found by watching the fighters: boundary, turning away, crouching, leg lifting, passivity (GDD 8.4). */
 	void StepPenalties(float DeltaSeconds);

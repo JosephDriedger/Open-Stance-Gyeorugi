@@ -1448,6 +1448,11 @@ void UOpenStanceCombatDebugSubsystem::Tick(float DeltaTime)
 	}
 	const bool bHeld = Model && Model->IsPaused();
 	bCameraHeld = bHeld;
+	if (bHeld)
+	{
+		// The pad is working the pause menu: whatever is still pressed when it closes waits for its release.
+		Sim.LockInput();
+	}
 
 	// A fixed step keeps the simulation the same whatever the frame rate, and slomo scales DeltaTime for free.
 	Accumulator = bHeld ? 0.0f : Accumulator + FMath::Min(DeltaTime, 0.1f);

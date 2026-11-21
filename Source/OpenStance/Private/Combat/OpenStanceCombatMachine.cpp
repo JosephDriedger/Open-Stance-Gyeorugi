@@ -286,6 +286,22 @@ bool FOpenStanceCombatMachine::CanScore(const FOpenStanceFighterState& State, co
 	return State.CombatState == S::AttackActive && bHasAttack && !Attack.bFake && Match.IsPlayLive();
 }
 
+void FOpenStanceCombatMachine::ResetForRound(FOpenStanceFighterState& State, TArray<FOpenStanceCombatEvent>& OutEvents)
+{
+	if (State.CombatState == S::MatchFinished)
+	{
+		return;
+	}
+	EndAttack();
+	CooldownLeft = 0.0f;
+	Cause = EOpenStanceKnockdownCause::None;
+	if (State.CombatState != S::IdleMovement)
+	{
+		Enter(S::IdleMovement, State, OutEvents, true);
+	}
+	Elapsed = 0.0f;
+}
+
 float FOpenStanceCombatMachine::GetImpactScale(const FOpenStanceFighterState& State) const
 {
 	return State.IsLowStamina() ? Tuning.LowStaminaImpactScale : 1.0f;

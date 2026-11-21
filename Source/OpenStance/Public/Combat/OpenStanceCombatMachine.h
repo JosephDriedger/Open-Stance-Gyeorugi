@@ -174,6 +174,13 @@ public:
 
 	bool IsCancelWindowOpen(const FOpenStanceFighterState& State) const;
 
+	/**
+	 * A new round: whatever the fighter was doing (a technique, a reaction, down on the mat) ends, and the fighter stands
+	 * idle with no cooldown. The attack serial keeps counting so the animation side never mistakes the next technique for
+	 * an old one. Does nothing once the match is finished.
+	 */
+	void ResetForRound(FOpenStanceFighterState& State, TArray<FOpenStanceCombatEvent>& OutEvents);
+
 private:
 	bool Enter(EOpenStanceCombatState To, FOpenStanceFighterState& State, TArray<FOpenStanceCombatEvent>& OutEvents, bool bForce = false);
 	float GetStateDuration(const FOpenStanceFighterState& State) const;
